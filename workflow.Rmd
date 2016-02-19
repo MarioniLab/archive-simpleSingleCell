@@ -23,6 +23,12 @@ opts_chunk$set(fig.width=7, fig.height=7)
 opts_chunk$set(dpi=300, dev="png", dev.args=list(pointsize=15))
 ```
 
+```{r, message=FALSE, echo=FALSE, results='hide'}
+library(scran)
+library(DESeq2)
+library(edgeR)
+```
+
 # Introduction
 
 Single-cell RNA sequencing (scRNA-seq) is widely used to measure the genome-wide expression profile of individual cells.
@@ -50,16 +56,150 @@ The aim is to provide a variety of usage examples that can be applied to constru
 
 Need to decide what data set to use here. Hopefully can use Antonio's gastrulation stuff.
 
-# Additional details on specific analysis steps
+# Choosing between normalization with and without spike-ins
 
-## Choosing between normalization with and without spike-ins
+## Overview
+Scaling normalization strategies for scRNA-seq data can be broadly divided into two classes.
+The first class assumes that there exists a subset of genes that are not differentially expressed between samples.
+This subset can be manually specified to contain house-keeping genes, or it can be empirically identified under the assumption that most genes are not DE [@anders2010differential;@robinson2010scaling].
+Any systematic difference in the counts across the non-DE subset is treated as technical bias and is eliminated by scaling.
+The second class of normalization strategies uses spike-in RNA of known composition and abundance.
+Specifically, the same quantity of spike-in RNA is added to each cell, captured into libraries and sequenced along with endogenous transcripts [@stegle2015computational].
+Differences in the coverage of the spike-in transcripts can only be due to cell-specific biases, e.g., in capture efficiency or sequencing depth.
+Scaling normalization is then applied to equalize spike-in coverage across cells.
 
+The choice between these two normalization strategies depends on the biology of the cells and the features of interest.
+If there is no reliable house-keeping set, and if the majority of genes are expected to be DE, then spike-in normalization may be the only option for removing technical biases.
+Spike-in normalization should also be used if differences in the total RNA content of individual cells are of interest.
+This is because the same amount of spike-in RNA is added to each cell, such that the relative quantity of endogenous RNA can be easily quantified in each cell.
+For non-DE normalization, any change in total RNA content will affect all genes in the non-DE subset, such that it will be treated as bias and removed.
+(This may be desirable if changes in total content are _not_ interesting.)
+Similarly, if spike-ins are not present or if they cannot be added to each cell in a reliable manner, then non-DE normalization should be applied.
 
+## Computing size factors for spike-in normalization
+
+The use of spike-in normalization can be demonstrated on a simple data set comparing mESCs and mouse embryonic fibroblasts (MEFs) [@islam2011characterization].
+A constant quantity of synthetic spike-in RNA was added to each cell, and spike-in transcripts were sequenced and counted along with transcripts from endogenous genes.
+Quantification of gene expression was performed in this manner for 48 mESCs, 44 MEFs and 4 negative controls.
+We obtain a table of read counts from NCBI GEO using the accession GSE29087, and load them into a `SummarizedExperiment` object for further manipulation.
+
+```{r}
+counts <- read.table("GSE29087_L139_expression_tab.txt.gz", skip=6, 
+    sep='\t', row.names=1)[,-c(1:6)]
+is.spike <- grepl("SPIKE", rownames(counts))
+sum(is.spike)
+library(scran)
+y <- countsToSE(counts[!is.spike,], counts[is.spike,])
+y$grouping <- factor(rep(c("mESC", "MEF", "Neg"), c(48, 44, 4)))
+dim(y)
+```
+
+We remove low-quality libraries that have low total counts for the endogenous genes or high proportions of reads mapped to genes on the mitochondrial genome.
+This removes a number of libraries, including those for the negative controls.
+We also remove lowly expressed genes with an average count below 1.
+
+```{r}
+totals <- colSums(assay(y))
+is.mito <- grepl("^mt-", rownames(y))
+okay.libs <- totals >= 1e5 & colSums(assay(y)[is.mito,])/totals < 0.1 
+y <- y[,okay.libs]
+sum(okay.libs)
+keep.gene <- rowMeans(assay(y)) >= 1
+y <- y[keep.gene,] 
+sum(keep.gene)
+```
+
+We compute size factors using the `normalizeBySpikes` function.
+The size factor for each cell is proportional to the total number of reads mapped to spike-in transcripts.
+The aim is to normalize the counts such that the total spike-in coverage is the same across cells.
+These values are stored in the `SummarizedExperiment` object as previously described, and downstream analyses can be applied.
+
+```{r}
+sf.spike <- normalizeBySpikes(y)
+y$size.factor <- sf.spike
+````
+
+Note that mESCs have consistently larger size factors compared to MEFs.
+This is due to the fact that the former contain substantially less endogenous RNA than the latter [@islam2011characterization].
+Larger size factors result in smaller normalized expression values for mESCs compared to MEFs, reflecting the decrease in total RNA content in the former.
+These differences are lost when a normalization method based on a non-DE majority is applied, such as that in the `r Biocpkg("DESeq2")` package [@anders2010differential].
+
+```{r}
+y$grouping <- droplevels(y$grouping)
+boxplot(split(sf.spike, y$grouping), log="y", cex.axis=1.2, cex.lab=1.4)
+library(DESeq2)
+y2 <- y
+y2$size.factor <- estimateSizeFactorsForMatrix(assay(y2))
+boxplot(split(y2$size.factor, y$grouping), log="y", cex.axis=1.2, 
+    cex.lab=1.4, ylim=range(sf.spike))
+```
+
+## Effect of spike-in normalization on downstream analyses
+
+Preservation of differences in total RNA content has some notable implications for downstream analyses.
+For DEG detection between cell types, the change in total RNA content will be incorporated into the log-fold change.
+This means that more DEGs are generally detected upon spike-in normalization compared to normalization based on a non-DE majority.
+In addition, there tends to be a greater imbalance in the number of up- and downregulated genes, as the change in total RNA content occurs in one direction for all genes.
+This is demonstrated below by comparing the DE results between the two normalization strategies. 
+
+```{r}
+library(edgeR)
+d <- DGEList(assay(y, "counts"))
+d$offset <- log(y$size.factor)
+design <- model.matrix(~y$grouping)
+d <- estimateDisp(d, design)
+fit <- glmFit(d, design)
+res <- glmLRT(fit)
+summary(decideTestsDGE(res))
+d2 <- d
+d2$offset <- log(y2$size.factor)
+d2 <- estimateDisp(d2, design)
+fit2 <- glmFit(d2, design)
+res2 <- glmLRT(fit2)
+summary(decideTestsDGE(res2))
+```
+
+One might question the relevance of DE that is driven by changes in total RNA content between cell types.
+Clearly, however, there will be a change in transcript abundance when the total amount of RNA in each cell changes.
+Thus, from a technical perspective, the detection of DE for those genes is appropriate.
+Biologically, the relevance of DE would depend on whether an increase in transcript molecules results in more molecular activity, e.g., due to increased production of protein product.
+While this relation seems trivially true, it is easy to imagine situations where it is not the case, e.g., when the translation machinery is saturated such that a global increase in transcript molecules has no effect.
+
+<!-- Also, if there's variability in cell sizes within groups, this'll reduce power to detect DEGs. -->
+
+For HVG detection, any variability in total RNA content is incorporated into the variance of each gene.
+This means that it will increase the size of the biological component of the variance.
+However, the magnitude of the increase will be the same for each gene as the variance of RNA content is constant.
+As such, even though the biological component will increase, the ranking of HVGs will be largely preserved. 
+
+```{r}
+y <- normalize(y)
+trend <- trendVar(y, trend="loess", span=0.8)
+components <- decomposeVar(y, trend)
+y2 <- normalize(y2)
+trend2 <- trendVar(y2, trend="loess", span=0.8)
+components2 <- decomposeVar(y2, trend2)
+```
+
+Most dimensionality reduction and clustering procedures tend to be robust to the choice of normalization method.
+This is because cells with different RNA content also tend to have different transcript compositions.
+Thus, they would be (correctly) separated based on their gene expression profiles, regardless of whether changes in total RNA content were preserved after normalization.
+Indeed, correlation-based methods are completely insensitive to normalization as the value of the correlation is not dependent on the scaling of expression values within each cell.
+
+```{r, fig.width=12, fig.height=6}
+par(mfrow=c(1,2))
+col <- c("red", "blue")[y$grouping]
+out <- prcomp(t(assay(y, "exprs")), scale.=TRUE)
+plot(out$x[,1], out$x[,2], col=col, pch=16, xlab="PC1", ylab="PC2")
+out2 <- prcomp(t(assay(y2, "exprs")), scale.=TRUE)
+plot(out2$x[,1], out2$x[,2], col=col, pch=16, xlab="PC1", ylab="PC2")
+```
 
 ## Classifying cells into cell cycle phases
 
 ## Detecting DEGs between pre-defined groups of cells
 
+# Conclusions
 
 # Software availability
 
