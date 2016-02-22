@@ -78,10 +78,10 @@ Each row of the matrix represents an endogenous gene or a spike-in transcript, a
 
 ```{r}
 library(R.utils)
-gunzip("GSE61533_HTSEQ_count_results.xls.gz", remove=FALSE)
+gunzip("GSE61533_HTSEQ_count_results.xls.gz", remove=FALSE, overwrite=TRUE)
 library(gdata)
 all.counts <- read.xls('GSE61533_HTSEQ_count_results.xls', sheet=1, header=TRUE, row.names=1)
-dim(incoming)
+dim(all.counts)
 ```
 
 Rows corresponding to spike-in transcripts are identified by the `ERCC` prefix in the row names.
@@ -100,7 +100,7 @@ These can be identified as those cells with low library sizes, i.e., a low sum o
 In general, any cell with a library size that is an order of magnitude lower than the median across all cells can be considered to be of low quality and removed.
 
 ```{r}
-keep <- y$lib.size >= median(totals)/10
+keep <- y$lib.size >= median(y$lib.size)/10
 y <- y[,keep]
 sum(keep)
 ```
@@ -177,8 +177,7 @@ All genes are scaled to have unit variances to ensure that low-abundance genes w
 
 ```{r pcaplot, fig.cap="PCA plot constructed from normalized log-expression values, where each point represents a cell in the HSC data set."}
 out <- prcomp(t(assay(y, "exprs")), scale.=TRUE)
-plot(out$x[,1], out$x[,2], xlab="PC1", ylab="PC2", pch=16, 
-    main="Expression values", cex.axis=1.2, cex.lab=1.4, main="")
+plot(out$x[,1], out$x[,2], xlab="PC1", ylab="PC2", pch=16, cex.axis=1.2, cex.lab=1.4)
 ```
 
 Alternatively, the PCA plot can be constructed from a matrix of correlations between cells. 
@@ -189,8 +188,8 @@ Scaling of the variances is not performed here as the correlation patterns are d
 
 ```{r pcacorplot, fig.cap="PCA plot constructed from a matrix of Spearman rank correlations between cells, where each point represents a cell in the HSC data set."}
 cor.mat <- cor(assay(y, "exprs"), method="spearman")
-out <- prcomp(cor.mat, scale.=TRUE)
-plot(out$x[,1], out$x[,2], xlab="PC1", ylab="PC2", pch=16, main="Correlations")
+out <- prcomp(cor.mat)
+plot(out$x[,1], out$x[,2], xlab="PC1", ylab="PC2", pch=16, cex.axis=1.2, cex.lab=1.4)
 ```
 
 Another popular approach to dimensionality reduction is the _t_-stochastic neighbour embedding (_t_-SNE) method [@van2008visualizing].
@@ -204,19 +203,18 @@ set.seed(100)
 par(mfrow=c(1,3), cex.axis=1.2, cex.lab=1.3, cex.main=1.4)
 transposed <- t(assay(y, "exprs"))
 out <- Rtsne(transposed, perplexity=5)
-plot(out$Y[,1], out$Y[,2], xlab="t-SNE1", ylab="t-SNE2", main="Perplexity=5", pch=16)
+plot(out$Y[,1], out$Y[,2], xlab="t-SNE1", ylab="t-SNE2", main="Perplexity = 5", pch=16)
 out <- Rtsne(transposed, perplexity=10)
-plot(out$Y[,1], out$Y[,2], xlab="t-SNE1", ylab="t-SNE2", main="Perplexity=10", pch=16)
+plot(out$Y[,1], out$Y[,2], xlab="t-SNE1", ylab="t-SNE2", main="Perplexity = 10", pch=16)
 out <- Rtsne(transposed, perplexity=20)
-plot(out$Y[,1], out$Y[,2], xlab="t-SNE1", ylab="t-SNE2", main="Perplexity=20", pch=16)
+plot(out$Y[,1], out$Y[,2], xlab="t-SNE1", ylab="t-SNE2", main="Perplexity = 20", pch=16)
 ```
 
 In general, _t_-SNE tends to work better than PCA for large data sets with complex substructure.
 However, this comes at the cost of more computational effort and complexity.
 For this particular data set, both methods suggest that there is no strong partionining into distinct subpopulations.
 Of course, there are many dimensionality reduction techniques that we have not considered here but could also be used, e.g., multidimensional scaling.
-Greater resolution of differences can also be achieved by applying these methods on expression values for a selected set of HVGs.
-This focuses on genes that are driving heterogeneity and potential substructure. 
+Greater resolution of differences can also be achieved by applying these methods on expression values for HVGs -- this will be discussed in further detail below.
 
 ## Classification of cell cycle phase 
 
@@ -306,10 +304,10 @@ Negatively correlated pairs may be particularly useful in this respect, as they 
 Larger sets of correlated genes can be assembled by treating genes as nodes in a graph and each pair of genes with significantly large correlations as an edge.
 In this manner, an undirected graph can be constructed using methods in the `r Biocpkg("RBGL")` package.
 Highly connected subgraphs can then be identified and defined as gene sets.
-This provides a convenient summary of the gene-gene correlation structure in this data set.
+This provides a convenient summary of the pairwise correlations between genes.
 
-```{r}
-require(RBGL)
+```{r, message=FALSE}
+library(RBGL)
 sig.cor <- var.cor$FDR <= 0.05
 g <- ftM2graphNEL(cbind(var.cor$gene1, var.cor$gene2)[sig.cor,], W=NULL, V=NULL, edgemode="undirected")
 cl <- highlyConnSG(g)$clusters
