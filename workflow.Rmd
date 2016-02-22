@@ -320,20 +320,73 @@ cl
 
 ## Using correlated HVGs for further data exploration
 
-```{r}
-# Looking at the top genes.
+The presence of subpopulations can be visually determined with a simple heatmap of gene expression in each cell.
+We focus on the significantly correlated HVGs for which any substructure should be most pronounced.
+All expression values are mean-centred for each gene to highlight the relative expression between cells.
+The heatmap itself is then constructed using the `heatmap.2` function from the `r CRANpkg("gplots")` package.
+
+```{r heatmap, message=FALSE, fig.width=7, fig.height=10, fig.cap="Heatmap of mean-centred normalized log-expression values for correlated HVGs in the HSC data set. Dendrograms are formed by hierarchical clustering with complete linkage on the Euclidean distances between genes (row) or cells (column)."}
 heat.vals <- assay(y, "exprs")
 heat.vals <- heat.vals - rowMeans(heat.vals)
-is.sig <- var.cor$FDR <= 0.05 
-chosen <- unique(c(var.cor$gene1[is.sig], var.cor$gene2[is.sig]))
-require(gplots)
-pdf("out.pdf", height=12, width=6)
+chosen <- unique(c(var.cor$gene1[sig.cor], var.cor$gene2[sig.cor]))
+library(gplots)
+heatmap.2(heat.vals[chosen,], col=bluered, symbreak=TRUE, trace='none', cexRow=0.8)
+```
+
+We recommend storing the heatmap at a sufficiently high resolution so that the relevant genes can be easily identified for further examination.
+A close look suggests that a H2-Aa/Cd74-expressing subpopulation exists alongside a Fos/Jun-negative subpopulation.
+This may be biologically relevant to the differentiation and maintenance of HSCs --
+    H2-Aa and Cd74 are components of the class II major histocompatibility complex, while Fos and Jun are involved in cell proliferation [@angel1991role].
+
+```{r, results='hide'}
+pdf("hsc_heat.pdf", height=12, width=6)
 heatmap.2(heat.vals[chosen,], col=bluered, symbreak=TRUE, trace='none', cexRow=0.5)
 dev.off()
 ```
 
+As previously mentioned, dimensionality reduction can be applied using only the set of HVGs to highlight any substructure that might be present.
+This is shown below for both PCA and _t_-SNE plots, though in this case, focusing on HVGs does not provide any additional separation into distinct subpopulations.
 
+```{r pcaredux, fig.width=10, fig.height=6, fig.cap="PCA (left) and _t_-SNE plots (right) using only the expression values for significantly correlated HVGs in the HSC data set."}
+par(mfrow=c(1,2), cex.axis=1.2, cex.lab=1.3, cex.main=1.4, mar=c(5.1, 5.1, 4.1, 1.1))
+out <- prcomp(t(assay(y, "exprs")[chosen,]), scale.=TRUE)
+plot(out$x[,1], out$x[,2], xlab="PC1", ylab="PC2", pch=16)
+set.seed(100)
+out <- Rtsne(t(assay(y, "exprs")[chosen,]), perplexity=10)
+plot(out$Y[,1], out$Y[,2], xlab="t-SNE1", ylab="t-SNE2", pch=16)
+```
 
+Finally, subpopulations of cells can be explicitly defined with clustering algorithms.
+Here, hierarchical clustering is used to construct a dendrogram, with 1 minus the rank correlation as the dissimilarity measure between each pair of cells.
+A dynamic tree cut is then performed to define the clusters, using the `cutreeDynamic` function in the `r CRANpkg("dynamicTreeCut")` package [@langfelder2008defining].
+Again, we focus on correlated HVGs for which subpopulation-specific expression patterns should be the most pronounced.
+
+```{r}
+my.dist <- as.dist(1 - cor(assay(y, "exprs")[chosen,], method="spearman"))
+my.tree <- hclust(my.dist, method="ward.D2")
+library(dynamicTreeCut)
+my.clusters <- unname(cutreeDynamic(my.tree, distM=as.matrix(my.dist), verbose=0))
+my.clusters
+```
+
+This approach yields a sensible set of subpopulations in most scenarios.
+Here, three clusters are identified, two of which correspond roughly to the H2-A2/Cd74-expressing and Fos/Jun-negative subpopulations.
+Additional work can then be conducted on these empirically defined clusters.
+For example, a DE analysis can be performed between subpopulations to identify candidate marker genes in each subpopulation (this will be explored in more detail later).
+
+```{r, fig.cap="Heatmap of mean-centred normalized log-expression values for correlated HVGs in the HSC data set. Column colours represent the clusters defined with a dynamic tree cut after hierarchical clustering on the rank correlations between cells."}
+heatmap.2(heat.vals[chosen,], col=bluered, symbreak=TRUE, trace='none', cexRow=0.8,
+    ColSideColors=c("darkgreen", "orange", "dodgerblue")[my.clusters],
+    Colv=as.dendrogram(my.tree))
+```
+
+Users should treat clustering results with some caution.
+It is difficult to maintain statistical rigour during clustering to protect against the formation of spurious clusters.
+As such, determining whether a cluster is "real" or not usually depends on subjective judgement, unless the clusters are very clearly defined (e.g., strong separation on a PCA plot, widespread differences in the expression profiles).
+Moreover, different algorithms can yield substantially different clusters by focusing on different aspects of the data.
+In short, experimental validation of the clustering results is critical to ensure that the putative subpopulations actually exist.
+
+# A more complex analysis on brain cell types
 
 ```{r, eval=FALSE}
 incoming <- read.table('GSE60361_C1-3005-Expression.txt.gz', header=TRUE)
