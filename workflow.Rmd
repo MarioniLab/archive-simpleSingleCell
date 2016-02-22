@@ -109,7 +109,7 @@ Another measure of low quality involves the proportion of reads mapped to genes 
 High proportions are indicative of poor-quality cells [@islam2014quantitative], possibly because of increased apoptosis.
 Here, the mitochondrial genes have been conveniently marked with a `mt-` prefix, so the proportion can be easily computed for each cell.
 
-```{r mitoplot, fig.cap="Histogram of the proportion of reads mapped to mitochondrial genes across all cells."}
+```{r mitoplot, fig.cap="Histogram of the proportion of reads mapped to mitochondrial genes across all cells in the HSC data set."}
 is.mito <- grepl("^mt-", rownames(y))
 mito.props <- colSums(assay(y)[is.mito,])/y$lib.size 
 hist(mito.props, xlab="Mitochondrial proportion", ylab="Number of cells", 
@@ -146,7 +146,7 @@ This is often done by assuming that most genes are not differentially expressed 
 Any systematic difference in count size across the non-DE majority of genes between two cells is assumed to represent bias and is removed by scaling.
 More specifically, "size factors" are calculated that represent the extent to which counts should be scaled in each library.
 
-Size factors can be computed with several different approaches, e.g., using the `estimateSizeFactorsFromMatrix` function in the `r Biocpkg("DESeq2")` package [@love2014moderated], or with the `calcNormFactors` function [@robinson2010scaling] in the `r Biocpkg("edgeR")` package (this requires an additional multiplication by the library size).
+Size factors can be computed with several different approaches, e.g., using the `estimateSizeFactorsFromMatrix` function in the `r Biocpkg("DESeq2")` package [@anders2010differential;@love2014moderated], or with the `calcNormFactors` function [@robinson2010scaling] in the `r Biocpkg("edgeR")` package (this requires an additional multiplication by the library size).
 However, single-cell data can be problematic for these bulk data-based methods due to the dominance of low and zero counts.
 To overcome this, we pool counts from many cells to increase the count size for accurate size factor estimation [@lun2016much].
 Pool-based size factors are then "deconvolved" into cell-based factors for cell-specific normalization.
@@ -173,8 +173,9 @@ Dimensionality reduction is often useful to examine major features of the data b
 Of particular interest is whether the HSCs partition into distinct subpopulations.
 This can be visualized by constructing a principal components analysis (PCA) plot from the normalized log-expression values.
 Cells with more similar expression profiles should be located close together on the plot.
+All genes are scaled to have unit variances to ensure that low-abundance genes with high variances do not dominate the plot.
 
-```{r pcaplot, fig.cap="PCA plot constructed from normalized log-expression values, where each point represents a cell."}
+```{r pcaplot, fig.cap="PCA plot constructed from normalized log-expression values, where each point represents a cell in the HSC data set."}
 out <- prcomp(t(assay(y, "exprs")), scale.=TRUE)
 plot(out$x[,1], out$x[,2], xlab="PC1", ylab="PC2", pch=16, 
     main="Expression values", cex.axis=1.2, cex.lab=1.4, main="")
@@ -184,10 +185,11 @@ Alternatively, the PCA plot can be constructed from a matrix of correlations bet
 Two cells with similar expression profiles will exhibit similar patterns of correlations to other cells.
 As a result, those two cells will be closer together in the plot.
 This approach tends to be more robust to noise and outliers that would dominate a standard PCA plot, at the cost of being less sensitive to differences in the expression profiles.
+Scaling of the variances is not performed here as the correlation patterns are directly comparable between cells.
 
-```{r pcacorplot, fig.cap="PCA plot constructed from a matrix of Spearman rank correlations between cells, where each point represents a cell."}
+```{r pcacorplot, fig.cap="PCA plot constructed from a matrix of Spearman rank correlations between cells, where each point represents a cell in the HSC data set."}
 cor.mat <- cor(assay(y, "exprs"), method="spearman")
-out <- prcomp(cor.mat)
+out <- prcomp(cor.mat, scale.=TRUE)
 plot(out$x[,1], out$x[,2], xlab="PC1", ylab="PC2", pch=16, main="Correlations")
 ```
 
@@ -196,7 +198,7 @@ A fast implementation is provided by the `Rtsne` function in the `r CRANpkg("Rts
 Note that, unlike PCA, _t_-SNE is a stochastic method -- users should run the algorithm several times to ensure that the results are representative, and then set a seed to ensure that the chosen results are reproducible.
 It is also advisable to test different settings of the "perplexity" parameter as this will affect the distribution of points in the low-dimensional space.
 
-```{r tsneplot, fig.cap="_t_-SNE plot constructed from normalized log-expression values, where each point represents a cell.", fig.width=12, fig.height=6}
+```{r tsneplot, fig.cap="_t_-SNE plot constructed from normalized log-expression values, where each point represents a cell in the HSC data set.", fig.width=12, fig.height=6}
 library(Rtsne)
 set.seed(100)
 par(mfrow=c(1,3), cex.axis=1.2, cex.lab=1.3, cex.main=1.4)
@@ -213,24 +215,49 @@ In general, _t_-SNE tends to work better than PCA for large data sets with compl
 However, this comes at the cost of more computational effort and complexity.
 For this particular data set, both methods suggest that there is no strong partionining into distinct subpopulations.
 Of course, there are many dimensionality reduction techniques that we have not considered here but could also be used, e.g., multidimensional scaling.
-In addition, greater resolution of differences can be achieved by applying these methods on expression values for a selected set of HVGs.
+Greater resolution of differences can also be achieved by applying these methods on expression values for a selected set of HVGs.
 This focuses on genes that are driving heterogeneity and potential substructure. 
 
-## 
+## Classification of cell cycle phase 
 
-```{r}
-# Cell cycle phase classification.
+We use the prediction method described by @scialdone2015computational to classify cells into cell cycle phases based on the gene expression data.
+Using a training data set, the sign of the difference in expression between two genes was computed for each pair of genes.
+Pairs were chosen with changes in the sign across cell cycle phases.
+Cells in a test data set can then be classified into the appropriate phase, based on whether the observed sign is consistent with one phase or another.
+This is achieved using the `cyclone` function on a pre-trained set of gene pairs for mouse data.
+(Some additional work is necessary to match the gene symbols in the data to the Ensembl annotation in the set of pairs.)
+
+```{r phaseplot, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the HSC data set, where each point represents a cell. "}
 mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", package="scran"))
 library(org.Mm.eg.db)
 anno <- select(org.Mm.eg.db, keys=rownames(y), keytype="SYMBOL", column="ENSEMBL")
 ensembl <- anno$ENSEMBL[match(rownames(y), anno$SYMBOL)]
 keep <- !is.na(ensembl)
 assignments <- cyclone(assay(y, "exprs")[keep,], mm.pairs, gene.names=ensembl[keep])
-plot(assignments$score$G1, assignments$score$G2M)
+plot(assignments$score$G1, assignments$score$G2M, xlab="G1 score", ylab="G2/M score",
+    pch=16, cex.axis=1.2, cex.lab=1.4, main="")
+```
 
-g1.only <- assignments$score$G1 > 0
+Cells are classified as being in G1 phase if the G1 score is above 0.5; in G2/M phase if the G2/M score is above 0.5; and in S phase, if neither is above 0.5.
+Here, the vast majority of cells are classified as being in G1 phase.
+We will focus on these cells for the downstream analysis.
+Cells in other phases are removed to avoid potential confounding effects from cell cycle-induced differences.
+If a non-negligible number of cells are in other phases, we can also use the assigned phase as a blocking factor in downstream analyses.
+This protects against cell cycle effects without involving substantial loss of information.
+
+```{r}
+g1.only <- assignments$score$G1 > 0.5
 y <- y[,g1.only]
+```
 
+Pre-trained classifiers are available in `r Rpackage("scran")` for human and mouse experiments.
+These tend to work reasonably well -- the classifier is non-parametric with few assumptions, and the transcriptional program associated with cell cycling should be mostly conserved across different cell types and biological settings.
+However, users can construct a custom classifier from their own training data using the `sandbag` function.
+This may be necessary for other model organisms where pre-trained classifiers are not available.
+
+
+
+```{r}
 # Identifying highly variable genes.
 var.fit <- trendVar(y, trend="loess")
 var.out <- decomposeVar(y, var.fit)
