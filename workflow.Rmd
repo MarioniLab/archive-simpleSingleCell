@@ -24,9 +24,13 @@ opts_chunk$set(dpi=300, dev="png", dev.args=list(pointsize=15))
 ```
 
 ```{r, message=FALSE, echo=FALSE, results='hide'}
-library(scran)
 library(DESeq2)
+library(scran)
 library(edgeR)
+library(scater)
+library(gplots)
+library(gdata)
+library(R.utils)
 ```
 
 # Introduction
@@ -75,56 +79,92 @@ For users favouring a R-based approach to read alignment and counting, we sugges
 The first task is to load the count matrix into memory.
 This requires some work to decompress and retreive the data from the Excel format.
 Each row of the matrix represents an endogenous gene or a spike-in transcript, and each column represents a single HSC.
+For convenience, the counts for spike-in transcripts and endogenous genes are stored in a `SCESet` object from the `r Biocpkg("scater")` package.
 
 ```{r}
 library(R.utils)
 gunzip("GSE61533_HTSEQ_count_results.xls.gz", remove=FALSE, overwrite=TRUE)
 library(gdata)
 all.counts <- read.xls('GSE61533_HTSEQ_count_results.xls', sheet=1, header=TRUE, row.names=1)
-dim(all.counts)
+library(scater)
+sce <- newSCESet(countData=all.counts)
+dim(sce)
 ```
 
-Rows corresponding to spike-in transcripts are identified by the `ERCC` prefix in the row names.
-For convenience, the counts for spike-in transcripts and endogenous genes are stored separately in a `SummarizedExperiment` object.
-This is done using the `countsToSE` function in the `r Rpackage("scran")`package.
+We annotate those rows corresponding to ERCC spike-ins and mitochondrial genes.
+This information can be easily extracted from the row names, though in general, identifying mitochondrial genes from standard identifiers like Ensembl requires access to extra annotation (this will be discussed later in more detail).
+We then calculate quality control metrics such as the total number of counts, the proportion of counts for the mitochondrial genes or spike-in transcripts, etc.
+These metrics are stored in the `pData` of the `SCESet` for future reference.
 
 ```{r}
-library(scran)
-spike.in <- grepl('^ERCC', rownames(all.counts))
-y <- countsToSE(all.counts[!spike.in,], all.counts[spike.in,])
-sum(spike.in)
+is.spike <- grepl("^ERCC", rownames(sce))
+fData(sce)$is_feature_spike <- is.spike
+is.mito <- grepl("^mt-", rownames(sce))
+sce <- calculateQCMetrics(sce, feature_controls=list(Spike=is.spike, Mt=is.mito))
+head(colnames(pData(sce)))
 ```
 
 Low-quality cells are defined as those where the endogenous RNA has not been efficiently captured (i.e., converted into cDNA and amplified) during library preparation.
-These can be identified as those cells with low library sizes, i.e., a low sum of counts for the endogenous genes.
-In general, any cell with a library size that is an order of magnitude lower than the median across all cells can be considered to be of low quality and removed.
+These can be identified as those cells with a low sum of counts for the endogenous genes.
+In general, any cell with a count sum that is an order of magnitude lower than the median across all cells can be considered to be of low quality and removed.
+A more relaxed threshold may need to be used when strong heterogeneity in total RNA content is expected across cells.
 
 ```{r}
-keep <- y$lib.size >= median(y$lib.size)/10
-y <- y[,keep]
-sum(keep)
+endo.sum <- sce$counts_endogenous_features
+summary(endo.sum)
+keep <- endo.sum >= median(endo.sum)/10
+sce <- sce[,keep]
+sum(!keep)
 ```
 
-Another measure of low quality involves the proportion of reads mapped to genes in the mitochondrial genome.
-High proportions are indicative of poor-quality cells [@islam2014quantitative], possibly because of increased apoptosis.
-Here, the mitochondrial genes have been conveniently marked with a `mt-` prefix, so the proportion can be easily computed for each cell.
+Cells with very few expressed (i.e., non-zero) counts are also removed.
+This ensures that the total count in each cell is not driven by a small number of transcripts.
+Cells with fewer than 1000 expressed genes are considered to be of poor quality, as it suggests that the diverse transcript population has not been successfully captured.
+Here, all cells have a reasonable number of expressed genes and so no removal is performed.
 
-```{r mitoplot, fig.cap="Histogram of the proportion of reads mapped to mitochondrial genes across all cells in the HSC data set."}
-is.mito <- grepl("^mt-", rownames(y))
-mito.props <- colSums(assay(y)[is.mito,])/y$lib.size 
-hist(mito.props, xlab="Mitochondrial proportion", ylab="Number of cells", 
+```{r}
+summary(sce$total_features)
+```
+
+Another measure of quality is the proportion of reads mapped to genes in the mitochondrial genome.
+High proportions are indicative of poor-quality cells [@islam2014quantitative;@ilicic2016classification], possibly because of increased apoptosis and/or loss of cytoplasmic RNA from lysed cells.
+Defining a threshold on the proportion is not straightforward as it depends largely on the cell type and the experimental protocol.
+If we assume that most cells in the data set are not apoptotic, then the threshold can be set to remove any large outliers from the distribution of proportions.
+Here, no obvious outliers are present, so no removal will be performed.
+A similar case can be made for the proportion of reads mapped to spike-in transcripts.
+
+```{r mitoplot, fig.width=12, fig.height=6, fig.cap="Histogram of the proportion of reads mapped to mitochondrial genes (left) or spike-in transcripts (right) across all remaining cells in the HSC data set."}
+par(mfrow=c(1,2))
+mito.props <- sce$pct_counts_feature_controls_Mt
+hist(mito.props, xlab="Mitochondrial proportion (%)", ylab="Number of cells", 
+    breaks=20, cex.lab=1.4, cex.axis=1.2, main="")
+spike.props <- sce$pct_counts_feature_controls_Spike
+hist(spike.props, xlab="ERCC proportion (%)", ylab="Number of cells", 
     breaks=20, cex.lab=1.4, cex.axis=1.2, main="")
 ```
 
-The appropriate threshold on the mitochondrial proportion will vary from case to case, depending on the cell type and the experimental protocols.
-If we assume that most cells in the data set are not apoptotic, then the threshold can be set to remove obvious outliers from the distribution of proportions.
-A threshold value of 0.09 is probably suitable for this data set, based on the previous histogram.
+An alternative approach to quality control is to perform a principal components analysis (PCA) based on the quality metrics for each cell, e.g., the total number of reads, the total number of features, the proportion of mitochondrial or spike-in reads.
+Outliers on a PCA plot may be indicative of low-quality cells that have dissimilar technical properties compared to the (presumed) majority of high-quality cells.
+
+```{r, fig.cap="PCA plot for all remaining cells in the HSC data set, constructed using quality metrics. The first and second components are shown on each axis, along with the percentage of total variance explained by each component. Bars represent the coordinates of the cells on each axis."}
+fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
+plotPCA(sce, pca_data_input = "pdata", detect_outliers=TRUE) + fontsize
+```
+
+The outlier cells can then be removed from the data set.
 
 ```{r}
-keep <- mito.props < 0.09
-y <- y[,keep]
-sum(keep)
+alt.sce <- plotPCA(sce, pca_data_input = "pdata", detect_outliers=TRUE, 
+    draw_plot=FALSE, return_SCESet=TRUE)
+which(alt.sce$outlier)
 ```
+
+Methods like outlier detection and support vector machines can provide greater power to distinguish low-quality cells from high-quality counterparts [@ilicic2016classification].
+This is because they are able to detect subtle patterns across many quality metrics simultaneously. 
+However, this comes at some cost to interpretability, as the reason for removing a given cell is not always immediately obvious.
+Thus, for this workflow, we will use the simple approach whereby each quality metric is considered separately.
+
+## Filtering out low-abundance genes
 
 Very low-abundance genes are also removed prior to further analysis.
 These genes tend to provide little information as the counts are too low for reliable inferences.
@@ -133,10 +173,32 @@ Here, low-abundance genes are defined as those with an average count across cell
 Removing them avoids problems with discreteness and also reduces the amount of computational work.
 
 ```{r}
-keep <- rowMeans(assay(y)) >= 1
-y <- y[keep,] 
+keep <- rowMeans(counts(sce)) >= 1
+sce <- sce[keep,] 
 sum(keep)
 ```
+
+An alternative approach to gene filtering is to select genes that have non-zero counts in at least _n_ cells. 
+This provides some more protection against outlier expression patterns, i.e., genes with strong expression in only one or two cells. 
+Such outlier patterns are typically uninteresting unless rare cells are of particular interest.
+An example of this approach is shown below for _n_ set to 10.
+
+```{r}
+alt.keep <- rowSums(is_exprs(sce)) >= 10
+sum(alt.keep)
+```
+
+The relationship between the proportion of expressing cells and the mean can be examined more closely in the plot below.
+The two statistics tend to be well-correlated, so filtering on either should give similar results.
+
+```{r, fig.cap="Frequency of expression against the mean expression for each gene. Circles represent endogenous genes and triangles represent spike-in transcripts or mitochondrial genes. The bars on each axis represent the location of each gene on that axis. Genes above high technical dropout are defined as those above a non-linear trend fitted to the triangles."}
+plotQC(sce, type = "exprs") + extra
+```
+
+In general, we prefer the mean-based filter as it tends to be less aggressive.
+A gene will be retained as long as it has sufficient expression in any subset of cells.
+The "at least _n_" filter depends heavily on the choice of _n_ -- in this case, a gene expressed in a subset of 9 cells would be lost.
+While the mean-based filter will retain more outlier-driven genes, this can be handled downstream by choosing methods that are robust to outliers.
 
 ## Normalization of cell-specific biases
 
@@ -152,69 +214,72 @@ To overcome this, we pool counts from many cells to increase the count size for 
 Pool-based size factors are then "deconvolved" into cell-based factors for cell-specific normalization.
 
 ```{r, warning=FALSE}
-y$size.factor <- normalizeBySums(y, sizes=c(20, 40, 60, 80))
-summary(y$size.factor)
+sce$size.factor <- normalizeBySums(sce, sizes=c(20, 40, 60, 80))
+summary(sce$size.factor)
+```
+
+In this case, the size factors are tightly correlated with the total counts for all cells.
+This suggests that the systematic differences between cells are primarily driven by differences in capture efficiency or sequencing depth.
+Any DE between cells would yield a non-linear trend between the total count and size factor, and/or increased scatter around the trend.
+This does not occur here as strong DE is unlikely to exist between cells of the same type.
+
+```{r, fig.cap="Size factors from deconvolution, shown against the total counts for all cells in the HSC data set. Axes are shown on a log-scale."}
+plot(sce$size.factor, sce$total_counts/1e6, log="xy", cex.axis=1.2, cex.lab=1.4,
+    ylab="Total count (per million)", xlab="Size factor", main="")
 ```
 
 Normalized log-expression values can be computed for use in downstream analyses.
 Each value is defined as the log-ratio of each count to the size factor for the corresponding cell (after adding a small prior count to avoid undefined values at zero counts).
 Division by the size factor ensures that any cell-specific biases are removed.
 The log-transformation is also useful as larger counts can be modelled reasonably well with a log-normal distribution [@law2014voom].
-The computed values are stored as an `"exprs"` matrix in the `SummarizedExperiment` object, in addition to the existing count matrix.
+The computed values are stored as an `"norm_exprs"` matrix in addition to the other assay elements.
 
 ```{r}
-y <- normalize(y)
-assayNames(y)
+sce <- normalize(sce)
+assayDataElementNames(sce)
 ```
 
 ## Data exploration with dimensionality reduction techniques
 
 Dimensionality reduction is often useful to examine major features of the data before more quantitative analyses.
 Of particular interest is whether the HSCs partition into distinct subpopulations.
-This can be visualized by constructing a principal components analysis (PCA) plot from the normalized log-expression values.
+This can be visualized by constructing a PCA plot from the normalized log-expression values.
 Cells with more similar expression profiles should be located close together on the plot.
-All genes are scaled to have unit variances to ensure that low-abundance genes with high variances do not dominate the plot.
 
-```{r pcaplot, fig.cap="PCA plot constructed from normalized log-expression values, where each point represents a cell in the HSC data set."}
-out <- prcomp(t(assay(y, "exprs")), scale.=TRUE)
-plot(out$x[,1], out$x[,2], xlab="PC1", ylab="PC2", pch=16, cex.axis=1.2, cex.lab=1.4)
+```{r pcaplot, fig.cap="PCA plot constructed from normalized log-expression values, where each point represents a cell in the HSC data set. First and second components are shown, along with the percentage of variance explained. Bars represent the coordinates of the cells on each axis. None of the cells are controls (e.g., empty wells) so the legend can be ignored."}
+plotPCA(sce, exprs_values="norm_exprs") + extra
 ```
 
 Alternatively, the PCA plot can be constructed from a matrix of correlations between cells. 
 Two cells with similar expression profiles will exhibit similar patterns of correlations to other cells.
 As a result, those two cells will be closer together in the plot.
 This approach tends to be more robust to noise and outliers that would dominate a standard PCA plot, at the cost of being less sensitive to differences in the expression profiles.
-Scaling of the variances is not performed here as the correlation patterns are directly comparable between cells.
 
 ```{r pcacorplot, fig.cap="PCA plot constructed from a matrix of Spearman rank correlations between cells, where each point represents a cell in the HSC data set."}
-cor.mat <- cor(assay(y, "exprs"), method="spearman")
+cor.mat <- cor(assayDataElement(sce, "norm_exprs"), method="spearman")
 out <- prcomp(cor.mat)
 plot(out$x[,1], out$x[,2], xlab="PC1", ylab="PC2", pch=16, cex.axis=1.2, cex.lab=1.4)
 ```
 
 Another popular approach to dimensionality reduction is the _t_-stochastic neighbour embedding (_t_-SNE) method [@van2008visualizing].
-A fast implementation is provided by the `Rtsne` function in the `r CRANpkg("Rtsne")` package, and can be applied to the normalized log-expression values for all cells.
-Note that, unlike PCA, _t_-SNE is a stochastic method -- users should run the algorithm several times to ensure that the results are representative, and then set a seed to ensure that the chosen results are reproducible.
+_t_-SNE tends to work better than PCA for large data sets with complex substructure, at the cost of more computational effort and complexity.
+Unlike PCA, _t_-SNE is a stochastic method -- users should run the algorithm several times to ensure that the results are representative, and then set a seed to ensure that the chosen results are reproducible.
 It is also advisable to test different settings of the "perplexity" parameter as this will affect the distribution of points in the low-dimensional space.
 
-```{r tsneplot, fig.cap="_t_-SNE plot constructed from normalized log-expression values, where each point represents a cell in the HSC data set.", fig.width=12, fig.height=6}
+```{r tsneplot, fig.cap="_t_-SNE plot constructed from normalized log-expression values using a range of perplexity values. In each plot, each point represents a cell in the HSC data set. Bars represent the coordinates of the cells on each axis.", fig.width=12, fig.height=6}
 library(Rtsne)
 set.seed(100)
-par(mfrow=c(1,3), cex.axis=1.2, cex.lab=1.3, cex.main=1.4)
-transposed <- t(assay(y, "exprs"))
-out <- Rtsne(transposed, perplexity=5)
-plot(out$Y[,1], out$Y[,2], xlab="t-SNE1", ylab="t-SNE2", main="Perplexity = 5", pch=16)
-out <- Rtsne(transposed, perplexity=10)
-plot(out$Y[,1], out$Y[,2], xlab="t-SNE1", ylab="t-SNE2", main="Perplexity = 10", pch=16)
-out <- Rtsne(transposed, perplexity=20)
-plot(out$Y[,1], out$Y[,2], xlab="t-SNE1", ylab="t-SNE2", main="Perplexity = 20", pch=16)
+out5 <- plotTSNE(sce, exprs_values="norm_exprs", perplexity=5) + extra + ggtitle("Perplexity = 5")
+out10 <- plotTSNE(sce, exprs_values="norm_exprs", perplexity=10) + extra + ggtitle("Perplexity = 10")
+out20 <- plotTSNE(sce, exprs_values="norm_exprs", perplexity=20) + extra + ggtitle("Perplexity = 20")
+multiplot(out5, out10, out20, cols=3)
 ```
 
-In general, _t_-SNE tends to work better than PCA for large data sets with complex substructure.
-However, this comes at the cost of more computational effort and complexity.
-For this particular data set, both methods suggest that there is no strong partionining into distinct subpopulations.
+By default, both the `plotPCA` and `plotTSNE` functions will only use the top 500 genes with the highest variances.
+This focuses on the genes that are driving heterogeneity in the population and should provide greater visual resolution of any systematic differences between groups of cells.
+For this data set, all methods suggest that there is no separation into distinct subpopulations.
+This is consistent with a homogenous population of cells of the same type.
 Of course, there are many dimensionality reduction techniques that we have not considered here but could also be used, e.g., multidimensional scaling.
-Greater resolution of differences can also be achieved by applying these methods on expression values for HVGs -- this will be discussed in further detail below.
 
 ## Classification of cell cycle phase 
 
@@ -228,10 +293,10 @@ This is achieved using the `cyclone` function on a pre-trained set of gene pairs
 ```{r phaseplot, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the HSC data set, where each point represents a cell. "}
 mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", package="scran"))
 library(org.Mm.eg.db)
-anno <- select(org.Mm.eg.db, keys=rownames(y), keytype="SYMBOL", column="ENSEMBL")
-ensembl <- anno$ENSEMBL[match(rownames(y), anno$SYMBOL)]
+anno <- select(org.Mm.eg.db, keys=rownames(sce), keytype="SYMBOL", column="ENSEMBL")
+ensembl <- anno$ENSEMBL[match(rownames(sce), anno$SYMBOL)]
 keep <- !is.na(ensembl)
-assignments <- cyclone(assay(y, "exprs")[keep,], mm.pairs, gene.names=ensembl[keep])
+assignments <- cyclone(sce[keep,], mm.pairs, gene.names=ensembl[keep])
 plot(assignments$score$G1, assignments$score$G2M, xlab="G1 score", ylab="G2/M score",
     pch=16, cex.axis=1.2, cex.lab=1.4, main="")
 ```
@@ -245,7 +310,7 @@ This protects against cell cycle effects without discarding a substantial amount
 
 ```{r}
 g1.only <- assignments$score$G1 > 0.5
-y <- y[,g1.only]
+sce <- sce[,g1.only]
 ```
 
 Pre-trained classifiers are available in `r Rpackage("scran")` for human and mouse experiments.
@@ -262,8 +327,8 @@ Recall that the same set of spike-ins is added in the same quantity to each cell
 The biological component of the variance can then be estimated by subtracting the fitted value of the trend from the total variance of each gene in the `decomposeVar` function.
 
 ```{r hvgplot, fig.cap="Variance of normalized log-expression values for each gene in the HSC data set, plotted against the average log-expression. The red line represents the mean-dependent trend in the technical variance of the spike-in transcripts (also highlighted as red points)."}
-var.fit <- trendVar(y, trend="loess", span=0.2)
-var.out <- decomposeVar(y, var.fit)
+var.fit <- trendVar(sce, trend="loess", span=0.2)
+var.out <- decomposeVar(sce, var.fit)
 plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Variance", ylab="Mean")
 points(var.fit$mean, var.fit$var, col="red", pch=16)
 o <- order(var.out$mean)
@@ -292,7 +357,7 @@ Note that we only apply this function for the top set of HVGs -- doing so for al
 
 ```{r}
 set.seed(100)
-var.cor <- correlatePairs(y[top.hvgs[1:200],])
+var.cor <- correlatePairs(sce[top.hvgs[1:200],])
 write.table(file="hsc_cor.tsv", var.cor, sep="\t", quote=FALSE, col.names=NA)
 head(var.cor)
 ```
@@ -324,8 +389,8 @@ All expression values are mean-centred for each gene to highlight the relative e
 The heatmap itself is then constructed using the `heatmap.2` function from the `r CRANpkg("gplots")` package.
 
 ```{r heatmap, message=FALSE, fig.width=7, fig.height=10, fig.cap="Heatmap of mean-centred normalized log-expression values for correlated HVGs in the HSC data set. Dendrograms are formed by hierarchical clustering with complete linkage on the Euclidean distances between genes (row) or cells (column)."}
-heat.vals <- assay(y, "exprs")
-heat.vals <- heat.vals - rowMeans(heat.vals)
+norm.exprs <- assayDataElement(sce, "norm_exprs")
+heat.vals <- norm.exprs - rowMeans(norm.exprs)
 chosen <- unique(c(var.cor$gene1[sig.cor], var.cor$gene2[sig.cor]))
 library(gplots)
 heatmap.2(heat.vals[chosen,], col=bluered, symbreak=TRUE, trace='none', cexRow=0.8)
@@ -345,13 +410,11 @@ dev.off()
 As previously mentioned, dimensionality reduction can be applied using only the set of HVGs to highlight any substructure that might be present.
 This is shown below for both PCA and _t_-SNE plots, though in this case, focusing on HVGs does not provide any additional separation into distinct subpopulations.
 
-```{r pcaredux, fig.width=10, fig.height=6, fig.cap="PCA (left) and _t_-SNE plots (right) using only the expression values for significantly correlated HVGs in the HSC data set."}
-par(mfrow=c(1,2), cex.axis=1.2, cex.lab=1.3, cex.main=1.4, mar=c(5.1, 5.1, 4.1, 1.1))
-out <- prcomp(t(assay(y, "exprs")[chosen,]), scale.=TRUE)
-plot(out$x[,1], out$x[,2], xlab="PC1", ylab="PC2", pch=16)
+```{r pcaredux, fig.width=10, fig.height=6, fig.cap="PCA (left) and _t_-SNE plots (right) using only the expression values for significantly correlated HVGs in the HSC data set. Each cell is represented by a point in each plot, and the bars represent the cell coordinates on each axis."}
 set.seed(100)
-out <- Rtsne(t(assay(y, "exprs")[chosen,]), perplexity=10)
-plot(out$Y[,1], out$Y[,2], xlab="t-SNE1", ylab="t-SNE2", pch=16)
+out.pca <- plotPCA(sce, exprs_values="norm_exprs", feature_set=chosen) + extra
+out.tsne <- plotTSNE(sce, exprs_values="norm_exprs", feature_set=chosen) + extra
+multiplot(out.pca, out.tsne, col=2)
 ```
 
 Finally, subpopulations of cells can be explicitly defined with clustering algorithms.
@@ -360,7 +423,7 @@ A dynamic tree cut is then performed to define the clusters, using the `cutreeDy
 Again, we focus on correlated HVGs for which subpopulation-specific expression patterns should be the most pronounced.
 
 ```{r}
-my.dist <- as.dist(1 - cor(assay(y, "exprs")[chosen,], method="spearman"))
+my.dist <- as.dist(1 - cor(norm.exprs, method="spearman"))
 my.tree <- hclust(my.dist, method="ward.D2")
 library(dynamicTreeCut)
 my.clusters <- unname(cutreeDynamic(my.tree, distM=as.matrix(my.dist), verbose=0))
@@ -452,7 +515,8 @@ A constant quantity of synthetic spike-in RNA was added to each cell, and spike-
 Quantification of gene expression was performed in this manner for 48 mESCs, 44 MEFs and 4 negative controls.
 We obtain a table of read counts from NCBI GEO using the accession GSE29087, and load them into a `SummarizedExperiment` object for further manipulation.
 
-```{r}
+```{r, eval=FALSE}
+#```{r}
 counts <- read.table("GSE29087_L139_expression_tab.txt.gz", skip=6, 
     sep='\t', row.names=1)[,-c(1:6)]
 is.spike <- grepl("SPIKE", rownames(counts))
@@ -467,7 +531,8 @@ We remove low-quality libraries that have low total counts for the endogenous ge
 This removes a number of libraries, including those for the negative controls.
 We also remove lowly expressed genes with an average count below 1.
 
-```{r}
+```{r, eval=FALSE}
+#```{r}
 totals <- colSums(assay(y))
 is.mito <- grepl("^mt-", rownames(y))
 okay.libs <- totals >= 1e5 & colSums(assay(y)[is.mito,])/totals < 0.1 
@@ -483,7 +548,8 @@ The size factor for each cell is proportional to the total number of reads mappe
 The aim is to normalize the counts such that the total spike-in coverage is the same across cells.
 These values are stored in the `SummarizedExperiment` object as previously described, and downstream analyses can be applied.
 
-```{r}
+```{r, eval=FALSE}
+#```{r}
 sf.spike <- normalizeBySpikes(y)
 y$size.factor <- sf.spike
 ````
@@ -493,7 +559,8 @@ This is due to the fact that the former contain substantially less endogenous RN
 Larger size factors result in smaller normalized expression values for mESCs compared to MEFs, reflecting the decrease in total RNA content in the former.
 These differences are lost when a normalization method based on a non-DE majority is applied, such as that in the `r Biocpkg("DESeq2")` package [@anders2010differential].
 
-```{r}
+```{r, eval=FALSE}
+#```{r}
 y$grouping <- droplevels(y$grouping)
 boxplot(split(sf.spike, y$grouping), log="y", cex.axis=1.2, cex.lab=1.4)
 library(DESeq2)
@@ -511,7 +578,8 @@ This means that more DEGs are generally detected upon spike-in normalization com
 In addition, there tends to be a greater imbalance in the number of up- and downregulated genes, as the change in total RNA content occurs in one direction for all genes.
 This is demonstrated below by comparing the DE results between the two normalization strategies. 
 
-```{r}
+```{r, eval=FALSE}
+#```{r}
 library(edgeR)
 d <- DGEList(assay(y, "counts"))
 d$offset <- log(y$size.factor)
@@ -536,26 +604,35 @@ While this relation seems trivially true, it is easy to imagine situations where
 
 <!-- Also, if there's variability in cell sizes within groups, this'll reduce power to detect DEGs. -->
 
-For HVG detection, any variability in total RNA content is incorporated into the variance of each gene.
-This means that it will increase the size of the biological component of the variance.
+For HVG detection, any variability in total RNA content will inflate the variance of the normalized expression values for each gene.
 However, the magnitude of the increase will be the same for each gene as the variance of RNA content is constant.
-As such, even though the biological component will increase, the ranking of HVGs will be largely preserved. 
+As such, the ranking of HVGs will be roughly similar across the different normalization strategies.
+This is demonstrated below, where there is 70-80\% similarity between the top sets of 500-2000 genes with the largest variances from each normalization method.
 
-```{r}
+```{r, eval=FALSE}
+#```{r}
 y <- normalize(y)
-trend <- trendVar(y, trend="loess", span=0.8)
-components <- decomposeVar(y, trend)
+trend <- trendVar(y, use.spikes=FALSE, trend="loess")
+resid.var <- trend$var - trend$trend(trend$mean)
 y2 <- normalize(y2)
-trend2 <- trendVar(y2, trend="loess", span=0.8)
-components2 <- decomposeVar(y2, trend2)
+trend2 <- trendVar(y2, use.spikes=FALSE, trend="loess")
+resid.var2 <- trend2$var - trend2$trend(trend2$mean)
+r <- rank(-resid.var)
+r2 <- rank(-resid.var2)
+sum(r <= 500 & r2 <= 500)
+sum(r <= 1000 & r2 <= 1000)
+sum(r <= 2000 & r2 <= 2000)
 ```
+
+<!-- don't subtract spike-ins here, as there's only 8 of them so it's not very reliable. -->
 
 Most dimensionality reduction and clustering procedures tend to be robust to the choice of normalization method.
 This is because cells with different RNA content also tend to have different transcript compositions.
 Thus, they would be (correctly) separated based on their gene expression profiles, regardless of whether changes in total RNA content were preserved after normalization.
 Indeed, correlation-based methods are completely insensitive to normalization as the value of the correlation is not dependent on the scaling of expression values within each cell.
 
-```{r, fig.width=12, fig.height=6}
+```{r, eval=FALSE}
+#```{r, fig.width=12, fig.height=6}
 par(mfrow=c(1,2))
 col <- c("red", "blue")[y$grouping]
 out <- prcomp(t(assay(y, "exprs")), scale.=TRUE)
