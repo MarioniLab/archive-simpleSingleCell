@@ -21,6 +21,7 @@ library(knitr)
 opts_chunk$set(error=FALSE)
 opts_chunk$set(fig.width=7, fig.height=7)
 opts_chunk$set(dpi=300, dev="png", dev.args=list(pointsize=15))
+options(bitmapType="cairo")
 ```
 
 ```{r, message=FALSE, echo=FALSE, results='hide'}
@@ -144,30 +145,30 @@ hist(spike.props, xlab="ERCC proportion (%)", ylab="Number of cells",
 ```
 
 An alternative approach to quality control is to perform a principal components analysis (PCA) based on the quality metrics for each cell, e.g., the total number of reads, the total number of features, the proportion of mitochondrial or spike-in reads.
-Outliers on a PCA plot may be indicative of low-quality cells that have dissimilar technical properties compared to the (presumed) majority of high-quality cells.
+Outliers on a PCA plot may be indicative of low-quality cells that have aberrant technical properties compared to the (presumed) majority of high-quality cells.
 
 ```{r, fig.cap="PCA plot for all remaining cells in the HSC data set, constructed using quality metrics. The first and second components are shown on each axis, along with the percentage of total variance explained by each component. Bars represent the coordinates of the cells on each axis."}
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
 plotPCA(sce, pca_data_input = "pdata", detect_outliers=TRUE) + fontsize
 ```
 
-The outlier cells can then be removed from the data set.
+In this case, two cells are identified as outliers from the PCA plot.
+These cells can be removed from the data set, under the assumption that they represent low-quality samples.
 
 ```{r}
 alt.sce <- plotPCA(sce, pca_data_input = "pdata", detect_outliers=TRUE, 
     draw_plot=FALSE, return_SCESet=TRUE)
-which(alt.sce$outlier)
+alt.sce <- alt.sce[,!alt.sce$outlier]
 ```
 
 Methods like outlier detection and support vector machines can provide greater power to distinguish low-quality cells from high-quality counterparts [@ilicic2016classification].
 This is because they are able to detect subtle patterns across many quality metrics simultaneously. 
-However, this comes at some cost to interpretability, as the reason for removing a given cell is not always immediately obvious.
+However, this comes at some cost to interpretability, as the reason for removing a given cell may not always be obvious.
 Thus, for this workflow, we will use the simple approach whereby each quality metric is considered separately.
 
 ## Filtering out low-abundance genes
 
-Very low-abundance genes are also removed prior to further analysis.
-These genes tend to provide little information as the counts are too low for reliable inferences.
+Low-abundance genes are removed as the counts are too low for reliable statistical inferences.
 In addition, the discreteness of the counts may interfere with downstream statistical procedures, e.g., by compromising the accuracy of asymptotic approximations.
 Here, low-abundance genes are defined as those with an average count across cells below 1.
 Removing them avoids problems with discreteness and also reduces the amount of computational work.
@@ -192,7 +193,7 @@ The relationship between the proportion of expressing cells and the mean can be 
 The two statistics tend to be well-correlated, so filtering on either should give similar results.
 
 ```{r, fig.cap="Frequency of expression against the mean expression for each gene. Circles represent endogenous genes and triangles represent spike-in transcripts or mitochondrial genes. The bars on each axis represent the location of each gene on that axis. Genes above high technical dropout are defined as those above a non-linear trend fitted to the triangles."}
-plotQC(sce, type = "exprs") + extra
+plotQC(sce, type = "exprs") + fontsize
 ```
 
 In general, we prefer the mean-based filter as it tends to be less aggressive.
@@ -247,7 +248,7 @@ This can be visualized by constructing a PCA plot from the normalized log-expres
 Cells with more similar expression profiles should be located close together on the plot.
 
 ```{r pcaplot, fig.cap="PCA plot constructed from normalized log-expression values, where each point represents a cell in the HSC data set. First and second components are shown, along with the percentage of variance explained. Bars represent the coordinates of the cells on each axis. None of the cells are controls (e.g., empty wells) so the legend can be ignored."}
-plotPCA(sce, exprs_values="norm_exprs") + extra
+plotPCA(sce, exprs_values="norm_exprs") + fontsize
 ```
 
 Alternatively, the PCA plot can be constructed from a matrix of correlations between cells. 
@@ -269,9 +270,9 @@ It is also advisable to test different settings of the "perplexity" parameter as
 ```{r tsneplot, fig.cap="_t_-SNE plot constructed from normalized log-expression values using a range of perplexity values. In each plot, each point represents a cell in the HSC data set. Bars represent the coordinates of the cells on each axis.", fig.width=12, fig.height=6}
 library(Rtsne)
 set.seed(100)
-out5 <- plotTSNE(sce, exprs_values="norm_exprs", perplexity=5) + extra + ggtitle("Perplexity = 5")
-out10 <- plotTSNE(sce, exprs_values="norm_exprs", perplexity=10) + extra + ggtitle("Perplexity = 10")
-out20 <- plotTSNE(sce, exprs_values="norm_exprs", perplexity=20) + extra + ggtitle("Perplexity = 20")
+out5 <- plotTSNE(sce, exprs_values="norm_exprs", perplexity=5) + fontsize + ggtitle("Perplexity = 5")
+out10 <- plotTSNE(sce, exprs_values="norm_exprs", perplexity=10) + fontsize + ggtitle("Perplexity = 10")
+out20 <- plotTSNE(sce, exprs_values="norm_exprs", perplexity=20) + fontsize + ggtitle("Perplexity = 20")
 multiplot(out5, out10, out20, cols=3)
 ```
 
@@ -327,7 +328,7 @@ Recall that the same set of spike-ins is added in the same quantity to each cell
 The biological component of the variance can then be estimated by subtracting the fitted value of the trend from the total variance of each gene in the `decomposeVar` function.
 
 ```{r hvgplot, fig.cap="Variance of normalized log-expression values for each gene in the HSC data set, plotted against the average log-expression. The red line represents the mean-dependent trend in the technical variance of the spike-in transcripts (also highlighted as red points)."}
-var.fit <- trendVar(sce, trend="loess", span=0.2)
+var.fit <- trendVar(sce, trend="loess", span=0.3)
 var.out <- decomposeVar(sce, var.fit)
 plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Variance", ylab="Mean")
 points(var.fit$mean, var.fit$var, col="red", pch=16)
@@ -412,8 +413,8 @@ This is shown below for both PCA and _t_-SNE plots, though in this case, focusin
 
 ```{r pcaredux, fig.width=10, fig.height=6, fig.cap="PCA (left) and _t_-SNE plots (right) using only the expression values for significantly correlated HVGs in the HSC data set. Each cell is represented by a point in each plot, and the bars represent the cell coordinates on each axis."}
 set.seed(100)
-out.pca <- plotPCA(sce, exprs_values="norm_exprs", feature_set=chosen) + extra
-out.tsne <- plotTSNE(sce, exprs_values="norm_exprs", feature_set=chosen) + extra
+out.pca <- plotPCA(sce, exprs_values="norm_exprs", feature_set=chosen) + fontsize
+out.tsne <- plotTSNE(sce, exprs_values="norm_exprs", feature_set=chosen) + fontsize
 multiplot(out.pca, out.tsne, col=2)
 ```
 
