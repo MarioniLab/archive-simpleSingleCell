@@ -456,16 +456,145 @@ multiplot(out.pca, out.tsne, cols=2)
 
 # A more complex analysis on brain cell types
 
-```{r, eval=FALSE}
-incoming <- read.table('GSE60361_C1-3005-Expression.txt.gz', header=TRUE)
-keep <- !duplicated(incoming[,1])
-all.counts <- incoming[keep,-1]
-rownames(all.counts) <- incoming[keep,1]
+## Overview
 
-totals <- colSums(all.counts)
-okay.libs <- totals > 1e4 
-all.counts <- all.counts[,okay.libs]
+We proceed to tackle a more complex data set from a study of cell types in the mouse brain [@zeisel2015brain].
+This contains approximately 3000 cells of varying types such as oligodendrocytes, microglia and neurons.
+Individual cells were isolated using the Fluidigm C1 microfluidics system and library preparation was performed on each cell using a UMI-based protocol.
+After sequencing, expression was quantified by counting the number of UMIs mapped to each gene.
+Count data for all endogenous genes, mitochondrial genes and spike-in transcripts were obtained from http://linnarssonlab.org/cortex.
 
+## Count loading 
+
+The count data are distributed across several files, so some work is necessary to consolidate them into a single matrix.
+We define a simple utility function for loading data in from each file. 
+(We stress that this function is only relevant to the current data set, and should _not_ be used for other data sets.
+In general, this kind of effort is not required if the counts are in a single file and separated from the metadata.)
+
+```{r}
+readFormat <- function(infile) { 
+    # First column is empty.
+    metadata <- read.delim(infile, stringsAsFactors=FALSE, header=FALSE, nrow=10)[,-1] 
+    rownames(metadata) <- metadata[,1]
+    metadata <- metadata[,-1]
+    metadata <- as.data.frame(t(metadata))
+    # First column after row names is some useless filler.
+    counts <- read.delim(infile, stringsAsFactors=FALSE, header=FALSE, row.names=1, skip=11)[,-1] 
+    counts <- as.matrix(counts)
+    return(list(metadata=metadata, counts=counts))
+}
+```
+
+Using this function, we read in the counts for the endogenous genes, ERCC spike-ins and mitochondrial genes.
+
+```{r}
+endo.data <- readFormat("expression_mRNA_17-Aug-2014.txt")
+spike.data <- readFormat("expression_spikes_17-Aug-2014.txt")
+mito.data <- readFormat("expression_mito_17-Aug-2014.txt")
+```
+
+We also need to rearrange the columns for the mitochondrial data, as the order is not consistent with the other files.
+
+```{r}
+m <- match(endo.data$metadata$cell_id, mito.data$metadata$cell_id)
+mito.data$metadata <- mito.data$metadata[m,]
+mito.data$counts <- mito.data$counts[,m]
+```
+
+```{r, echo=FALSE}
+stopifnot(identical(endo.data$metadata$cell_id, spike.data$metadata$cell_id)) # should be the same.
+stopifnot(all(endo.data$metadata$cell_id==mito.data$metadata$cell_id)) # should now be the same.
+```
+
+The counts are then combined into a single matrix for constructing a `SCESet` object.
+For convenience, metadata for all cells are stored in the same object for later access.
+
+```{r}
+all.counts <- rbind(endo.data$counts, mito.data$counts, spike.data$counts)
+metadata <- AnnotatedDataFrame(endo.data$metadata)
+sce <- newSCESet(countData=all.counts, phenoData=metadata)
+dim(sce)
+```
+
+We also add annotation identifying which rows correspond to each class of features.
+
+```{r}
+nrows <- c(nrow(endo.data$counts), nrow(mito.data$counts), nrow(spike.data$counts))
+is.spike <- rep(c(FALSE, TRUE, FALSE), nrows)
+fData(sce)$is_feature_spike <- is.spike
+is.mito <- rep(c(FALSE, FALSE, TRUE), nrows)
+```
+
+```{r, echo=FALSE, results='hide'}
+# Save some memory.
+rm(mito.data, endo.data, spike.data)
+gc()
+```
+
+## Quality control on the cells and genes
+
+The original authors of the study have already removed low-quality cells prior to data publication.
+Nonetheless, we can compute some metrics to check that whether the remaining cells are satisfactory.
+
+```{r}
+sce <- calculateQCMetrics(sce, feature_controls=list(Spike=is.spike, Mt=is.mito)) 
+```
+
+As previously described, we remove cells with low total counts for endogenous genes or with few total expressed features.
+
+```{r}
+endo.sum <- sce$counts_endogenous_features 
+count.keep <- endo.sum >= median(endo.sum)/10
+sum(!count.keep)
+feature.keep <- sce$total_features >= 1000
+sum(!feature.keep)
+```
+
+We also examine the distribution of the proportions of total reads mapped to mitochondrial or spike-in genes.
+
+```{r mitoplot, fig.width=12, fig.height=6, fig.cap="Histogram of the proportion of reads mapped to mitochondrial genes (left) or spike-in transcripts (right) across all cells in the brain data set."}
+par(mfrow=c(1,2))
+mito.props <- sce$pct_counts_feature_controls_Mt
+hist(mito.props, xlab="Mitochondrial proportion (%)", ylab="Number of cells", 
+    breaks=20, cex.lab=1.4, cex.axis=1.2, main="")
+spike.props <- sce$pct_counts_feature_controls_Spike
+hist(spike.props, xlab="ERCC proportion (%)", ylab="Number of cells", 
+breaks=20, cex.lab=1.4, cex.axis=1.2, main="")
+```
+
+Here, a couple of clear outliers are observed for the spike-in proportions.
+We remove cells with proportions above a threshold of 15%, as this is where the probability density of the empirical distribution becomes negligible.
+For the mitochondrial proportions, the distinction is more difficult.
+This may be because of the presence of many cell types with different mitochondria copy number or activity.
+In this data set, we set a threshold of 70% and remove the most extreme cases on the right tail.
+
+```{r}
+spike.keep <- spike.props <= 15
+sum(!spike.keep)
+mito.keep <- mito.props <= 70
+sum(!mito.keep)
+```
+
+Removal of low-quality cells can then be performed by combining all of the metrics.
+The vast majority of cells are retained, which suggests that the original quality control procedures were generally adequate.
+
+```{r}
+total.keep <- count.keep & feature.keep & spike.keep & mito.keep
+sce <- sce[,total.keep]
+sum(total.keep)
+```
+
+Low-abundance genes are also removed by applying a simple mean-based filter.
+
+```{r}
+keep <- rowMeans(counts(sce)) >= 1
+sce <- sce[keep,]
+sum(keep)
+```
+
+## Normalization and cell-cycle classification
+
+```{r}
 library(scran)
 y <- countsToSE(all.counts) 
 clusters <- quickCluster(y)
@@ -480,7 +609,9 @@ ensembl <- anno$ENSEMBL[match(rownames(y), anno$SYMBOL)]
 keep <- !is.na(ensembl)
 assignments <- cyclone(assay(y, "exprs")[keep,], mm.pairs, gene.names=ensembl[keep], BPPARAM=MulticoreParam(5))
 plot(assignments$score$G1, assignments$score$G2M)
+```
 
+```{r}
 var.fit <- trendVar(y, trend="loess", use.spikes=FALSE)
 var.out <- decomposeVar(y, var.fit)
 
