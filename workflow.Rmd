@@ -433,9 +433,9 @@ heatmap.2(heat.vals[chosen,], col=bluered, symbreak=TRUE, trace='none', cexRow=0
     Colv=as.dendrogram(my.tree))
 ```
 
-A close look suggests that a H2-Aa/Cd74-expressing subpopulation exists alongside a Fos/Jun-negative subpopulation.
-H2-Aa is a component of the class II major histocompatibility complex and may be indicative of B-cell contamination [@heng2008immunological].
-Fos and Jun may also be relevant as they are involved in cell proliferation [@angel1991role].
+A close look suggests that a _H2-Aa_/_Cd74_-expressing subpopulation exists alongside a _Fos_/_Jun_-negative subpopulation.
+_H2-Aa_ codes for a component of the class II major histocompatibility complex and may be indicative of B-cell contamination [@heng2008immunological].
+_Fos_ and _Jun_ may also be relevant as they are involved in cell proliferation [@angel1991role].
 In addition, these visual subpopulations roughly correspond to the computationally identified clusters from the dynamic tree cut.
 Further analyses can then be performed on those empirical clusters -- for example, we can perform a DE analysis to identify marker genes for each corresponding subpopulation (this will be explored in more detail later).
 
