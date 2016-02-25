@@ -63,11 +63,11 @@ The aim is to provide a variety of modular usage examples that can be applied to
 ## Overview
 
 To introduce most of the concepts of scRNA-seq data analysis, we use a relatively simple data set from a study of haematopoietic stem cells (HSCs) [@wilson2015combined].
-Mouse HSCs were purified and 96 cells were sequenced using the Smart-seq2 protocol.
+Single mouse HSCs were isolated into microtiter plates and libraries were prepared for 96 cells using the Smart-seq2 protocol.
 A constant amount of spike-in RNA from the External RNA Controls Consortium (ERCC) was also added to each cell prior to library preparation.
-The expression of each gene was quantified by counting the total number of reads mapped to the exonic regions of that gene.
+High-throughput sequencing was performed and the expression of each gene was quantified by counting the total number of reads mapped to its exonic regions.
 Similarly, the quantity of each spike-in transcript was measured by counting reads mapped to the spike-in reference sequence.
-Counts for all genes/transcripts in each cell were obtained from the NCBI Gene Expression Omnibus as a supplementary file under the accession number GSE61533.
+Counts for all genes/transcripts in each cell were obtained from the NCBI Gene Expression Omnibus (GEO) as a supplementary file under the accession number GSE61533.
 
 For simplicity, we forgo a description of the read processing steps required to generate the count matrix, i.e., read alignment and counting into features.
 These steps have been described in some detail elsewhere [@love2015rnaseq], and are largely the same for bulk and single-cell data.
