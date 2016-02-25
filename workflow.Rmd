@@ -245,7 +245,7 @@ assayDataElementNames(sce)
 Dimensionality reduction is often useful to examine major features of the data before more quantitative analyses.
 Of particular interest is whether the HSCs partition into distinct subpopulations.
 This can be visualized by constructing a PCA plot from the normalized log-expression values.
-Cells with more similar expression profiles should be located close together on the plot.
+Cells with similar expression profiles should be located close together on the plot.
 
 ```{r pcaplot, fig.cap="PCA plot constructed from normalized log-expression values, where each point represents a cell in the HSC data set. First and second components are shown, along with the percentage of variance explained. Bars represent the coordinates of the cells on each axis. None of the cells are controls (e.g., empty wells) so the legend can be ignored."}
 plotPCA(sce, exprs_values="norm_exprs") + fontsize
