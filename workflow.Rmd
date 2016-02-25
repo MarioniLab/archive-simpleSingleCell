@@ -32,6 +32,7 @@ library(scater)
 library(gplots)
 library(gdata)
 library(R.utils)
+library(org.Mm.eg.db)
 ```
 
 # Introduction
@@ -291,7 +292,7 @@ Cells in a test data set can then be classified into the appropriate phase, base
 This is achieved using the `cyclone` function on a pre-trained set of gene pairs for mouse data.
 (Some additional work is necessary to match the gene symbols in the data to the Ensembl annotation in the set of pairs.)
 
-```{r phaseplot, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the HSC data set, where each point represents a cell. "}
+```{r phaseplot, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the HSC data set, where each point represents a cell."}
 mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", package="scran"))
 library(org.Mm.eg.db)
 anno <- select(org.Mm.eg.db, keys=rownames(sce), keytype="SYMBOL", column="ENSEMBL")
@@ -585,6 +586,7 @@ sum(total.keep)
 ```
 
 Low-abundance genes are also removed by applying a simple mean-based filter.
+This yields fewer genes than in the HSC data set, mostly because the sequencing depth per cell is much lower.
 
 ```{r}
 keep <- rowMeans(counts(sce)) >= 1
@@ -594,22 +596,51 @@ sum(keep)
 
 ## Normalization and cell-cycle classification
 
-```{r}
-library(scran)
-y <- countsToSE(all.counts) 
-clusters <- quickCluster(y)
-y$size.factor <- normalizeBySums(y, cluster=clusters)
-y <- normalize(y)
+Normalization of cell-specific biases is performed using the `normalizeBySums` function.
+Here, we cluster similar cells together and normalize the cells in each cluster using the deconvolution method.
+This improves the accuracy of normalization by reducing the number of DE genes between cells in the same cluster.
+Normalization between clusters is then performed to ensure that expression values from cells in different clusters are comparable.
 
-# Cell cycle phase classification.
+```{r}
+clusters <- quickCluster(sce)
+sce$size.factor <- normalizeBySums(sce, cluster=clusters)
+sce <- normalize(sce)
+```
+
+Greater scatter is observed between the total count for each cell and its size factor.
+This is consistent with an increased amount of DE between cells of different types, which compromises the accuracy of library size normalization [@robinson2010scaling].
+In contrast, the size factors are estimated based on median ratios and are more robust to the presence of DE between cells.
+
+```{r, fig.cap="Size factors from deconvolution, shown against the total counts for all cells in the brain data set. Axes are shown on a log-scale."}
+plot(sce$size.factor, sce$total_counts/1e6, log="xy", cex.axis=1.2, cex.lab=1.4,
+    ylab="Total count (per million)", xlab="Size factor", main="")
+```
+
+We also attempt to classify cells into cell cycle phases using the `cyclone` method.
+We use additional cores to speed up classification for data sets with many cells.
+However, examination of the plot below indicates that many of the G1 and G2/M scores are ambiguous.
+This highlights the potential difficulties of training a classifier on one cell type (mouse embryonic stem cells -- see @scialdone2015computational for more details) and applying it on a substantially different cell type.
+Some neuron types are particularly problematic as they are postmitotic and do not belong in any phase of the cell cycle.
+
+```{r, echo=FALSE, results='hide', message=FALSE}
 mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", package="scran"))
 library(org.Mm.eg.db)
-anno <- select(org.Mm.eg.db, keys=rownames(y), keytype="SYMBOL", column="ENSEMBL")
-ensembl <- anno$ENSEMBL[match(rownames(y), anno$SYMBOL)]
-keep <- !is.na(ensembl)
-assignments <- cyclone(assay(y, "exprs")[keep,], mm.pairs, gene.names=ensembl[keep], BPPARAM=MulticoreParam(5))
-plot(assignments$score$G1, assignments$score$G2M)
 ```
+
+```{r, message=FALSE,  fig.cap="Cell cycle phase scores from applying the pair-based classifier on the brain data set, where each point represents a cell."}
+anno <- select(org.Mm.eg.db, keys=rownames(sce), keytype="SYMBOL", column="ENSEMBL")
+ensembl <- anno$ENSEMBL[match(rownames(sce), anno$SYMBOL)]
+keep <- !is.na(ensembl)
+assignments <- cyclone(sce[keep,], mm.pairs, gene.names=ensembl[keep], 
+    BPPARAM=MulticoreParam(5))
+plot(assignments$score$G1, assignments$score$G2M, xlab="G1 score", ylab="G2/M score",
+    pch=16, cex.axis=1.2, cex.lab=1.4, main="")
+```
+
+Given the lack of definitive classification, we will not perform any processing of the data set by cell cycle phase.
+However, this information is still useful for verifying downstream results.
+For example, if putative subpopulations have distinctly different phase scores, we may suspect that the differences between subpopulations are mainly driven by cell cycle effects.
+
 
 ```{r}
 var.fit <- trendVar(y, trend="loess", use.spikes=FALSE)
