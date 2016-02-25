@@ -673,7 +673,6 @@ multiplot(tsne1, tsne2, cols=2)
 An additional effect to consider is the fact that cells were processed on many different C1 chips.
 This can lead to batch effects due to technical differences in library preparation between chips.
 To check that this is not the case, we examine the spread of cells from each chip on the PCA plot.
-(We separate cells by tissue to avoid picking up the tissue effect again.)
 Cells from different chips seem to mix together, which suggests that the substructure is not being driven by a batch effect.
 
 ```{r pca2plotbrain, fig.width=15, fig.height=6, fig.cap="PCA plots constructed from the normalized expression values for all cells in the brain data set from the cortex (left) or hippocampus (right). Each cell is represented by a point in each plot, and the bars represent the cell coordinates on each axis. Cells are coloured according to the C1 chip from which the library was prepared."}
@@ -685,6 +684,13 @@ pca2 <- plotPCA(sce[,sce$tissue!="sscortex"], exprs_values="norm_exprs",
 multiplot(pca1, pca2, cols=2)
 ```
 
+Note that we separate cells by tissue to avoid picking up the tissue effect in the PCA plots (as the chip factor is nested within the tissue factor).
+This hierarchical approach can be extended if sufficient annotation is available.
+For example, consider a situation where multiple chips were used for each mouse, and multiple mice were used in the entire experiment.
+We could construct a PCA plot for cells in each mouse, coloured by the chip of origin -- this allows us to check whether chip effects are present in that mouse.
+We could then construct a PCA plot for all cells, coloured by the mouse of origin -- this allows us to check whether a mouse effect is present.
+This strategy reduces the complexity of the colours in each plot and improves the ease of diagnosis.
+
 <!-- 
 The prefix of the cell ID seems to be the chip, as the second half of the ID marks the well position and there's always less than 96.
 It should at least be the mouse, as the prefix is nested in tissue/sex. 
@@ -692,8 +698,8 @@ It should at least be the mouse, as the prefix is nested in tissue/sex.
 
 In summary, the major difference between cells seems to be associated with the tissue of origin.
 Whether this is interesting or not is debatable as it depends on the biological hypothesis being studied.
-However, for the purposes of this workflow, we will consider the tissue of origin as being an uninteresting confounding effect.
-As such, we will block on the tissue of origin in all of our downstream analyses.
+However, for the purposes of this workflow, we will treat the tissue of origin as an uninteresting confounding effect.
+As such, we will block on tissue in all of our downstream analyses.
 
 ```{r}
 design <- model.matrix(~sce$tissue)
