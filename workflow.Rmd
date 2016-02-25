@@ -324,13 +324,18 @@ This may be necessary for other model organisms where pre-trained classifiers ar
 Identification of HVGs allows us to focus on the genes that are driving heterogeneity across cells.
 We first decompose the variance in expression for each gene into biological and technical components.
 The latter is estimated by fitting a mean-variance trend to the spike-in transcripts with the `trendVar` function.
+As the trend can be rather non-linear, some adjustment of the span for loess curves (or the degrees of freedom for polynomial curves) may be required to obtain a satisfactory fit.
+
+```{r}
+var.fit <- trendVar(sce, trend="loess", span=0.25)
+```
+
 Recall that the same set of spike-ins is added in the same quantity to each cell, and thus should exhibit no biological variability.
 The biological component of the variance can then be estimated by subtracting the fitted value of the trend from the total variance of each gene in the `decomposeVar` function.
 
 ```{r hvgplot, fig.cap="Variance of normalized log-expression values for each gene in the HSC data set, plotted against the average log-expression. The red line represents the mean-dependent trend in the technical variance of the spike-in transcripts (also highlighted as red points)."}
-var.fit <- trendVar(sce, trend="loess", span=0.3)
 var.out <- decomposeVar(sce, var.fit)
-plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Variance", ylab="Mean")
+plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression", ylab="Variance of log-expression")
 points(var.fit$mean, var.fit$var, col="red", pch=16)
 o <- order(var.out$mean)
 lines(var.out$mean[o], var.out$tech[o], col="red", lwd=2)
@@ -348,6 +353,7 @@ head(var.out[top.hvgs,])
 Of course, there are many ways of defining HVGs, e.g., by using the coefficient of variation [@kolod2015singlecell;@kim2015characterizing], through the dispersion parameter in the negative binomial distribution [@mccarthy2012differential], or as a proportion of total variability [@vallejos2015basics].
 We use the variance of the log-expression values because the log-transformation provides some protection against genes with strong expression in only one or two outlier cells.
 This ensures that the set of top HVGs is not dominated by genes with (mostly uninteresting) outlier expression patterns.
+However, the cost of this robustness is the need to fit a rather complex mean-variance relationship.
 
 ## Identifying correlated gene pairs with Spearman's rho
 
@@ -399,8 +405,8 @@ heatmap.2(heat.vals[chosen,], col=bluered, symbreak=TRUE, trace='none', cexRow=0
 
 We recommend storing the heatmap at a sufficiently high resolution so that the relevant genes can be easily identified for further examination.
 A close look suggests that a H2-Aa/Cd74-expressing subpopulation exists alongside a Fos/Jun-negative subpopulation.
-This may be biologically relevant to the differentiation and maintenance of HSCs --
-    H2-Aa and Cd74 are components of the class II major histocompatibility complex, while Fos and Jun are involved in cell proliferation [@angel1991role].
+H2-Aa is a component of the class II major histocompatibility complex and may be indicative of B-cell contamination [@heng2008immunological].
+Fos and Jun may also be relevant as they are involved in cell proliferation [@angel1991role].
 
 ```{r, results='hide'}
 pdf("hsc_heat.pdf", height=12, width=6)
@@ -415,19 +421,21 @@ This is shown below for both PCA and _t_-SNE plots, though in this case, focusin
 set.seed(100)
 out.pca <- plotPCA(sce, exprs_values="norm_exprs", feature_set=chosen) + fontsize
 out.tsne <- plotTSNE(sce, exprs_values="norm_exprs", feature_set=chosen) + fontsize
-multiplot(out.pca, out.tsne, col=2)
+multiplot(out.pca, out.tsne, cols=2)
 ```
 
 Finally, subpopulations of cells can be explicitly defined with clustering algorithms.
 Here, hierarchical clustering is used to construct a dendrogram, with 1 minus the rank correlation as the dissimilarity measure between each pair of cells.
-A dynamic tree cut is then performed to define the clusters, using the `cutreeDynamic` function in the `r CRANpkg("dynamicTreeCut")` package [@langfelder2008defining].
 Again, we focus on correlated HVGs for which subpopulation-specific expression patterns should be the most pronounced.
+A dynamic tree cut is then performed to define the clusters, using the `cutreeDynamic` function in the `r CRANpkg("dynamicTreeCut")` package [@langfelder2008defining].
+Note that some tuning of `cutHeight` is required to obtain satisfactory results for each data set.
 
 ```{r}
-my.dist <- as.dist(1 - cor(norm.exprs, method="spearman"))
+my.dist <- dist(t(heat.vals[chosen,]))
 my.tree <- hclust(my.dist, method="ward.D2")
 library(dynamicTreeCut)
-my.clusters <- unname(cutreeDynamic(my.tree, distM=as.matrix(my.dist), verbose=0))
+my.clusters <- unname(cutreeDynamic(my.tree, distM=as.matrix(my.dist), 
+    verbose=0, cutHeight=60))
 my.clusters
 ```
 
@@ -438,7 +446,7 @@ For example, a DE analysis can be performed between subpopulations to identify c
 
 ```{r, fig.cap="Heatmap of mean-centred normalized log-expression values for correlated HVGs in the HSC data set. Column colours represent the clusters defined with a dynamic tree cut after hierarchical clustering on the rank correlations between cells."}
 heatmap.2(heat.vals[chosen,], col=bluered, symbreak=TRUE, trace='none', cexRow=0.8,
-    ColSideColors=c("darkgreen", "orange", "dodgerblue")[my.clusters],
+    ColSideColors=c("darkgreen", "orange", "dodgerblue")[my.clusters+1],
     Colv=as.dendrogram(my.tree))
 ```
 
