@@ -641,15 +641,63 @@ Given the lack of definitive classification, we will not perform any processing 
 However, this information is still useful for verifying downstream results.
 For example, if putative subpopulations have distinctly different phase scores, we may suspect that the differences between subpopulations are being driven by cell cycle effects.
 
-## Data exploration
+## Data exploration to examine the effect of technical factors
 
-```{r pcaredux, fig.width=10, fig.height=6, fig.cap="PCA (left) and _t_-SNE plots (right) using only the expression values for significantly correlated HVGs in the HSC data set. Each cell is represented by a point in each plot, and the bars represent the cell coordinates on each axis."}
-set.seed(100)
-out.pca <- plotPCA(sce, exprs_values="norm_exprs", feature_set=chosen) + fontsize
-out.tsne <- plotTSNE(sce, exprs_values="norm_exprs", feature_set=chosen) + fontsize
-multiplot(out.pca, out.tsne, cols=2)
+For large experiments, data exploration has two functions -- to identify interesting biology, and also to check the effect of various technical factors.
+PCA plots constructed from the expression data suggest that distinct subpopulations are present.
+Some of the substructure may be due to differences in the tissue from which the cells were extracted, e.g.,
+    cells from the cortex and hippocampus dominate the bottom-right and bottom-left corners of the plot, respectively.
+In contrast, cells taken from mice of different sexes mix throughout the plot, indicating that sex has little effect on the overall differences across the data set.
+
+```{r, echo=FALSE, results='hide', message=FALSE}
+fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
 ```
 
+```{r pcaplotbrain, fig.width=12, fig.height=6, fig.cap="PCA plots constructed from the normalized expression values for all remaining cells in the brain data set. Each cell is represented by a point in each plot, and the bars represent the cell coordinates on each axis. Left: cells are coloured according to the tissue of origin (cortex or hippocampus). Right: cells are coloured according to the sex of the mouse -- male (-1), female (1) or unassigned (0)."}
+pca1 <- plotPCA(sce, exprs_values="norm_exprs", colour_by="tissue") + fontsize
+pca2 <- plotPCA(sce, exprs_values="norm_exprs", colour_by="sex") + fontsize
+multiplot(pca1, pca2, cols=2)
+```
+
+Similar results are observed with _t_-SNE plots.
+Again, users should set the seed to a constant value to ensure that the results are reproducible.
+
+```{r tsneplotbrain, fig.width=12, fig.height=6, fig.cap="_t_-SNE plots constructed from the normalized expression values for all remaining cells in the brain data set. Each cell is represented by a point in each plot, and the bars represent the cell coordinates on each axis. Left: cells are coloured according to the tissue of origin (cortex or hippocampus). Right: cells are coloured according to the sex of the mouse -- male (-1), female (1) or unassigned (0)."}
+set.seed(100)
+tsne1 <- plotTSNE(sce, exprs_values="norm_exprs", colour_by="tissue") + fontsize
+set.seed(100)
+tsne2 <- plotTSNE(sce, exprs_values="norm_exprs", colour_by="sex") + fontsize
+multiplot(tsne1, tsne2, cols=2)
+```
+
+An additional effect to consider is the fact that cells were processed on many different C1 chips.
+This can lead to batch effects due to technical differences in library preparation between chips.
+To check that this is not the case, we examine the spread of cells from each chip on the PCA plot.
+(We separate cells by tissue to avoid picking up the tissue effect again.)
+Cells from different chips seem to mix together, which suggests that the substructure is not being driven by a batch effect.
+
+```{r pca2plotbrain, fig.width=15, fig.height=6, fig.cap="PCA plots constructed from the normalized expression values for all cells in the brain data set from the cortex (left) or hippocampus (right). Each cell is represented by a point in each plot, and the bars represent the cell coordinates on each axis. Cells are coloured according to the C1 chip from which the library was prepared."}
+sce$chip <- sub("_.*", "", sce$cell_id)
+pca1 <- plotPCA(sce[,sce$tissue=="sscortex"], exprs_values="norm_exprs", 
+    colour_by="chip") + fontsize + ggtitle("Cortex")
+pca2 <- plotPCA(sce[,sce$tissue!="sscortex"], exprs_values="norm_exprs", 
+    colour_by="chip") + fontsize + ggtitle("Hippocampus")
+multiplot(pca1, pca2, cols=2)
+```
+
+<!-- 
+The prefix of the cell ID seems to be the chip, as the second half of the ID marks the well position and there's always less than 96.
+It should at least be the mouse, as the prefix is nested in tissue/sex. 
+-->
+
+In summary, the major difference between cells seems to be associated with the tissue of origin.
+Whether this is interesting or not is debatable as it depends on the biological hypothesis being studied.
+However, for the purposes of this workflow, we will consider the tissue of origin as being an uninteresting confounding effect.
+As such, we will block on the tissue of origin in all of our downstream analyses.
+
+```{r}
+design <- model.matrix(~sce$tissue)
+```
 
 ## Identifying correlated HVGs
 
