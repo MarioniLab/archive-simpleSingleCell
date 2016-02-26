@@ -138,11 +138,9 @@ A similar case can be made for the proportion of reads mapped to spike-in transc
 ```{r controlplothsc, fig.width=12, fig.height=6, fig.cap="Histogram of the proportion of reads mapped to mitochondrial genes (left) or spike-in transcripts (right) across all remaining cells in the HSC data set."}
 par(mfrow=c(1,2))
 mito.props <- sce$pct_counts_feature_controls_Mt
-hist(mito.props, xlab="Mitochondrial proportion (%)", ylab="Number of cells", 
-    breaks=20, cex.lab=1.4, cex.axis=1.2, main="")
+hist(mito.props, xlab="Mitochondrial proportion (%)", ylab="Number of cells", breaks=20, main="")
 spike.props <- sce$pct_counts_feature_controls_Spike
-hist(spike.props, xlab="ERCC proportion (%)", ylab="Number of cells", 
-    breaks=20, cex.lab=1.4, cex.axis=1.2, main="")
+hist(spike.props, xlab="ERCC proportion (%)", ylab="Number of cells", breaks=20, main="")
 ```
 
 An alternative approach to quality control is to perform a principal components analysis (PCA) based on the quality metrics for each cell, e.g., the total number of reads, the total number of features, the proportion of mitochondrial or spike-in reads.
@@ -226,8 +224,8 @@ Any DE between cells would yield a non-linear trend between the total count and 
 This does not occur here as strong DE is unlikely to exist between cells of the same type.
 
 ```{r normplothsc, fig.cap="Size factors from deconvolution, shown against the total counts for all cells in the HSC data set. Axes are shown on a log-scale."}
-plot(sce$size.factor, sce$total_counts/1e6, log="xy", cex.axis=1.2, cex.lab=1.4,
-    ylab="Total count (per million)", xlab="Size factor", main="")
+plot(sce$size.factor, sce$total_counts/1e6, log="xy",
+    ylab="Total count (per million)", xlab="Size factor")
 ```
 
 Normalized log-expression values can be computed for use in downstream analyses.
@@ -259,7 +257,7 @@ This approach tends to be more robust to noise and outliers that would dominate 
 ```{r pcacorplothsc, fig.cap="PCA plot constructed from a matrix of Spearman rank correlations between cells, where each point represents a cell in the HSC data set."}
 cor.mat <- cor(assayDataElement(sce, "exprs"), method="spearman")
 out <- prcomp(cor.mat)
-plot(out$x[,1], out$x[,2], xlab="PC1", ylab="PC2", pch=16, cex.axis=1.2, cex.lab=1.4)
+plot(out$x[,1], out$x[,2], xlab="PC1", ylab="PC2", pch=16)
 ```
 
 Another popular approach to dimensionality reduction is the _t_-stochastic neighbour embedding (_t_-SNE) method [@van2008visualizing].
@@ -297,8 +295,7 @@ anno <- select(org.Mm.eg.db, keys=rownames(sce), keytype="SYMBOL", column="ENSEM
 ensembl <- anno$ENSEMBL[match(rownames(sce), anno$SYMBOL)]
 keep <- !is.na(ensembl)
 assignments <- cyclone(sce[keep,], mm.pairs, gene.names=ensembl[keep])
-plot(assignments$score$G1, assignments$score$G2M, xlab="G1 score", ylab="G2/M score",
-    pch=16, cex.axis=1.2, cex.lab=1.4, main="")
+plot(assignments$score$G1, assignments$score$G2M, xlab="G1 score", ylab="G2/M score", pch=16)
 ```
 
 Cells are classified as being in G1 phase if the G1 score is above 0.5; in G2/M phase if the G2/M score is above 0.5; and in S phase, if neither is above 0.5.
@@ -586,11 +583,9 @@ We also examine the distribution of the proportions of total reads mapped to mit
 ```{r controlplotbrain, fig.width=12, fig.height=6, fig.cap="Histogram of the proportion of reads mapped to mitochondrial genes (left) or spike-in transcripts (right) across all cells in the brain data set."}
 par(mfrow=c(1,2))
 mito.props <- sce$pct_counts_feature_controls_Mt
-hist(mito.props, xlab="Mitochondrial proportion (%)", ylab="Number of cells", 
-    breaks=20, cex.lab=1.4, cex.axis=1.2, main="")
+hist(mito.props, xlab="Mitochondrial proportion (%)", ylab="Number of cells", breaks=20, main="")
 spike.props <- sce$pct_counts_feature_controls_Spike
-hist(spike.props, xlab="ERCC proportion (%)", ylab="Number of cells", 
-breaks=20, cex.lab=1.4, cex.axis=1.2, main="")
+hist(spike.props, xlab="ERCC proportion (%)", ylab="Number of cells", breaks=20, main="")
 ```
 
 Here, a couple of clear outliers are observed for the spike-in proportions.
@@ -642,8 +637,8 @@ This is consistent with an increased amount of DE between cells of different typ
 In contrast, the size factors are estimated based on median ratios and are more robust to the presence of DE between cells.
 
 ```{r normplotbrain, fig.cap="Size factors from deconvolution, shown against the total counts for all cells in the brain data set. Axes are shown on a log-scale."}
-plot(sce$size.factor, sce$total_counts/1e6, log="xy", cex.axis=1.2, cex.lab=1.4,
-    ylab="Total count (per million)", xlab="Size factor", main="")
+plot(sce$size.factor, sce$total_counts/1e6, log="xy",
+    ylab="Total count (per million)", xlab="Size factor")
 ```
 
 We also attempt to classify cells into cell cycle phases using the `cyclone` method.
@@ -655,16 +650,15 @@ Some neuron types are particularly problematic as they are postmitotic and do no
 ```{r, echo=FALSE, results='hide', message=FALSE}
 mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", package="scran"))
 library(org.Mm.eg.db)
+gc()
 ```
 
 ```{r phaseplotbrain, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the brain data set, where each point represents a cell."}
 anno <- select(org.Mm.eg.db, keys=rownames(sce), keytype="SYMBOL", column="ENSEMBL")
 ensembl <- anno$ENSEMBL[match(rownames(sce), anno$SYMBOL)]
 keep <- !is.na(ensembl)
-assignments <- cyclone(sce[keep,], mm.pairs, gene.names=ensembl[keep], 
-    BPPARAM=MulticoreParam(5))
-plot(assignments$score$G1, assignments$score$G2M, xlab="G1 score", ylab="G2/M score",
-    pch=16, cex.axis=1.2, cex.lab=1.4, main="")
+assignments <- cyclone(sce[keep,], mm.pairs, gene.names=ensembl[keep], BPPARAM=MulticoreParam(5))
+plot(assignments$score$G1, assignments$score$G2M, xlab="G1 score", ylab="G2/M score", pch=16)
 ```
 
 Given the lack of definitive classification, we will not perform any processing of the data set by cell cycle phase.
