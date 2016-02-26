@@ -130,34 +130,41 @@ summary(sce$total_features)
 
 Another measure of quality is the proportion of reads mapped to genes in the mitochondrial genome.
 High proportions are indicative of poor-quality cells [@islam2014quantitative;@ilicic2016classification], possibly because of increased apoptosis and/or loss of cytoplasmic RNA from lysed cells.
-Defining a threshold on the proportion is not straightforward as it depends largely on the cell type and the experimental protocol.
-If we assume that most cells in the data set are not apoptotic, then the threshold can be set to remove any large outliers from the distribution of proportions.
-Here, no obvious outliers are present, so no removal will be performed.
 A similar case can be made for the proportion of reads mapped to spike-in transcripts.
+The distributions of mitochondrial and spike-in proportions across all cells are shown in the plots below.
 
 ```{r controlplothsc, fig.width=12, fig.height=6, fig.cap="Histogram of the proportion of reads mapped to mitochondrial genes (left) or spike-in transcripts (right) across all remaining cells in the HSC data set."}
 par(mfrow=c(1,2))
 mito.props <- sce$pct_counts_feature_controls_Mt
-hist(mito.props, xlab="Mitochondrial proportion (%)", ylab="Number of cells", breaks=20, main="")
+hist(mito.props, xlab="Mitochondrial proportion", ylab="Number of cells", 
+    breaks=20, main="", col="grey80")
 spike.props <- sce$pct_counts_feature_controls_Spike
-hist(spike.props, xlab="ERCC proportion (%)", ylab="Number of cells", breaks=20, main="")
+hist(spike.props, xlab="ERCC proportion", ylab="Number of cells",
+    breaks=20, main="", col="grey80")
+```
+
+Defining a threshold on the proportion is not straightforward as it depends largely on the cell type and the experimental protocol.
+If we assume that most cells in the data set are not apoptotic, then the threshold can be set to remove any large outliers from the distribution of proportions.
+Here, we define outliers as those with proportions that are more than 3 median absolute deviations above the median.
+This results in the removal of a small number of cells.
+
+```{r}
+mito.keep <- mito.props < median(mito.props) + 3*mad(mito.props)
+sum(!mito.keep)
+spike.keep <- spike.props < median(spike.props) + 3*mad(spike.props)
+sum(!spike.keep)
+sce <- sce[,mito.keep & spike.keep]
+ncol(sce)
 ```
 
 An alternative approach to quality control is to perform a principal components analysis (PCA) based on the quality metrics for each cell, e.g., the total number of reads, the total number of features, the proportion of mitochondrial or spike-in reads.
 Outliers on a PCA plot may be indicative of low-quality cells that have aberrant technical properties compared to the (presumed) majority of high-quality cells.
+Here, no cells were identified as outliers in the plot below.
+This is consistent with the removal of suspect cells in the preceding quality control steps.
 
 ```{r pcaqualplothsc, fig.cap="PCA plot for all remaining cells in the HSC data set, constructed using quality metrics. The first and second components are shown on each axis, along with the percentage of total variance explained by each component. Bars represent the coordinates of the cells on each axis."}
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
 plotPCA(sce, pca_data_input = "pdata", detect_outliers=TRUE) + fontsize
-```
-
-In this case, two cells are identified as outliers from the PCA plot.
-These cells can be removed from the data set, under the assumption that they represent low-quality samples.
-
-```{r}
-alt.sce <- plotPCA(sce, pca_data_input = "pdata", detect_outliers=TRUE, 
-    draw_plot=FALSE, return_SCESet=TRUE)
-alt.sce <- alt.sce[,!alt.sce$outlier]
 ```
 
 Methods like outlier detection and support vector machines can provide greater power to distinguish low-quality cells from high-quality counterparts [@ilicic2016classification].
