@@ -207,14 +207,6 @@ A gene will be retained as long as it has sufficient expression in any subset of
 The "at least _n_" filter depends heavily on the choice of _n_ -- in this case, a gene expressed in a subset of 9 cells would be lost.
 While the mean-based filter will retain more outlier-driven genes, this can be handled downstream by choosing methods that are robust to outliers.
 
-Filtering can also be performed to remove genes that are known to be uninteresting.
-Here, we remove mitochondrial genes as we are primarily interested in the regulation of nuclear genes.
-Other candidates for removal include pseudo-genes or ribosomal proteins that are generally uninteresting but may affect downstream analyses.
-
-```{r}
-sce <- sce[!fData(sce)$is_feature_control_Mt,]
-```
-
 ## Normalization of cell-specific biases
 
 Read counts are subject to differences in capture efficiency and sequencing depth between cells [@stegle2015computational].
@@ -455,7 +447,7 @@ We can visualize this dendrogram result with a heatmap.
 All expression values are mean-centred for each gene to highlight the relative expression between cells.
 We recommend storing the heatmap at a sufficiently high resolution so that the relevant genes can be easily identified for further examination.
 
-```{r heatmaphsc, message=FALSE, fig.width=7, fig.height=10, fig.cap="Heatmap of mean-centred normalized log-expression values for correlated HVGs in the HSC data set. Dendrograms are formed by hierarchical clustering on the Euclidean distances between genes (row) or cells (column). Column colours represent the cluster to which each cell is assigned after a dynamic tree cut."}
+```{r heatmaphsc, message=FALSE, fig.width=7, fig.height=7, fig.cap="Heatmap of mean-centred normalized log-expression values for correlated HVGs in the HSC data set. Dendrograms are formed by hierarchical clustering on the Euclidean distances between genes (row) or cells (column). Column colours represent the cluster to which each cell is assigned after a dynamic tree cut."}
 library(gplots)
 heat.vals <- norm.exprs - rowMeans(norm.exprs)
 heatmap.2(heat.vals[chosen,], col=bluered, symbreak=TRUE, trace='none', cexRow=0.8,
@@ -622,8 +614,11 @@ sce <- sce[keep,]
 sum(keep)
 ```
 
-We also remove mitochondrial genes prior to downstream analyses.
-This is particularly important in this data set, as differences in mitochondrial RNA content across cell types can have a substantial impact, e.g., on HVG detection and clustering.
+We also filter out mitochondrial genes prior to further analysis.
+This is because systematic differences in mitochondrial RNA content are present across multiple cell types in this data set.
+Such differences will cause mitochondrial genes to dominate the top set of results (e.g., for identification of correlated HVGs).
+However, these genes are largely uninteresting given that most studies focus on nuclear regulation.
+Other candidates for removal include pseudogenes or ribosomal RNA/protein-coding genes that are mostly uninteresting but can interfere with interpretation of the results.
 
 ```{r}
 sce <- sce[!fData(sce)$is_feature_control_Mt,]
