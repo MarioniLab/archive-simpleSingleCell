@@ -800,15 +800,24 @@ write.table(file="brain_cor.tsv", var.cor, sep="\t", quote=FALSE, col.names=NA)
 head(var.cor)
 ```
 
-Correlated HVGs are used to construct a heatmap to inspect for subpopulations.
-The plot below shows systematic differences between groups of cells with distinct patterns of expression.
-This is consistent with the presence of well-defined subpopulations that are also recovered by clustering.
-Greater control of the empirical clusters can be obtained by manually specifying `cutHeight` in `cutreeDynamic`.
+Correlated HVGs are used to construct a heatmap that can be inspected for subpopulations.
+However, before we do so, we use the `removeBatchEffect` function in the `r Biocpkg("limma")` package to remove the tissue effect.
+This ensures that the tissue of origin will not dominate the visualization.
 
-```{r heatmapbrain, message=FALSE, fig.width=7, fig.height=10, fig.cap="Heatmap of mean-centred normalized log-expression values for correlated HVGs in the brain data set. Dendrograms are formed by hierarchical clustering on the Euclidean distances between genes (row) or cells (column). Column colours represent the cluster to which each cell is assigned after a dynamic tree cut."}
+```{r}
 sig.cor <- var.cor$FDR <= 0.05
 chosen <- unique(c(var.cor$gene1[sig.cor], var.cor$gene2[sig.cor]))
 norm.exprs <- exprs(sce)[chosen,,drop=FALSE]
+library(limma)
+norm.exprs <- removeBatchEffect(norm.exprs, batch=sce$tissue)
+```
+
+The plot below shows systematic differences between groups of cells with distinct patterns of expression.
+This is consistent with the presence of well-defined subpopulations.
+The empirical clusters also correspond roughly to the visual subpopulations. 
+Greater control of the empirical clusters can be obtained by manually specifying `cutHeight` in `cutreeDynamic`.
+
+```{r heatmapbrain, message=FALSE, fig.width=7, fig.height=10, fig.cap="Heatmap of mean-centred normalized log-expression values for correlated HVGs in the brain data set. Dendrograms are formed by hierarchical clustering on the Euclidean distances between genes (row) or cells (column). Column colours represent the cluster to which each cell is assigned after a dynamic tree cut."}
 my.dist <- dist(t(norm.exprs))
 my.tree <- hclust(my.dist, method="ward.D2")
 my.clusters <- unname(cutreeDynamic(my.tree, distM=as.matrix(my.dist), verbose=0))
@@ -816,6 +825,15 @@ heat.vals <- norm.exprs - rowMeans(norm.exprs)
 clust.col <- rainbow(max(my.clusters))
 heatmap.2(heat.vals, col=bluered, symbreak=TRUE, trace='none', cexRow=0.8,
     ColSideColors=clust.col[my.clusters], Colv=as.dendrogram(my.tree))
+```
+
+This heatmap can be stored at a greater resolution for detailed inspection later.
+
+```{r, results='hide'}
+pdf("brain_heat.pdf", width=7, height=20)
+heatmap.2(heat.vals, col=bluered, symbreak=TRUE, trace='none', cexRow=0.8,
+    ColSideColors=clust.col[my.clusters], Colv=as.dendrogram(my.tree))
+dev.off()
 ```
 
 ## Detecting marker genes between subpopulations
