@@ -862,8 +862,7 @@ fit <- glmFit(y, design)
 ```
 
 To identify marker genes for a particular cluster, we test each gene for DE between that cluster and each other cluster.
-This is done using the likelihood ratio test (LRT) for each comparison.
-This is illustrated below for cluster 2.
+This is done using the likelihood ratio test (LRT) for each comparison, and is demonstrated below for cluster 2.
 
 ```{r}
 result.logFC <- result.PValue <- list()
@@ -900,6 +899,7 @@ head(marker.set)
 We save this list of genes for further examination.
 We also examine the expression profile for the top set of genes to verify that the DE is not being driven by outlier cells.
 The heatmap below indicates that all of the markers are strongly upregulated across the majority of cells in cluster 2 compared to the other clusters.
+In general, `r Biocpkg("edgeR")` will automatically protect against outlier expression patterns, as any outliers will inflate the dispersion and increase the _p_-value for the affected gene.
 
 ```{r, fig.cap="Heatmap of mean-centred normalized log-expression values for the top set of markers for cluster 2 in the brain data set. Column colours represent the cluster to which each cell is assigned."}
 write.table(marker.set, file="marker_brain_2.tsv", sep="\t", quote=FALSE, row.names=FALSE)
