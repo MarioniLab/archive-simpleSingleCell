@@ -615,7 +615,7 @@ sum(keep)
 ```
 
 ```{r echo=FALSE, results='hide', message=FALSE}
-qc()
+gc()
 ```
 
 ## Normalization and cell-cycle classification
@@ -632,7 +632,7 @@ sce <- normalize(sce)
 ```
 
 ```{r echo=FALSE, results='hide', message=FALSE}
-qc()
+gc()
 ```
 
 Greater scatter is observed between the total count for each cell and its size factor.
@@ -746,6 +746,11 @@ var.fit <- trendVar(okay.sce, trend="loess", design=design[has.spikes,], span=0.
 var.out <- decomposeVar(okay.sce, var.fit)
 ```
 
+```{r, echo=FALSE, results='hide', message=FALSE}
+rm(okay.sce)
+gc()
+```
+
 <!--
 An alternative is to fit the mean-variance trend to the endogenous genes.
 This assumes that the majority of genes are constantly expressed, such that the technical component dominates the total variance of expression for those genes.
@@ -806,7 +811,7 @@ The plot below shows systematic differences between groups of cells with distinc
 This is consistent with the presence of well-defined subpopulations that are also recovered by clustering.
 Greater control of the empirical clusters can be obtained by manually specifying `cutHeight` in `cutreeDynamic`.
 
-```{r heatmaphsc, message=FALSE, fig.width=7, fig.height=10, fig.cap="Heatmap of mean-centred normalized log-expression values for correlated HVGs in the brain data set. Dendrograms are formed by hierarchical clustering on the Euclidean distances between genes (row) or cells (column). Column colours represent the cluster to which each cell is assigned after a dynamic tree cut."}
+```{r heatmapbrain, message=FALSE, fig.width=7, fig.height=10, fig.cap="Heatmap of mean-centred normalized log-expression values for correlated HVGs in the brain data set. Dendrograms are formed by hierarchical clustering on the Euclidean distances between genes (row) or cells (column). Column colours represent the cluster to which each cell is assigned after a dynamic tree cut."}
 sig.cor <- var.cor$FDR <= 0.05
 chosen <- unique(c(var.cor$gene1[sig.cor], var.cor$gene2[sig.cor]))
 norm.exprs <- exprs(sce)[chosen,,drop=FALSE]
