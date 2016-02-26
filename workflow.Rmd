@@ -234,11 +234,10 @@ Normalized log-expression values can be computed for use in downstream analyses.
 Each value is defined as the log-ratio of each count to the size factor for the corresponding cell (after adding a small prior count to avoid undefined values at zero counts).
 Division by the size factor ensures that any cell-specific biases are removed.
 The log-transformation is also useful as larger counts can be modelled reasonably well with a log-normal distribution [@law2014voom].
-The computed values are stored as an `"norm_exprs"` matrix in addition to the other assay elements.
+The computed values are stored as an `"exprs"` matrix in addition to the other assay elements.
 
 ```{r}
 sce <- normalize(sce)
-assayDataElementNames(sce)
 ```
 
 ## Data exploration with dimensionality reduction techniques
@@ -249,7 +248,7 @@ This can be visualized by constructing a PCA plot from the normalized log-expres
 Cells with similar expression profiles should be located close together on the plot.
 
 ```{r pcaplothsc, fig.cap="PCA plot constructed from normalized log-expression values, where each point represents a cell in the HSC data set. First and second components are shown, along with the percentage of variance explained. Bars represent the coordinates of the cells on each axis. None of the cells are controls (e.g., empty wells) so the legend can be ignored."}
-plotPCA(sce, exprs_values="norm_exprs") + fontsize
+plotPCA(sce, exprs_values="exprs") + fontsize
 ```
 
 Alternatively, the PCA plot can be constructed from a matrix of correlations between cells. 
@@ -258,7 +257,7 @@ As a result, those two cells will be closer together in the plot.
 This approach tends to be more robust to noise and outliers that would dominate a standard PCA plot, at the cost of being less sensitive to differences in the expression profiles.
 
 ```{r pcacorplothsc, fig.cap="PCA plot constructed from a matrix of Spearman rank correlations between cells, where each point represents a cell in the HSC data set."}
-cor.mat <- cor(assayDataElement(sce, "norm_exprs"), method="spearman")
+cor.mat <- cor(assayDataElement(sce, "exprs"), method="spearman")
 out <- prcomp(cor.mat)
 plot(out$x[,1], out$x[,2], xlab="PC1", ylab="PC2", pch=16, cex.axis=1.2, cex.lab=1.4)
 ```
@@ -270,9 +269,9 @@ It is also advisable to test different settings of the "perplexity" parameter as
 
 ```{r tsneplothsc, fig.cap="_t_-SNE plot constructed from normalized log-expression values using a range of perplexity values. In each plot, each point represents a cell in the HSC data set. Bars represent the coordinates of the cells on each axis.", fig.width=12, fig.height=6}
 set.seed(100)
-out5 <- plotTSNE(sce, exprs_values="norm_exprs", perplexity=5) + fontsize + ggtitle("Perplexity = 5")
-out10 <- plotTSNE(sce, exprs_values="norm_exprs", perplexity=10) + fontsize + ggtitle("Perplexity = 10")
-out20 <- plotTSNE(sce, exprs_values="norm_exprs", perplexity=20) + fontsize + ggtitle("Perplexity = 20")
+out5 <- plotTSNE(sce, exprs_values="exprs", perplexity=5) + fontsize + ggtitle("Perplexity = 5")
+out10 <- plotTSNE(sce, exprs_values="exprs", perplexity=10) + fontsize + ggtitle("Perplexity = 10")
+out20 <- plotTSNE(sce, exprs_values="exprs", perplexity=20) + fontsize + ggtitle("Perplexity = 20")
 multiplot(out5, out10, out20, cols=3)
 ```
 
@@ -321,20 +320,53 @@ This may be necessary for other model organisms where pre-trained classifiers ar
 
 ## Identifying HVGs from the normalized log-expression 
 
-Identification of HVGs allows us to focus on the genes that are driving heterogeneity across cells.
-We first decompose the variance in expression for each gene into biological and technical components.
-The latter is estimated by fitting a mean-variance trend to the spike-in transcripts with the `trendVar` function.
-As the trend can be rather non-linear, some adjustment of the span for loess curves (or the degrees of freedom for polynomial curves) may be required to obtain a satisfactory fit.
+We identify HVGs to focus on the genes that are driving heterogeneity across the population of cells.
+This requires estimation of the variance in expression for each gene, followed by decomposition of the variance into biological and technical components.
+HVGs are then identified as those genes with the highest biological components.
+This avoids prioritizing genes that are highly variable due to technical factors such as sampling noise during RNA capture and library preparation.
+
+Ideally, the technical component would be estimated by fitting a mean-variance trend to the spike-in transcripts.
+Recall that the same set of spike-ins is added in the same quantity to each cell.
+This means that the spike-in transcripts should exhibit no biological variability.
+Thus, any variance in the counts of each spike-in transcript should be technical in origin.
+Fitting is performed by the `trendVar` function, using a loess curve with a low span as the trend is highly non-linear.
+(Some adjustment of the parameters may be required to obtain a satisfactory fit.)
 
 ```{r}
-var.fit <- trendVar(sce, trend="loess", span=0.25)
+var.fit <- trendVar(sce, trend="loess", span=0.3)
 ```
 
-Recall that the same set of spike-ins is added in the same quantity to each cell, and thus should exhibit no biological variability.
-The biological component of the variance can then be estimated by subtracting the fitted value of the trend from the total variance of each gene in the `decomposeVar` function.
+Given the mean abundance of a gene, the fitted value of the trend can be used as an estimate of the technical component for that gene.
+The biological component of the variance can then be estimated by subtracting the technical component from the total variance of each gene in the `decomposeVar` function.
 
-```{r hvgplothsc, fig.cap="Variance of normalized log-expression values for each gene in the HSC data set, plotted against the average log-expression. The red line represents the mean-dependent trend in the technical variance of the spike-in transcripts (also highlighted as red points)."}
+```{r}
 var.out <- decomposeVar(sce, var.fit)
+```
+
+<!--
+In practice, this approach is complicated by the difficulty of accurately fitting a complex trend to a few spike-in points.
+An alternative is to fit the mean-variance trend to the endogenous genes.
+This assumes that the majority of genes are constantly expressed, such that the technical component dominates the total variance of expression for those genes.
+The fitted value of the trend can then be used as an estimate of the technical component.
+This exploits the presence of the larger number of endogenous genes to obtain a more stable fit.
+
+```{r}
+var.fit2 <- trendVar(sce, trend="loess", use.spikes=FALSE)
+var.out2 <- decomposeVar(sce, var.fit2, get.spikes=TRUE)
+```
+-->
+
+In practice, this approach is complicated by the difficulty of accurately fitting a complex trend to a low number of unevenly distributed points.
+We assess the suitability of the fitted trend by examining whether it is consistent with the spike-in variances. 
+The former generally passes through the bulk of the latter in the plot below, though some inaccuracy is unavoidable for mean intervals containing few spike-in transcripts.
+
+<!--
+This result suggests that the assumption is valid in this data set, i.e., most endogenous genes exhibit technical variance with little biological heterogeneity.
+However, if the trend were systematically greater than the spike-in variances, the assumption would not hold.
+We would then have to rely on a (potentially unstable) trend fitted to the spike-in variances only.
+-->
+
+```{r hvgplothsc, fig.cap="Variance of normalized log-expression values for each gene in the HSC data set, plotted against the mean log-expression. The red line represents the mean-dependent trend in the technical variance of the spike-in transcripts (also highlighted as red points)."}
 plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression", 
     ylab="Variance of log-expression")
 points(var.fit$mean, var.fit$var, col="red", pch=16)
@@ -354,7 +386,7 @@ head(var.out[top.hvgs,])
 Of course, there are many ways of defining HVGs, e.g., by using the coefficient of variation [@kolod2015singlecell;@kim2015characterizing], through the dispersion parameter in the negative binomial distribution [@mccarthy2012differential], or as a proportion of total variability [@vallejos2015basics].
 We use the variance of the log-expression values because the log-transformation provides some protection against genes with strong expression in only one or two outlier cells.
 This ensures that the set of top HVGs is not dominated by genes with (mostly uninteresting) outlier expression patterns.
-However, the cost of this robustness is the need to fit a rather complex mean-variance relationship.
+However, the cost of this robustness is the need to fit a complex mean-variance relationship.
 
 ## Identifying correlated gene pairs with Spearman's rho
 
@@ -395,9 +427,8 @@ For further analyses, we focus on the significantly correlated HVGs for which an
 This may allow us to identify subpopulations that would have otherwise been masked by random noise in the expression profiles..
 
 ```{r}
-norm.exprs <- assayDataElement(sce, "norm_exprs")
 chosen <- unique(c(var.cor$gene1[sig.cor], var.cor$gene2[sig.cor]))
-norm.exprs <- norm.exprs[chosen,,drop=FALSE]
+norm.exprs <- exprs(sce)[chosen,,drop=FALSE]
 ```
 
 We construct a simple dendrogram to group together cells with similar expression patterns across the chosen genes.
@@ -449,8 +480,8 @@ This is shown below for both PCA and _t_-SNE plots, though in this case, focusin
 
 ```{r pcareduxhsc, fig.width=10, fig.height=6, fig.cap="PCA (left) and _t_-SNE plots (right) using only the expression values for significantly correlated HVGs in the HSC data set. Each cell is represented by a point in each plot, and the bars represent the cell coordinates on each axis."}
 set.seed(100)
-out.pca <- plotPCA(sce, exprs_values="norm_exprs", feature_set=chosen) + fontsize
-out.tsne <- plotTSNE(sce, exprs_values="norm_exprs", feature_set=chosen) + fontsize
+out.pca <- plotPCA(sce, exprs_values="exprs", feature_set=chosen) + fontsize
+out.tsne <- plotTSNE(sce, exprs_values="exprs", feature_set=chosen) + fontsize
 multiplot(out.pca, out.tsne, cols=2)
 ```
 
@@ -653,8 +684,8 @@ fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=
 ```
 
 ```{r pcaplotbrain, fig.width=12, fig.height=6, fig.cap="PCA plots constructed from the normalized expression values for all remaining cells in the brain data set. Each cell is represented by a point in each plot, and the bars represent the cell coordinates on each axis. Left: cells are coloured according to the tissue of origin (cortex or hippocampus). Right: cells are coloured according to the sex of the mouse -- male (-1), female (1) or unassigned (0)."}
-pca1 <- plotPCA(sce, exprs_values="norm_exprs", colour_by="tissue") + fontsize
-pca2 <- plotPCA(sce, exprs_values="norm_exprs", colour_by="sex") + fontsize
+pca1 <- plotPCA(sce, exprs_values="exprs", colour_by="tissue") + fontsize
+pca2 <- plotPCA(sce, exprs_values="exprs", colour_by="sex") + fontsize
 multiplot(pca1, pca2, cols=2)
 ```
 
@@ -663,9 +694,9 @@ Again, users should set the seed to a constant value to ensure that the results 
 
 ```{r tsneplotbrain, fig.width=12, fig.height=6, fig.cap="_t_-SNE plots constructed from the normalized expression values for all remaining cells in the brain data set. Each cell is represented by a point in each plot, and the bars represent the cell coordinates on each axis. Left: cells are coloured according to the tissue of origin (cortex or hippocampus). Right: cells are coloured according to the sex of the mouse -- male (-1), female (1) or unassigned (0)."}
 set.seed(100)
-tsne1 <- plotTSNE(sce, exprs_values="norm_exprs", colour_by="tissue") + fontsize
+tsne1 <- plotTSNE(sce, exprs_values="exprs", colour_by="tissue") + fontsize
 set.seed(100)
-tsne2 <- plotTSNE(sce, exprs_values="norm_exprs", colour_by="sex") + fontsize
+tsne2 <- plotTSNE(sce, exprs_values="exprs", colour_by="sex") + fontsize
 multiplot(tsne1, tsne2, cols=2)
 ```
 
@@ -676,9 +707,9 @@ Cells from different chips seem to mix together, which suggests that the substru
 
 ```{r pca2plotbrain, fig.width=15, fig.height=6, fig.cap="PCA plots constructed from the normalized expression values for all cells in the brain data set from the cortex (left) or hippocampus (right). Each cell is represented by a point in each plot, and the bars represent the cell coordinates on each axis. Cells are coloured according to the C1 chip from which the library was prepared."}
 sce$chip <- sub("_.*", "", sce$cell_id)
-pca1 <- plotPCA(sce[,sce$tissue=="sscortex"], exprs_values="norm_exprs", 
+pca1 <- plotPCA(sce[,sce$tissue=="sscortex"], exprs_values="exprs", 
     colour_by="chip") + fontsize + ggtitle("Cortex")
-pca2 <- plotPCA(sce[,sce$tissue!="sscortex"], exprs_values="norm_exprs", 
+pca2 <- plotPCA(sce[,sce$tissue!="sscortex"], exprs_values="exprs", 
     colour_by="chip") + fontsize + ggtitle("Hippocampus")
 multiplot(pca1, pca2, cols=2)
 ```
