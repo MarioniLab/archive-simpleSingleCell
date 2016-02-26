@@ -145,7 +145,7 @@ hist(spike.props, xlab="ERCC proportion", ylab="Number of cells",
 
 Defining a threshold on the proportion is not straightforward as it depends largely on the cell type and the experimental protocol.
 If we assume that most cells in the data set are not apoptotic, then the threshold can be set to remove any large outliers from the distribution of proportions.
-Here, we define outliers as those with proportions that are more than 3 median absolute deviations above the median.
+Here, we define outliers as those with proportions that are more than 3 median absolute deviations (MADs) above the median proportion.
 This results in the removal of a small number of cells.
 
 ```{r}
@@ -549,9 +549,9 @@ We also add annotation identifying which rows correspond to each class of featur
 
 ```{r}
 nrows <- c(nrow(endo.data$counts), nrow(mito.data$counts), nrow(spike.data$counts))
-is.spike <- rep(c(FALSE, TRUE, FALSE), nrows)
+is.spike <- rep(c(FALSE, FALSE, TRUE), nrows)
 fData(sce)$is_feature_spike <- is.spike
-is.mito <- rep(c(FALSE, FALSE, TRUE), nrows)
+is.mito <- rep(c(FALSE, TRUE, FALSE), nrows)
 ```
 
 ```{r, echo=FALSE, results='hide'}
@@ -590,15 +590,15 @@ hist(spike.props, xlab="ERCC proportion (%)", ylab="Number of cells", breaks=20,
 ```
 
 Here, a couple of clear outliers are observed for the spike-in proportions.
-We remove cells with proportions above a threshold of 15%, as this is where the probability density of the empirical distribution becomes negligible.
+We use a MAD-based threshold to define and remove these outlier cells.
 For the mitochondrial proportions, the distinction is more difficult.
-This may be because of the presence of many cell types with different mitochondria copy number or activity.
-In this data set, we set a threshold of 70% and remove the most extreme cases on the right tail.
+This may be due to the presence of many cell types with different mitochondria copy number or activity.
+As such, we relax the threshold (using 5 MADs instead of 3) to avoid removing potential cell types with high mitochondrial RNA.
 
 ```{r}
-spike.keep <- spike.props <= 15
+spike.keep <- spike.props <= median(spike.props) + 3*mad(spike.props)
 sum(!spike.keep)
-mito.keep <- mito.props <= 70
+mito.keep <- mito.props <= median(mito.props) + 5*mad(mito.props)
 sum(!mito.keep)
 ```
 
@@ -620,6 +620,10 @@ sce <- sce[keep,]
 sum(keep)
 ```
 
+```{r echo=FALSE, results='hide', message=FALSE}
+qc()
+```
+
 ## Normalization and cell-cycle classification
 
 Normalization of cell-specific biases is performed using the `normalizeBySums` function.
@@ -631,6 +635,10 @@ Normalization between clusters is then performed to ensure that expression value
 clusters <- quickCluster(sce)
 sce$size.factor <- normalizeBySums(sce, cluster=clusters)
 sce <- normalize(sce)
+```
+
+```{r echo=FALSE, results='hide', message=FALSE}
+qc()
 ```
 
 Greater scatter is observed between the total count for each cell and its size factor.
@@ -651,7 +659,6 @@ Some neuron types are particularly problematic as they are postmitotic and do no
 ```{r, echo=FALSE, results='hide', message=FALSE}
 mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", package="scran"))
 library(org.Mm.eg.db)
-gc()
 ```
 
 ```{r phaseplotbrain, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the brain data set, where each point represents a cell."}
@@ -664,7 +671,7 @@ plot(assignments$score$G1, assignments$score$G2M, xlab="G1 score", ylab="G2/M sc
 
 Given the lack of definitive classification, we will not perform any processing of the data set by cell cycle phase.
 However, this information is still useful for verifying downstream results.
-For example, if putative subpopulations have distinctly different phase scores, we may suspect that the differences between subpopulations are being driven by cell cycle effects.
+For example, if putative subpopulations have distinctly different phase scores, we might suspect that the differences between subpopulations are being driven by cell cycle effects.
 
 ## Data exploration to examine the effect of technical factors
 
