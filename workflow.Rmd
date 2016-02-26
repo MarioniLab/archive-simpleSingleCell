@@ -329,10 +329,9 @@ This requires estimation of the variance in expression for each gene, followed b
 HVGs are then identified as those genes with the highest biological components.
 This avoids prioritizing genes that are highly variable due to technical factors such as sampling noise during RNA capture and library preparation.
 
-Ideally, the technical component would be estimated by fitting a mean-variance trend to the spike-in transcripts.
+The technical component is estimated by fitting a mean-variance trend to the spike-in transcripts.
 Recall that the same set of spike-ins is added in the same quantity to each cell.
-This means that the spike-in transcripts should exhibit no biological variability.
-Thus, any variance in the counts of each spike-in transcript should be technical in origin.
+This means that the spike-in transcripts should exhibit no biological variability, such that any variance in the counts should be technical in origin.
 Fitting is performed by the `trendVar` function, using a loess curve with a low span as the trend is highly non-linear.
 (Some adjustment of the parameters may be required to obtain a satisfactory fit.)
 
@@ -346,19 +345,6 @@ The biological component of the variance can then be estimated by subtracting th
 ```{r}
 var.out <- decomposeVar(sce, var.fit)
 ```
-
-<!--
-In practice, this approach is complicated by the difficulty of accurately fitting a complex trend to a few spike-in points.
-An alternative is to fit the mean-variance trend to the endogenous genes.
-This assumes that the majority of genes are constantly expressed, such that the technical component dominates the total variance of expression for those genes.
-The fitted value of the trend can then be used as an estimate of the technical component.
-This exploits the presence of the larger number of endogenous genes to obtain a more stable fit.
-
-```{r}
-var.fit2 <- trendVar(sce, trend="loess", use.spikes=FALSE)
-var.out2 <- decomposeVar(sce, var.fit2, get.spikes=TRUE)
-```
--->
 
 In practice, this approach is complicated by the difficulty of accurately fitting a complex trend to a low number of unevenly distributed points.
 We assess the suitability of the fitted trend by examining whether it is consistent with the spike-in variances. 
@@ -385,6 +371,14 @@ This can be used to prioritize interesting genes for further investigation.
 top.hvgs <- order(var.out$bio, decreasing=TRUE)
 write.table(file="hsc_hvg.tsv", var.out[top.hvgs,], sep="\t", quote=FALSE, col.names=NA)
 head(var.out[top.hvgs,])
+```
+
+It is advisable to check the distribution of expression values for the top HVGs, in order to ensure that the variance estimate is not being dominated by one or two outlier cells.
+
+```{r, fig.cap="Boxplots of normalized log-expression values for the top 10 HVGs in the HSC data set. Points correspond to cells that are more than 1.5 interquartile ranges from the edge of each box."}
+examined <- top.hvgs[1:10]
+all.names <- matrix(rownames(sce)[examined], nrow=length(examined), ncol=ncol(sce))
+boxplot(split(exprs(sce)[examined,], all.names), las=2, ylab="Normalized log-expression")
 ```
 
 Of course, there are many ways of defining HVGs, e.g., by using the coefficient of variation [@kolod2015singlecell;@kim2015characterizing], through the dispersion parameter in the negative binomial distribution [@mccarthy2012differential], or as a proportion of total variability [@vallejos2015basics].
