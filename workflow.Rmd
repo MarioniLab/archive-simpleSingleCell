@@ -839,7 +839,73 @@ heatmap.2(heat.vals[chosen,], col=bluered, symbreak=TRUE, trace='none', cexRow=0
     ColSideColors=clust.col[my.clusters], Colv=as.dendrogram(my.tree))
 ```
 
-## Defining subpopulations and detecting marker genes
+## Detecting marker genes between subpopulations
+
+Once putative subpopulations are identified by clustering, we can identify some candidate marker genes that are unique to those subpopulations.
+This is done by testing for DE between each pair of subpopulations and selecting those genes that are consistently upregulated (or downregulated) in one subpopulation compared to all others.
+DE testing can be done using a number of packages, but for this workflow, we will use the `r Biocpkg("edgeR")` package [@robinson2010edgeR].
+First, we set up a design matrix specifying which cells belong in which cluster.
+Each `cluster*` coefficient represents the average log-expression of all cells in the corresponding cluster.
+We also block on uninteresting factors such as the tissue of origin.
+
+```{r}
+cluster <- factor(my.clusters)
+design <- model.matrix(~0 + cluster + sce$tissue)
+colnames(design)
+```
+
+The `r Biocpkg("edgeR")` package uses negative binomial (NB) distributions to model the read counts for each sample.
+We estimate the NB dispersion parameter that quantifies the biological variability in expression across cells in the same cluster.
+We then fit a generalized linear model (GLM) to the counts for each gene [@mccarthy2012differential].
+We log-transform the size factors and use them as GLM offsets to normalize cell-specific biases.
+
+```{r}
+y <- DGEList(counts(sce))
+y$offset <- log(sce$size.factor)
+y <- estimateDisp(y, design, robust=TRUE)
+fit <- glmFit(y, design)
+```
+
+To identify marker genes for a particular cluster, we test each gene for DE between that cluster and each other cluster.
+This is done using the likelihood ratio test (LRT) for each comparison.
+This is illustrated below for cluster 2.
+
+```{r}
+result.logFC <- result.PValue <- list()
+chosen.clust <- 2
+for (clust in as.integer(levels(cluster))) {
+    if (clust==chosen.clust) { next }
+    contrast <- numeric(ncol(design))
+    contrast[chosen.clust] <- 1
+    contrast[clust] <- -1
+    res <- glmLRT(fit, contrast=contrast)
+    con.name <- paste0('against.', clust)
+    result.logFC[[con.name]] <- res$table$logFC
+    result.PValue[[con.name]] <- res$table$PValue
+}
+```
+
+Potential marker genes for cluster 2 are ranked based on the maximum _p_-value across all comparisons.
+A gene that is DE between the chosen cluster and all others should have small _p_-values for all comparisons, and thus a small maximum _p_-value.
+In addition, we only focus on genes with the same sign of the log-fold change across all comparisons.
+This is necessary to identify specific markers that are unambiguously upregulated (or downregulated) in cluster 2 relative to the other clusters.
+
+```{r}
+max.PValue <- do.call(pmax, result.PValue)
+all.logFC <- do.call(cbind, result.logFC)
+all.signs <- sign(all.logFC)
+same.sign <- rowSums(all.signs[,1]!=all.signs)==0L
+marker.set <- data.frame(Gene=rownames(y), logFC=all.logFC, PValue=max.PValue)
+marker.set <- marker.set[same.sign,]
+marker.set <- marker.set[order(marker.set$PValue),]
+head(marker.set)
+```
+
+This can be repeated for each cluster to identify markers specific to the corresponding subpopulation.
+However, it must be stressed that the _p_-values cannot be interpreted as measures of significance.
+This is because the clusters have been empirically identified from the data.
+`r Biocpkg("edgeR")` does not account for the uncertainty and stochasticity in clustering, which means that the _p_-values are much lower than they should be. 
+The (maximum) _p_-value should only be used for ranking candidate markers for follow-up studies.
 
 # Choosing between normalization with and without spike-ins
 
