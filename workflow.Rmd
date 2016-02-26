@@ -761,22 +761,6 @@ rm(okay.sce)
 gc()
 ```
 
-<!--
-An alternative is to fit the mean-variance trend to the endogenous genes.
-This assumes that the majority of genes are constantly expressed, such that the technical component dominates the total variance of expression for those genes.
-The fitted value of the trend can then be used as an estimate of the technical component.
-This exploits the presence of the larger number of endogenous genes to obtain a more stable fit.
-
-```{r, eval=FALSE}
-var.fit2 <- trendVar(sce, trend="loess", use.spikes=FALSE)
-var.out2 <- decomposeVar(sce, var.fit2)
-```
-
-This result suggests that the assumption is valid in this data set, i.e., most endogenous genes exhibit technical variance with little biological heterogeneity.
-However, if the trend were systematically greater than the spike-in variances, the assumption would not hold.
-We would then have to rely on a (potentially unstable) trend fitted to the spike-in variances only.
--->
-
 The plot below suggests that the trend is fitted well to the technical variances.
 Errors in fitting seem to be negligible relative to the size of the total variances for the endogenous genes.
 The gene-wise variances are also larger than those in the HSC data set, consistent with strong hetergeneity in expression across multiple cell types.
@@ -1069,6 +1053,24 @@ plot(out$x[,1], out$x[,2], col=col, pch=16, xlab="PC1", ylab="PC2")
 out2 <- prcomp(t(assay(y2, "exprs")), scale.=TRUE)
 plot(out2$x[,1], out2$x[,2], col=col, pch=16, xlab="PC1", ylab="PC2")
 ```
+
+## Identifying HVGs without spike-ins
+
+An alternative is to fit the mean-variance trend to the endogenous genes.
+This assumes that the majority of genes are constantly expressed, such that the technical component dominates the total variance of expression for those genes.
+The fitted value of the trend can then be used as an estimate of the technical component.
+This exploits the presence of the larger number of endogenous genes to obtain a more stable fit.
+
+```{r, eval=FALSE}
+var.fit2 <- trendVar(sce, trend="loess", use.spikes=FALSE)
+var.out2 <- decomposeVar(sce, var.fit2)
+```
+
+This result suggests that the assumption is valid in this data set, i.e., most endogenous genes exhibit technical variance with little biological heterogeneity.
+However, if the trend were systematically greater than the spike-in variances, the assumption would not hold.
+We would then have to rely on a (potentially unstable) trend fitted to the spike-in variances only.
+
+<!-- Need to put spike-ins at higher quantities to cover the range properly -->
 
 ## Classifying cells into cell cycle phases
 
