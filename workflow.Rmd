@@ -207,6 +207,14 @@ A gene will be retained as long as it has sufficient expression in any subset of
 The "at least _n_" filter depends heavily on the choice of _n_ -- in this case, a gene expressed in a subset of 9 cells would be lost.
 While the mean-based filter will retain more outlier-driven genes, this can be handled downstream by choosing methods that are robust to outliers.
 
+Filtering can also be performed to remove genes that are known to be uninteresting.
+Here, we remove mitochondrial genes as we are primarily interested in the regulation of nuclear genes.
+Other candidates for removal include pseudo-genes or ribosomal proteins that are generally uninteresting but may affect downstream analyses.
+
+```{r}
+sce <- sce[!fData(sce)$is_feature_control_Mt,]
+```
+
 ## Normalization of cell-specific biases
 
 Read counts are subject to differences in capture efficiency and sequencing depth between cells [@stegle2015computational].
@@ -612,6 +620,13 @@ This yields fewer genes than in the HSC data set, mostly because the sequencing 
 keep <- rowMeans(counts(sce)) >= 1
 sce <- sce[keep,]
 sum(keep)
+```
+
+We also remove mitochondrial genes prior to downstream analyses.
+This is particularly important in this data set, as differences in mitochondrial RNA content across cell types can have a substantial impact, e.g., on HVG detection and clustering.
+
+```{r}
+sce <- sce[!fData(sce)$is_feature_control_Mt,]
 ```
 
 ```{r echo=FALSE, results='hide', message=FALSE}
