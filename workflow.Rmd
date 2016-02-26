@@ -835,7 +835,7 @@ my.tree <- hclust(my.dist, method="ward.D2")
 my.clusters <- unname(cutreeDynamic(my.tree, distM=as.matrix(my.dist), verbose=0))
 heat.vals <- norm.exprs - rowMeans(norm.exprs)
 clust.col <- rainbow(max(my.clusters))
-heatmap.2(heat.vals[chosen,], col=bluered, symbreak=TRUE, trace='none', cexRow=0.8,
+heatmap.2(heat.vals, col=bluered, symbreak=TRUE, trace='none', cexRow=0.8,
     ColSideColors=clust.col[my.clusters], Colv=as.dendrogram(my.tree))
 ```
 
@@ -895,13 +895,28 @@ max.PValue <- do.call(pmax, result.PValue)
 all.logFC <- do.call(cbind, result.logFC)
 all.signs <- sign(all.logFC)
 same.sign <- rowSums(all.signs[,1]!=all.signs)==0L
-marker.set <- data.frame(Gene=rownames(y), logFC=all.logFC, PValue=max.PValue)
+marker.set <- data.frame(Gene=rownames(y), logFC=all.logFC, 
+    PValue=max.PValue, stringsAsFactors=FALSE)
 marker.set <- marker.set[same.sign,]
 marker.set <- marker.set[order(marker.set$PValue),]
 head(marker.set)
 ```
 
-This can be repeated for each cluster to identify markers specific to the corresponding subpopulation.
+We save this list of genes for further examination.
+We also examine the expression profile for the top set of genes to verify that the DE is not being driven by outlier cells.
+The heatmap below indicates that all of the markers are strongly upregulated across the majority of cells in cluster 2 compared to the other clusters.
+
+```{r, fig.cap="Heatmap of mean-centred normalized log-expression values for the top set of markers for cluster 2 in the brain data set. Column colours represent the cluster to which each cell is assigned."}
+write.table(marker.set, file="marker_brain_2.tsv", sep="\t", quote=FALSE, row.names=FALSE)
+top.markers <- marker.set$Gene[1:20]
+norm.exprs <- exprs(sce)[top.markers,,drop=FALSE]
+heat.vals <- norm.exprs - rowMeans(norm.exprs)
+heatmap.2(heat.vals, col=bluered, symbreak=TRUE, trace='none', cexRow=1,
+    ColSideColors=clust.col[my.clusters], Colv=as.dendrogram(my.tree), dendrogram='none')
+legend("bottomleft", col=clust.col, legend=sort(unique(my.clusters)), pch=16)
+```
+
+This process can be repeated for each cluster to identify markers specific to the corresponding subpopulation.
 However, it must be stressed that the _p_-values cannot be interpreted as measures of significance.
 This is because the clusters have been empirically identified from the data.
 `r Biocpkg("edgeR")` does not account for the uncertainty and stochasticity in clustering, which means that the _p_-values are much lower than they should be. 
