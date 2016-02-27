@@ -394,9 +394,18 @@ write.table(file="hsc_cor.tsv", var.cor, sep="\t", quote=FALSE, col.names=NA)
 head(var.cor)
 ```
 
-The top set of correlated HVGs can be prioritized for follow-up studies.
+HVGs with significant correlations can be prioritized for follow-up studies.
 For example, a set of correlated genes can be used as markers to validate the existence of a subpopulation of cells with a specific expression pattern, e.g., via fluorescence-activated cell sorting, immunohistology or RNA flourescence _in situ_ hybridization.
 Negatively correlated pairs may be particularly useful in this respect, as they provide a clear "negative control" signal for cells outside of the subpopulation.
+
+Significant correlations are defined by testing against the null hypothesis of no correlations, i.e., expression profiles between two genes are independent.
+This yields a _p_-value representing the significance of each pairwise correlation.
+Correction for multiple testing across many gene pairs is performed by controlling the false discovery rate (FDR) at 5%.
+
+```{r}
+sig.cor <- var.cor$FDR <= 0.05
+summary(sig.cor)
+```
 
 Larger sets of correlated genes can be assembled by treating genes as nodes in a graph and each pair of genes with significantly large correlations as an edge.
 In this manner, an undirected graph can be constructed using methods in the `r Biocpkg("RBGL")` package.
@@ -405,7 +414,6 @@ This provides a convenient summary of the pairwise correlations between genes.
 
 ```{r, message=FALSE}
 library(RBGL)
-sig.cor <- var.cor$FDR <= 0.05
 g <- ftM2graphNEL(cbind(var.cor$gene1, var.cor$gene2)[sig.cor,], W=NULL, V=NULL, edgemode="undirected")
 cl <- highlyConnSG(g)$clusters
 cl <- cl[order(lengths(cl), decreasing=TRUE)]
@@ -743,10 +751,11 @@ design <- model.matrix(~sce$tissue)
 
 ## Identifying correlated HVGs
 
-To identify HVGs, we fit a trend to the technical variances for the spike-in transcripts as previously described.
-We compute the biological component of the variance for each gene by subtracting the fitted trend from the total variance.
+We identify HVGs that may be involved in driving population heterogeneity.
+This is done by fitting a trend to the technical variances for the spike-in transcripts as previously described.
+We then compute the biological component of the variance for each endogenous gene by subtracting the fitted value of the trend from the total variance.
 However, this is complicated by the low coverage of the spike-in transcripts in this data set.
-Indeed, we must remove some cells with very low (or even zero) total spike-in counts before we can compute the variance.
+We must remove some cells with very low (or even zero) total spike-in counts before we can compute the technical variance.
 
 ```{r}
 has.spikes <- colSums(spikes(sce)) > 50
@@ -761,7 +770,7 @@ rm(okay.sce)
 gc()
 ```
 
-The plot below suggests that the trend is fitted well to the technical variances.
+The plot below suggests that the trend is fitted accurately to the technical variances.
 Errors in fitting seem to be negligible relative to the size of the total variances for the endogenous genes.
 The gene-wise variances are also larger than those in the HSC data set, consistent with strong hetergeneity in expression across multiple cell types.
 
@@ -790,7 +799,7 @@ all.names <- matrix(rownames(sce)[examined], nrow=length(examined), ncol=ncol(sc
 boxplot(split(exprs(sce)[examined,], all.names), las=2, ylab="Normalized log-expression")
 ```
 
-The top 200 HVGs can be tested for significant correlations.
+To identify genes involved in defining subpopulations, the top 200 HVGs can be tested for significant pairwise correlations.
 These results are also saved to file for use in designing validation experiments.
 
 ```{r}
@@ -800,9 +809,10 @@ write.table(file="brain_cor.tsv", var.cor, sep="\t", quote=FALSE, col.names=NA)
 head(var.cor)
 ```
 
-Correlated HVGs are used to construct a heatmap that can be inspected for subpopulations.
-However, before we do so, we use the `removeBatchEffect` function in the `r Biocpkg("limma")` package to remove the tissue effect.
-This ensures that the tissue of origin will not dominate the visualization.
+Correlated HVGs can also be used to construct a heatmap that can be inspected for subpopulations.
+Here, we use the normalized log-expression values for the top HVGs that have significant correlations at a FDR of 5%.
+We also apply the `removeBatchEffect` function from the `r Biocpkg("limma")` package [@ritchie2015limma] to remove the tissue effect.
+This ensures that any differences due to the tissue of origin will not dominate the visualization of the expression profiles.
 
 ```{r}
 sig.cor <- var.cor$FDR <= 0.05
@@ -814,7 +824,7 @@ norm.exprs <- removeBatchEffect(norm.exprs, batch=sce$tissue)
 
 The plot below shows systematic differences between groups of cells with distinct patterns of expression.
 This is consistent with the presence of well-defined subpopulations.
-The empirical clusters also correspond roughly to the visual subpopulations. 
+The empirical clusters also correspond roughly to the visual subpopulations, which suggests that they can be reliably used for downstream analyses. 
 Greater control of the empirical clusters can be obtained by manually specifying `cutHeight` in `cutreeDynamic`.
 
 ```{r heatmapbrain, message=FALSE, fig.width=7, fig.height=10, fig.cap="Heatmap of mean-centred normalized log-expression values for correlated HVGs in the brain data set. Dendrograms are formed by hierarchical clustering on the Euclidean distances between genes (row) or cells (column). Column colours represent the cluster to which each cell is assigned after a dynamic tree cut."}
@@ -864,7 +874,7 @@ fit <- glmFit(y, design)
 ```
 
 To identify marker genes for a particular cluster, we test each gene for DE between that cluster and each other cluster.
-This is done using the likelihood ratio test (LRT) for each comparison, and is demonstrated below for cluster 2.
+This is done using the likelihood ratio test (LRT) for each comparison, which is demonstrated below for cluster 2.
 
 ```{r}
 result.logFC <- result.PValue <- list()
