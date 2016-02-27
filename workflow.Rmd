@@ -485,6 +485,16 @@ out.tsne <- plotTSNE(sce, exprs_values="exprs", feature_set=chosen) + fontsize
 multiplot(out.pca, out.tsne, cols=2)
 ```
 
+## Additional comments
+
+Once the preliminary analysis is completed, it is often useful to save the `SCESet` object to file.
+This means that the object can be easily restored into new R sessions for further work, without having to repeat all of the processing steps described here.
+More complex analyses can then be performed on the single-cell expression data, e.g., ordering HSCs by differentiation pseudotime with `r Biocpkg("monocle")` [@trapnell2014dynamics], or characterizing cell-state hierarchies with `r Biocpkg("sincell")` [@julia2015sincell].
+
+```{r}
+saveRDS(file="hsc_data.rds", sce)
+```
+
 # A more complex analysis on brain cell types
 
 ## Overview
