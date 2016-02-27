@@ -329,7 +329,7 @@ This requires estimation of the variance in expression for each gene, followed b
 HVGs are then identified as those genes with the highest biological components.
 This avoids prioritizing genes that are highly variable due to technical factors such as sampling noise during RNA capture and library preparation.
 
-The technical component is estimated by fitting a mean-variance trend to the spike-in transcripts.
+Ideally, the technical component would be estimated by fitting a mean-variance trend to the spike-in transcripts.
 Recall that the same set of spike-ins is added in the same quantity to each cell.
 This means that the spike-in transcripts should exhibit no biological variability, such that any variance in the counts should be technical in origin.
 Fitting is performed by the `trendVar` function, using a loess curve with a low span as the trend is highly non-linear.
@@ -340,31 +340,43 @@ var.fit <- trendVar(sce, trend="loess", span=0.3)
 ```
 
 Given the mean abundance of a gene, the fitted value of the trend can be used as an estimate of the technical component for that gene.
-The biological component of the variance can then be estimated by subtracting the technical component from the total variance of each gene in the `decomposeVar` function.
+The biological component of the variance can then be calculated by subtracting the technical component from the total variance of each gene in the `decomposeVar` function.
 
 ```{r}
 var.out <- decomposeVar(sce, var.fit)
 ```
 
-In practice, this approach is complicated by the difficulty of accurately fitting a complex trend to a low number of unevenly distributed points.
-We assess the suitability of the fitted trend by examining whether it is consistent with the spike-in variances. 
-The former generally passes through the bulk of the latter in the plot below, though some inaccuracy is unavoidable for mean intervals containing few spike-in transcripts.
+In practice, this strategy is complicated by the difficulty of accurately fitting a complex trend to a low number of unevenly distributed points.
+An alternative approach is to fit the mean-variance trend to the endogenous genes.
+This assumes that the majority of genes are constantly expressed, such that the technical component dominates the total variance of expression for those genes.
+The fitted value of the trend can then be used as an estimate of the technical component.
 
-```{r hvgplothsc, fig.cap="Variance of normalized log-expression values for each gene in the HSC data set, plotted against the mean log-expression. The red line represents the mean-dependent trend in the technical variance of the spike-in transcripts (also highlighted as red points)."}
+```{r}
+var.fit2 <- trendVar(sce, trend="loess", use.spikes=FALSE, span=0.2)
+var.out2 <- decomposeVar(sce, var.fit2)
+```
+
+We assess the suitability of the trend fitted to the endogenous variances by examining whether it is consistent with the spike-in variances. 
+The former passes through the bulk of the latter in the plot below, indicating that our assumption (that most genes are not biologically variable) is valid.
+In contrast, the spike-in trend is less accurate at mean intervals with few spike-in transcripts.
+More generally, the use of an endogenous trend is the only option in data sets where no spike-ins were added or in situations where not enough spike-in RNA was added to cover the range of means for the endogenous genes.
+
+```{r hvgplothsc, fig.cap="Variance of normalized log-expression values for each gene in the HSC data set, plotted against the mean log-expression. The red line represents the mean-dependent trend in the technical variance of the spike-in transcripts (also highlighted as red points). The blue line represents the trend fitted to the variances of the endogenous genes."}
 plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression", 
     ylab="Variance of log-expression")
 points(var.fit$mean, var.fit$var, col="red", pch=16)
 o <- order(var.out$mean)
 lines(var.out$mean[o], var.out$tech[o], col="red", lwd=2)
+lines(var.out2$mean[o], var.out2$tech[o], col="dodgerblue", lwd=2)
 ```
 
 The top HVGs are identified by ranking genes on their biological components.
 This can be used to prioritize interesting genes for further investigation.
 
 ```{r}
-top.hvgs <- order(var.out$bio, decreasing=TRUE)
-write.table(file="hsc_hvg.tsv", var.out[top.hvgs,], sep="\t", quote=FALSE, col.names=NA)
-head(var.out[top.hvgs,])
+top.hvgs <- order(var.out2$bio, decreasing=TRUE)
+write.table(file="hsc_hvg.tsv", var.out2[top.hvgs,], sep="\t", quote=FALSE, col.names=NA)
+head(var.out2[top.hvgs,])
 ```
 
 It is advisable to check the distribution of expression values for the top HVGs, in order to ensure that the variance estimate is not being dominated by one or two outlier cells.
@@ -459,7 +471,7 @@ We recommend storing the heatmap at a sufficiently high resolution so that the r
 library(gplots)
 heat.vals <- norm.exprs - rowMeans(norm.exprs)
 heatmap.2(heat.vals[chosen,], col=bluered, symbreak=TRUE, trace='none', cexRow=0.8,
-    ColSideColors=c("darkgreen", "orange", "dodgerblue")[my.clusters+1],
+    ColSideColors=c("darkgreen", "orange", "dodgerblue", "grey80")[my.clusters+1],
     Colv=as.dendrogram(my.tree))
 ```
 
@@ -782,7 +794,8 @@ gc()
 
 The plot below suggests that the trend is fitted accurately to the technical variances.
 Errors in fitting seem to be negligible relative to the size of the total variances for the endogenous genes.
-The gene-wise variances are also larger than those in the HSC data set, consistent with strong hetergeneity in expression across multiple cell types.
+The technical variances are also much smaller than those in the HSC data set.
+This is due to the use of UMIs which reduces the noise caused by variable PCR amplification.
 
 ```{r, fig.cap="Variance of normalized log-expression values for each gene in the brain data set, plotted against the mean log-expression. The red line represents the mean-   dependent trend in the technical variance of the spike-in transcripts (also highlighted as red points)."}
 plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression", 
@@ -939,15 +952,27 @@ This is because the clusters have been empirically identified from the data.
 `r Biocpkg("edgeR")` does not account for the uncertainty and stochasticity in clustering, which means that the _p_-values are much lower than they should be. 
 The (maximum) _p_-value should only be used for ranking candidate markers for follow-up studies.
 
-# Choosing between normalization with and without spike-ins
+## Additional comments
 
-## Overview
+Having completed the preliminary analysis, we save the `SCESet` object with its associated data to file.
+This is especially important here as the brain data set is quite large.
+If further analyses are to be performed, it would be inconvenient to have to repeat all of the pre-processing steps described above.
+
+```{r}
+saveRDS(file="brain_data.rds", sce)
+```
+
+```{r, echo=FALSE, results='hide'}
+gc()
+```
+
+# Alternative parameter settings and strategies
+
+## Normalizing based on spike-in coverage
+
 Scaling normalization strategies for scRNA-seq data can be broadly divided into two classes.
-The first class assumes that there exists a subset of genes that are not differentially expressed between samples.
-This subset can be manually specified to contain house-keeping genes, or it can be empirically identified under the assumption that most genes are not DE [@anders2010differential;@robinson2010scaling].
-Any systematic difference in the counts across the non-DE subset is treated as technical bias and is eliminated by scaling.
-The second class of normalization strategies uses spike-in RNA of known composition and abundance.
-Specifically, the same quantity of spike-in RNA is added to each cell, captured into libraries and sequenced along with endogenous transcripts [@stegle2015computational].
+The first class assumes that there exists a subset of genes that are not DE between samples, as previously described.
+The second class uses the fact that the same amount of spike-in RNA was added to each cell.
 Differences in the coverage of the spike-in transcripts can only be due to cell-specific biases, e.g., in capture efficiency or sequencing depth.
 Scaling normalization is then applied to equalize spike-in coverage across cells.
 
@@ -956,161 +981,34 @@ If there is no reliable house-keeping set, and if the majority of genes are expe
 Spike-in normalization should also be used if differences in the total RNA content of individual cells are of interest.
 This is because the same amount of spike-in RNA is added to each cell, such that the relative quantity of endogenous RNA can be easily quantified in each cell.
 For non-DE normalization, any change in total RNA content will affect all genes in the non-DE subset, such that it will be treated as bias and removed.
-(This may be desirable if changes in total content are _not_ interesting.)
-Similarly, if spike-ins are not present or if they cannot be added to each cell in a reliable manner, then non-DE normalization should be applied.
 
-## Computing size factors for spike-in normalization
+The use of spike-in normalization can be demonstrated on the HSC data set.
+We load in the `SCESet` object that we saved earlier, which contains the count data for filtered genes in high-quality HSCs.
+We then apply the `normalizeBySpikes` method to estimate size factors for all cells.
+This method computes the total count over all spike-in transcripts in each cell, and calculates size factors to equalize the total spike-in count across cells. 
 
-The use of spike-in normalization can be demonstrated on a simple data set comparing mESCs and mouse embryonic fibroblasts (MEFs) [@islam2011characterization].
-A constant quantity of synthetic spike-in RNA was added to each cell, and spike-in transcripts were sequenced and counted along with transcripts from endogenous genes.
-Quantification of gene expression was performed in this manner for 48 mESCs, 44 MEFs and 4 negative controls.
-We obtain a table of read counts from NCBI GEO using the accession GSE29087, and load them into a `SummarizedExperiment` object for further manipulation.
-
-```{r, eval=FALSE}
-#```{r}
-counts <- read.table("GSE29087_L139_expression_tab.txt.gz", skip=6, 
-    sep='\t', row.names=1)[,-c(1:6)]
-is.spike <- grepl("SPIKE", rownames(counts))
-sum(is.spike)
-library(scran)
-y <- countsToSE(counts[!is.spike,], counts[is.spike,])
-y$grouping <- factor(rep(c("mESC", "MEF", "Neg"), c(48, 44, 4)))
-dim(y)
+```{r}
+sce <- readRDS("hsc_data.rds")
+sf <- normalizeBySpikes(sce)
 ```
 
-We remove low-quality libraries that have low total counts for the endogenous genes or high proportions of reads mapped to genes on the mitochondrial genome.
-This removes a number of libraries, including those for the negative controls.
-We also remove lowly expressed genes with an average count below 1.
+Both non-DE methods (like deconvolution) and spike-in normalization will capture technical biases such as sequencing depth and capture efficiency.
+Indeed, the plot below shows a rough positive correlation between the two sets of size factors, consistent with removal of technical biases by both methods.
+However, the differences between the two sets are attributable to variability in total RNA content across the HSC population.
+Spike-in normalization will preserve differences in RNA content, whereas non-DE normalization will eliminate them.
 
-```{r, eval=FALSE}
-#```{r}
-totals <- colSums(assay(y))
-is.mito <- grepl("^mt-", rownames(y))
-okay.libs <- totals >= 1e5 & colSums(assay(y)[is.mito,])/totals < 0.1 
-y <- y[,okay.libs]
-sum(okay.libs)
-keep.gene <- rowMeans(assay(y)) >= 1
-y <- y[keep.gene,] 
-sum(keep.gene)
+```{r, fig.cap="Size factors from spike-in normalization, shown against the size factors from deconvolution for all cells in the HSC data set. Axes are shown on a log-scale."}
+plot(sf, sce$size.factor, pch=16, log="xy", xlab="Size factor (spike-in)",
+    ylab="Size factor (deconvolution)")
 ```
 
-We compute size factors using the `normalizeBySpikes` function.
-The size factor for each cell is proportional to the total number of reads mapped to spike-in transcripts.
-The aim is to normalize the counts such that the total spike-in coverage is the same across cells.
-These values are stored in the `SummarizedExperiment` object as previously described, and downstream analyses can be applied.
+Whether or not total RNA content is relevant depends on the biological hypothesis. 
+In the analyses described above, variability in total RNA across the population was treated as noise and removed by non-DE normalization.
+This may not always be appropriate if total RNA is associated with a biological difference of interest.
+For example, @islam2011characterization describe a 5-fold difference in total RNA between mouse embyronic stem cells and fibroblasts.
+Spike-in normalization will preserve this difference and may provide more accurate quantification in downstream analyses.
 
-```{r, eval=FALSE}
-#```{r}
-sf.spike <- normalizeBySpikes(y)
-y$size.factor <- sf.spike
-````
-
-Note that mESCs have consistently larger size factors compared to MEFs.
-This is due to the fact that the former contain substantially less endogenous RNA than the latter [@islam2011characterization].
-Larger size factors result in smaller normalized expression values for mESCs compared to MEFs, reflecting the decrease in total RNA content in the former.
-These differences are lost when a normalization method based on a non-DE majority is applied, such as that in the `r Biocpkg("DESeq2")` package [@anders2010differential].
-
-```{r, eval=FALSE}
-#```{r}
-y$grouping <- droplevels(y$grouping)
-boxplot(split(sf.spike, y$grouping), log="y", cex.axis=1.2, cex.lab=1.4)
-library(DESeq2)
-y2 <- y
-y2$size.factor <- estimateSizeFactorsForMatrix(assay(y2))
-boxplot(split(y2$size.factor, y$grouping), log="y", cex.axis=1.2, 
-    cex.lab=1.4, ylim=range(sf.spike))
-```
-
-## Effect of spike-in normalization on downstream analyses
-
-Preservation of differences in total RNA content has some notable implications for downstream analyses.
-For DEG detection between cell types, the change in total RNA content will be incorporated into the log-fold change.
-This means that more DEGs are generally detected upon spike-in normalization compared to normalization based on a non-DE majority.
-In addition, there tends to be a greater imbalance in the number of up- and downregulated genes, as the change in total RNA content occurs in one direction for all genes.
-This is demonstrated below by comparing the DE results between the two normalization strategies. 
-
-```{r, eval=FALSE}
-#```{r}
-library(edgeR)
-d <- DGEList(assay(y, "counts"))
-d$offset <- log(y$size.factor)
-design <- model.matrix(~y$grouping)
-d <- estimateDisp(d, design)
-fit <- glmFit(d, design)
-res <- glmLRT(fit)
-summary(decideTestsDGE(res))
-d2 <- d
-d2$offset <- log(y2$size.factor)
-d2 <- estimateDisp(d2, design)
-fit2 <- glmFit(d2, design)
-res2 <- glmLRT(fit2)
-summary(decideTestsDGE(res2))
-```
-
-One might question the relevance of DE that is driven by changes in total RNA content between cell types.
-Clearly, however, there will be a change in transcript abundance when the total amount of RNA in each cell changes.
-Thus, from a technical perspective, the detection of DE for those genes is appropriate.
-Biologically, the relevance of DE would depend on whether an increase in transcript molecules results in more molecular activity, e.g., due to increased production of protein product.
-While this relation seems trivially true, it is easy to imagine situations where it is not the case, e.g., when the translation machinery is saturated such that a global increase in transcript molecules has no effect.
-
-<!-- Also, if there's variability in cell sizes within groups, this'll reduce power to detect DEGs. -->
-
-For HVG detection, any variability in total RNA content will inflate the variance of the normalized expression values for each gene.
-However, the magnitude of the increase will be the same for each gene as the variance of RNA content is constant.
-As such, the ranking of HVGs will be roughly similar across the different normalization strategies.
-This is demonstrated below, where there is 70-80\% similarity between the top sets of 500-2000 genes with the largest variances from each normalization method.
-
-```{r, eval=FALSE}
-#```{r}
-y <- normalize(y)
-trend <- trendVar(y, use.spikes=FALSE, trend="loess")
-resid.var <- trend$var - trend$trend(trend$mean)
-y2 <- normalize(y2)
-trend2 <- trendVar(y2, use.spikes=FALSE, trend="loess")
-resid.var2 <- trend2$var - trend2$trend(trend2$mean)
-r <- rank(-resid.var)
-r2 <- rank(-resid.var2)
-sum(r <= 500 & r2 <= 500)
-sum(r <= 1000 & r2 <= 1000)
-sum(r <= 2000 & r2 <= 2000)
-```
-
-<!-- don't subtract spike-ins here, as there's only 8 of them so it's not very reliable. -->
-
-Most dimensionality reduction and clustering procedures tend to be robust to the choice of normalization method.
-This is because cells with different RNA content also tend to have different transcript compositions.
-Thus, they would be (correctly) separated based on their gene expression profiles, regardless of whether changes in total RNA content were preserved after normalization.
-Indeed, correlation-based methods are completely insensitive to normalization as the value of the correlation is not dependent on the scaling of expression values within each cell.
-
-```{r, eval=FALSE}
-#```{r, fig.width=12, fig.height=6}
-par(mfrow=c(1,2))
-col <- c("red", "blue")[y$grouping]
-out <- prcomp(t(assay(y, "exprs")), scale.=TRUE)
-plot(out$x[,1], out$x[,2], col=col, pch=16, xlab="PC1", ylab="PC2")
-out2 <- prcomp(t(assay(y2, "exprs")), scale.=TRUE)
-plot(out2$x[,1], out2$x[,2], col=col, pch=16, xlab="PC1", ylab="PC2")
-```
-
-## Identifying HVGs without spike-ins
-
-An alternative is to fit the mean-variance trend to the endogenous genes.
-This assumes that the majority of genes are constantly expressed, such that the technical component dominates the total variance of expression for those genes.
-The fitted value of the trend can then be used as an estimate of the technical component.
-This exploits the presence of the larger number of endogenous genes to obtain a more stable fit.
-
-```{r, eval=FALSE}
-var.fit2 <- trendVar(sce, trend="loess", use.spikes=FALSE)
-var.out2 <- decomposeVar(sce, var.fit2)
-```
-
-This result suggests that the assumption is valid in this data set, i.e., most endogenous genes exhibit technical variance with little biological heterogeneity.
-However, if the trend were systematically greater than the spike-in variances, the assumption would not hold.
-We would then have to rely on a (potentially unstable) trend fitted to the spike-in variances only.
-
-<!-- Need to put spike-ins at higher quantities to cover the range properly -->
-
-## Classifying cells into cell cycle phases
+## Blocking on the cell-cycle phase
 
 ## Detecting DEGs between pre-defined groups of cells
 
