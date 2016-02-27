@@ -491,8 +491,8 @@ Count data for all endogenous genes, mitochondrial genes and spike-in transcript
 
 The count data are distributed across several files, so some work is necessary to consolidate them into a single matrix.
 We define a simple utility function for loading data in from each file. 
-(We stress that this function is only relevant to the current data set, and should _not_ be used for other data sets.
-In general, this kind of effort is not required if the counts are in a single file and separated from the metadata.)
+(We stress that this function is only relevant to the current data set, and should not be used for other data sets.
+This kind of effort is generally not required if all of the counts are in a single file and separated from the metadata.)
 
 ```{r}
 readFormat <- function(infile) { 
@@ -898,10 +898,10 @@ marker.set <- marker.set[order(marker.set$PValue),]
 head(marker.set)
 ```
 
-We save this list of genes for further examination.
-We also examine the expression profile for the top set of genes to verify that the DE is not being driven by outlier cells.
-The heatmap below indicates that all of the markers are strongly upregulated across the majority of cells in cluster 2 compared to the other clusters.
-In general, `r Biocpkg("edgeR")` will automatically protect against outlier expression patterns, as any outliers will inflate the dispersion and increase the _p_-value for the affected gene.
+We save the list of candidate marker genes for further examination.
+We also examine their expression profiles to verify that the DE is not being driven by outlier cells.
+The heatmap below indicates that all of the top markers are strongly expressed across most cells in cluster 2, whereas expression is lower or absent in the other clusters.
+Some robustness to outliers is expected from `r Biocpkg("edgeR")`, as any outliers will inflate the dispersion and increase the maximum _p_-value for the affected genes.
 
 ```{r, fig.cap="Heatmap of mean-centred normalized log-expression values for the top set of markers for cluster 2 in the brain data set. Column colours represent the cluster to which each cell is assigned."}
 write.table(marker.set, file="marker_brain_2.tsv", sep="\t", quote=FALSE, row.names=FALSE)
