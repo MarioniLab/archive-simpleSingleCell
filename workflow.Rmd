@@ -230,7 +230,7 @@ This suggests that the systematic differences between cells are primarily driven
 Any DE between cells would yield a non-linear trend between the total count and size factor, and/or increased scatter around the trend.
 This does not occur here as strong DE is unlikely to exist between cells of the same type.
 
-```{r normplothsc, fig.cap="Size factors from deconvolution, shown against the total counts for all cells in the HSC data set. Axes are shown on a log-scale."}
+```{r normplothsc, fig.cap="Size factors from deconvolution, plotted against the total counts for all cells in the HSC data set. Axes are shown on a log-scale."}
 plot(sce$size.factor, sce$total_counts/1e6, log="xy",
     ylab="Total count (per million)", xlab="Size factor")
 ```
@@ -679,7 +679,7 @@ Greater scatter is observed between the total count for each cell and its size f
 This is consistent with an increased amount of DE between cells of different types, which compromises the accuracy of library size normalization [@robinson2010scaling].
 In contrast, the size factors are estimated based on median ratios and are more robust to the presence of DE between cells.
 
-```{r normplotbrain, fig.cap="Size factors from deconvolution, shown against the total counts for all cells in the brain data set. Axes are shown on a log-scale."}
+```{r normplotbrain, fig.cap="Size factors from deconvolution, plotted against the total counts for all cells in the brain data set. Axes are shown on a log-scale."}
 plot(sce$size.factor, sce$total_counts/1e6, log="xy",
     ylab="Total count (per million)", xlab="Size factor")
 ```
@@ -997,7 +997,7 @@ Indeed, the plot below shows a rough positive correlation between the two sets o
 However, the differences between the two sets are attributable to variability in total RNA content across the HSC population.
 Spike-in normalization will preserve differences in RNA content, whereas non-DE normalization will eliminate them.
 
-```{r, fig.cap="Size factors from spike-in normalization, shown against the size factors from deconvolution for all cells in the HSC data set. Axes are shown on a log-scale."}
+```{r, fig.cap="Size factors from spike-in normalization, plotted against the size factors from deconvolution for all cells in the HSC data set. Axes are shown on a log-scale."}
 plot(sf, sce$size.factor, pch=16, log="xy", xlab="Size factor (spike-in)",
     ylab="Size factor (deconvolution)")
 ```
