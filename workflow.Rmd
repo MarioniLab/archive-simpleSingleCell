@@ -100,7 +100,7 @@ These metrics are stored in the `pData` of the `SCESet` for future reference.
 
 ```{r}
 is.spike <- grepl("^ERCC", rownames(sce))
-fData(sce)$is_feature_spike <- is.spike
+isSpike(sce) <- is.spike
 is.mito <- grepl("^mt-", rownames(sce))
 sce <- calculateQCMetrics(sce, feature_controls=list(Spike=is.spike, Mt=is.mito))
 head(colnames(pData(sce)))
@@ -575,7 +575,7 @@ We also add annotation identifying which rows correspond to each class of featur
 ```{r}
 nrows <- c(nrow(endo.data$counts), nrow(mito.data$counts), nrow(spike.data$counts))
 is.spike <- rep(c(FALSE, FALSE, TRUE), nrows)
-fData(sce)$is_feature_spike <- is.spike
+isSpike(sce) <- is.spike
 is.mito <- rep(c(FALSE, TRUE, FALSE), nrows)
 ```
 
@@ -778,7 +778,7 @@ We identify HVGs that may be involved in driving population heterogeneity.
 This is done by fitting a trend to the technical variances for the spike-in transcripts as previously described.
 We then compute the biological component of the variance for each endogenous gene by subtracting the fitted value of the trend from the total variance.
 However, this is complicated by the low coverage of the spike-in transcripts in this data set.
-We must remove some cells with very low (or even zero) total spike-in counts before we can compute the technical variance.
+We must remove some cells with very low total spike-in counts before we can compute the technical variance.
 
 ```{r}
 has.spikes <- colSums(spikes(sce)) > 50
