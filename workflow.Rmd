@@ -22,6 +22,12 @@ opts_chunk$set(error=FALSE, message=FALSE, warning=FALSE)
 opts_chunk$set(fig.width=7, fig.height=7)
 opts_chunk$set(dpi=300, dev="png", dev.args=list(pointsize=15))
 options(bitmapType="cairo", width=100)
+
+# Setting single-core unless explicitly specified otherwise.
+whee <- bpparam()
+bpworkers(whee) <- 1
+register(whee)
+rm(whee)
 ```
 
 ```{r, message=FALSE, echo=FALSE, results='hide'}
