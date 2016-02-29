@@ -221,8 +221,8 @@ To overcome this, we pool counts from many cells to increase the count size for 
 Pool-based size factors are then "deconvolved" into cell-based factors for cell-specific normalization.
 
 ```{r, warning=FALSE}
-sce$size.factor <- normalizeBySums(sce, sizes=c(20, 40, 60, 80))
-summary(sce$size.factor)
+sce <- computeSumFactors(sce, sizes=c(20, 40, 60, 80))
+summary(sizeFactors(sce))
 ```
 
 In this case, the size factors are tightly correlated with the total counts for all cells.
@@ -231,7 +231,7 @@ Any DE between cells would yield a non-linear trend between the total count and 
 This does not occur here as strong DE is unlikely to exist between cells of the same type.
 
 ```{r normplothsc, fig.cap="Size factors from deconvolution, plotted against the total counts for all cells in the HSC data set. Axes are shown on a log-scale."}
-plot(sce$size.factor, sce$total_counts/1e6, log="xy",
+plot(sizeFactors(sce), sce$total_counts/1e6, log="xy",
     ylab="Total count (per million)", xlab="Size factor")
 ```
 
@@ -662,14 +662,14 @@ gc()
 
 ## Normalization and cell-cycle classification
 
-Normalization of cell-specific biases is performed using the `normalizeBySums` function.
+Normalization of cell-specific biases is performed using the deconvolution method in the `computeSumFactors` function.
 Here, we cluster similar cells together and normalize the cells in each cluster using the deconvolution method.
 This improves the accuracy of normalization by reducing the number of DE genes between cells in the same cluster.
 Normalization between clusters is then performed to ensure that expression values from cells in different clusters are comparable.
 
 ```{r}
 clusters <- quickCluster(sce)
-sce$size.factor <- normalizeBySums(sce, cluster=clusters)
+sce <- computeSumFactors(sce, cluster=clusters)
 sce <- normalize(sce)
 ```
 
@@ -677,12 +677,12 @@ sce <- normalize(sce)
 gc()
 ```
 
-Greater scatter is observed between the total count for each cell and its size factor.
+Compared to the HSC analysis, more scatter is observed for the trend between the total count and size factor for each cell.
 This is consistent with an increased amount of DE between cells of different types, which compromises the accuracy of library size normalization [@robinson2010scaling].
 In contrast, the size factors are estimated based on median ratios and are more robust to the presence of DE between cells.
 
 ```{r normplotbrain, fig.cap="Size factors from deconvolution, plotted against the total counts for all cells in the brain data set. Axes are shown on a log-scale."}
-plot(sce$size.factor, sce$total_counts/1e6, log="xy",
+plot(sizeFactors(sce), sce$total_counts/1e6, log="xy",
     ylab="Total count (per million)", xlab="Size factor")
 ```
 
@@ -780,7 +780,7 @@ This is done by fitting a trend to the technical variances for the spike-in tran
 We then compute the biological component of the variance for each endogenous gene by subtracting the fitted value of the trend from the total variance.
 
 ```{r}
-var.fit <- trendVar(sce, trend="loess", design=design[has.spikes,], span=0.4)
+var.fit <- trendVar(sce, trend="loess", design=design, span=0.4)
 var.out <- decomposeVar(sce, var.fit)
 ```
 
@@ -889,7 +889,7 @@ We log-transform the size factors and use them as GLM offsets to normalize cell-
 
 ```{r}
 y <- DGEList(counts(sce))
-y$offset <- log(sce$size.factor)
+y$offset <- log(sizeFactors(sce))
 y <- estimateDisp(y, design, robust=TRUE)
 fit <- glmFit(y, design)
 ```
@@ -982,12 +982,13 @@ For non-DE normalization, any change in total RNA content will affect all genes 
 
 The use of spike-in normalization can be demonstrated on the HSC data set.
 We load in the `SCESet` object that we saved earlier, which contains the count data for filtered genes in high-quality HSCs.
-We then apply the `normalizeBySpikes` method to estimate size factors for all cells.
+We then apply the `computeSpikeFactors` method to estimate size factors for all cells.
 This method computes the total count over all spike-in transcripts in each cell, and calculates size factors to equalize the total spike-in count across cells. 
 
 ```{r}
 sce <- readRDS("hsc_data.rds")
-sf <- normalizeBySpikes(sce)
+deconv.sf <- sizeFactors(sce)
+sce <- computeSpikeFactors(sce)
 ```
 
 Both non-DE methods (like deconvolution) and spike-in normalization will capture technical biases such as sequencing depth and capture efficiency.
@@ -996,7 +997,7 @@ However, the differences between the two sets are attributable to variability in
 Spike-in normalization will preserve differences in RNA content, whereas non-DE normalization will eliminate them.
 
 ```{r, fig.cap="Size factors from spike-in normalization, plotted against the size factors from deconvolution for all cells in the HSC data set. Axes are shown on a log-scale."}
-plot(sf, sce$size.factor, pch=16, log="xy", xlab="Size factor (spike-in)",
+plot(sizeFactors(sce), deconv.sf, pch=16, log="xy", xlab="Size factor (spike-in)",
     ylab="Size factor (deconvolution)")
 ```
 
