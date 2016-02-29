@@ -318,7 +318,7 @@ g1.only <- assignments$score$G1 > 0.5
 sce <- sce[,g1.only]
 ```
 
-Pre-trained classifiers are available in `r Rpackage("scran")` for human and mouse experiments.
+Pre-trained classifiers are available in `r Rpackage("scran")` for human and mouse data. 
 The mouse classifier used here was trained on embryonic stem cells but can still be generally applied -- the pair-based method is a non-parametric procedure that should be robust to technical differences between data sets, and the transcriptional program associated with cell cycling should be mostly conserved across cell types.
 However, it will (inevitably) be less accurate for cell types that are substantially different from those used in the training set.
 Users can also construct a custom classifier from their own training data using the `sandbag` function.
@@ -381,7 +381,7 @@ write.table(file="hsc_hvg.tsv", var.out2[top.hvgs,], sep="\t", quote=FALSE, col.
 head(var.out2[top.hvgs,])
 ```
 
-It is advisable to check the distribution of expression values for the top HVGs, in order to ensure that the variance estimate is not being dominated by one or two outlier cells.
+We recommend checking the distribution of expression values for the top HVGs to ensure that the variance estimate is not being dominated by one or two outlier cells.
 
 ```{r, fig.cap="Boxplots of normalized log-expression values for the top 10 HVGs in the HSC data set. Points correspond to cells that are more than 1.5 interquartile ranges from the edge of each box."}
 examined <- top.hvgs[1:10]
@@ -446,7 +446,7 @@ norm.exprs <- exprs(sce)[chosen,,drop=FALSE]
 ```
 
 We construct a simple dendrogram to group together cells with similar expression patterns across the chosen genes.
-Here, we cluster on Euclidean distances to provide greater sensitivity for low numbers of genes.
+Here, we cluster on Euclidean distances to provide greater sensitivity to differences in expression for low numbers of genes.
 Ward's clustering criterion is used to minimize the total variance within each cluster.
 
 ```{r}
@@ -1016,7 +1016,7 @@ Spike-in normalization will preserve this difference and may provide more accura
 
 Cell cycle phase is usually uninteresting in studies focusing on other aspects of biology.
 However, the effects of cell cycle on the expression profile can mask other effects and interfere with the interpretation of the results.
-This cannot be avoided by simply removing cell cycle marker genes, as cell cycle can affect a substantial proportion of the transcriptome [@buettner2015computational].
+This cannot be avoided by simply removing cell cycle marker genes, as the cell cycle can affect a substantial number of other transcripts [@buettner2015computational].
 Rather, a more sophisticated strategy is required -- this is demonstrated below using data from a study of T Helper 2 (Th2) cells [@mahata2014singlecell].
 @buettner2015computational have already applied quality control and normalized the data, so we can use them directly as log-expression values.
 
