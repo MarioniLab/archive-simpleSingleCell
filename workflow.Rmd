@@ -1,5 +1,5 @@
 ---
-title: Cell by cell, chart to chart: a workflow for basic analyses of single-cell RNA-seq data
+title: "Cell by cell, chart to chart: an illustrated workflow for basic analyses of single-cell RNA-seq data"
 author: 
     - name: Aaron T. L. Lun
       affiliation: Cancer Research UK Cambridge Institute, Li Ka Shing Centre, Robinson Way, Cambridge CB2 0RE, United Kingdom
