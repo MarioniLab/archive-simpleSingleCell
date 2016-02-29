@@ -1013,6 +1013,69 @@ Spike-in normalization will preserve this difference and may provide more accura
 
 ## Blocking on the cell-cycle phase
 
+Cell cycle phase is usually uninteresting in studies focusing on other aspects of biology.
+However, the effects of cell cycle on the expression profile can mask other effects and interfere with the interpretation of the results.
+This cannot be avoided by simply removing cell cycle marker genes, as cell cycle can affect a substantial proportion of the transcriptome [@buettner2015computational].
+Rather, a more sophisticated strategy is required -- this is demonstrated below using data from a study of T Helper 2 (Th2) cells [@mahata2014singlecell].
+@buettner2015computational have already applied quality control and normalized the data, so we can use them directly as log-expression values.
+
+```{r}
+library(openxlsx)
+incoming <- read.xlsx("nbt.3102-S7.xlsx", sheet=1, rowNames=TRUE)
+sce <- newSCESet(exprsData=t(incoming))
+```
+
+We empirically identify the cell cycle phase using the pair-based classifier.
+The majority of cells in the plot below are assigned to the G1 or G2/M phases, with small numbers of cells in S-phase or without clear assignments.
+
+```{r, echo=FALSE, results='hide', message=FALSE}
+mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", package="scran"))
+library(org.Mm.eg.db)
+```
+
+```{r phaseplotth2, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the Th2 data set, where each point represents a cell."}
+anno <- select(org.Mm.eg.db, keys=rownames(sce), keytype="SYMBOL", column="ENSEMBL")
+ensembl <- anno$ENSEMBL[match(rownames(sce), anno$SYMBOL)]
+keep <- !is.na(ensembl)
+assignments <- cyclone(exprs(sce)[keep,], mm.pairs, gene.names=ensembl[keep])
+plot(assignments$score$G1, assignments$score$G2M, xlab="G1 score", ylab="G2/M score", pch=16)
+```
+
+The assignment for each cell can be explicitly defined by applying a threshold of 0.5 on the scores.
+
+```{r}
+hard.assign <- rep("S", ncol(sce))
+hard.assign[assignments$score$G1 > 0.5] <- "G1"
+hard.assign[assignments$score$G2M > 0.5] <- "G2M"
+hard.assign[assignments$score$G1 > 0.5 & assignments$score$G2M > 0.5] <- "unknown"
+sce$assignments <- hard.assign
+table(hard.assign)
+```
+
+We then use `removeBatchEffect` to remove the effect of the (empirical) cell cycle phase on the gene expression profiles.
+The result of this procedure can be visualized with some PCA plots in the image below.
+Before removal, cells in G1 and G2/M phase tend to be located in different parts of the plot, whereas they intermingle after removal.
+This suggests that the cell cycle effect has been successfully removed.
+
+```{r pcaplotth2, fig.width=10, fig.height=6, fig.cap="PCA plots before (left) and after (right) removal of the cell cycle effect in the Th2 data set. Each point represents a cell, coloured according to the empirically assigned cell cycle phase. Bars represent the location of cells on each axis."}
+corrected <- removeBatchEffect(exprs(sce), batch=hard.assign)
+assayDataElement(sce, "corrected") <- corrected
+pca1 <- plotPCA(sce, colour_by="assignments") + fontsize + ggtitle("Before removal")
+pca2 <- plotPCA(sce, exprs_values="corrected", colour_by="assignments") + 
+    fontsize + ggtitle("After removal")
+multiplot(pca1, pca2, cols=2)
+```
+
+For other analyses (e.g., detecting DEGs or HVGs), the phase-corrected values from `removeBatchEffect` should not be used.
+Rather, an equivalent result can be obtained by blocking on the assigned phase in the design matrix.
+The additional model coefficients will absorb any phase-related effects on expression such that they will not affect estimation of the effects of other experimental factors.
+Note that users should ensure that the phase is not confounded with other factors of interest.
+For example, model fitting is not possible if all cells in one experimental condition are in one phase, and all cells in another condition are in a different phase.
+
+```{r}
+design <- model.matrix(~ factor(hard.assign))
+```
+
 ## Detecting DEGs between pre-defined groups of cells
 
 # Conclusions
