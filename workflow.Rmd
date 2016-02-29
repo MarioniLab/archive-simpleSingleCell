@@ -797,6 +797,8 @@ The plot below suggests that the trend is fitted accurately to the technical var
 Errors in fitting seem to be negligible relative to the size of the total variances for the endogenous genes.
 The technical variances are also much smaller than those in the HSC data set.
 This is due to the use of UMIs which reduces the noise caused by variable PCR amplification.
+Furthermore, the spike-in trend is consistently lower than the variances of the endogenous genes.
+This means the previous strategy of fitting a trend to the endogenous variances would not be appropriate here (or necessary, given the quality of the spike-in trend). 
 
 ```{r, fig.cap="Variance of normalized log-expression values for each gene in the brain data set, plotted against the mean log-expression. The red line represents the mean-   dependent trend in the technical variance of the spike-in transcripts (also highlighted as red points)."}
 plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression", 
