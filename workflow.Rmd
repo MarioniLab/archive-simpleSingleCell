@@ -259,7 +259,8 @@ plotPCA(sce, exprs_values="exprs") + fontsize
 Alternatively, the PCA plot can be constructed from a matrix of correlations between cells. 
 Two cells with similar expression profiles will exhibit similar patterns of correlations to other cells.
 As a result, those two cells will be closer together in the plot.
-This approach tends to be more robust to noise and outliers that would dominate a standard PCA plot, at the cost of being less sensitive to differences in the expression profiles.
+This approach tends to be more robust to outliers than a standard PCA plot, as a small number of aberrant genes will have little effect on the value of Spearman's rank correlation.
+However, this comes at the cost of being less sensitive to subtle differences in the expression profiles.
 
 ```{r pcacorplothsc, fig.cap="PCA plot constructed from a matrix of Spearman rank correlations between cells, where each point represents a cell in the HSC data set."}
 cor.mat <- cor(assayDataElement(sce, "exprs"), method="spearman")
