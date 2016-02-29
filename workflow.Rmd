@@ -94,7 +94,7 @@ dim(sce)
 ```
 
 We annotate those rows corresponding to ERCC spike-ins and mitochondrial genes.
-This information can be easily extracted from the row names, though in general, identifying mitochondrial genes from standard identifiers like Ensembl requires access to extra annotation (this will be discussed later in more detail).
+This information can be easily extracted from the row names, though in general, identifying mitochondrial genes from standard identifiers like Ensembl requires extra annotation.
 We then calculate quality control metrics such as the total number of counts, the proportion of counts for the mitochondrial genes or spike-in transcripts, etc.
 These metrics are stored in the `pData` of the `SCESet` for future reference.
 
@@ -481,7 +481,7 @@ A close look suggests that a _H2-Aa_/_Cd74_-expressing subpopulation exists alon
 _H2-Aa_ codes for a component of the class II major histocompatibility complex and may be indicative of B-cell contamination [@heng2008immunological].
 _Fos_ and _Jun_ may also be relevant as they are involved in cell proliferation [@angel1991role].
 In addition, these visual subpopulations roughly correspond to the computationally identified clusters from the dynamic tree cut.
-Further analyses can then be performed on those empirical clusters -- for example, we can perform a DE analysis to identify marker genes for each corresponding subpopulation (this will be explored in more detail later).
+Further analyses can then be performed on those empirical clusters -- for example, we could perform a DE analysis to identify marker genes for each corresponding subpopulation.
 
 That being said, users should treat clustering results with some caution.
 It is difficult to maintain statistical rigour during clustering to protect against the formation of spurious clusters.
