@@ -1027,6 +1027,7 @@ The majority of cells in the plot below are assigned to the G1 or G2/M phases, w
 ```{r, echo=FALSE, results='hide', message=FALSE}
 mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", package="scran"))
 library(org.Mm.eg.db)
+set.seed(100)
 ```
 
 ```{r phaseplotth2, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the Th2 data set, where each point represents a cell."}
@@ -1050,8 +1051,8 @@ table(hard.assign)
 
 We then use `removeBatchEffect` to remove the effect of the (empirical) cell cycle phase on the gene expression profiles.
 The result of this procedure can be visualized with some PCA plots in the image below.
-Before removal, cells in G1 and G2/M phase tend to be located in different parts of the plot, whereas they intermingle after removal.
-This suggests that the cell cycle effect has been successfully removed.
+Before removal, cells in the G1 and G2/M phases tend to be concentrated in different parts of the plot.
+Afterwards, more intermingling is observed between the phases which suggests that the cell cycle effect has been mitigated.
 
 ```{r pcaplotth2, fig.width=10, fig.height=6, fig.cap="PCA plots before (left) and after (right) removal of the cell cycle effect in the Th2 data set. Each point represents a cell, coloured according to the empirically assigned cell cycle phase. Bars represent the location of cells on each axis."}
 corrected <- removeBatchEffect(exprs(sce), batch=hard.assign)
@@ -1062,7 +1063,7 @@ pca2 <- plotPCA(sce, exprs_values="corrected", colour_by="assignments") +
 multiplot(pca1, pca2, cols=2)
 ```
 
-For other analyses (e.g., detecting DEGs or HVGs), the phase-corrected values from `removeBatchEffect` should not be used.
+For other analyses (e.g., detecting DEGs or HVGs), the phase-corrected values from `removeBatchEffect` should not be used directly.
 Rather, an equivalent result can be obtained by blocking on the assigned phase in the design matrix.
 The additional model coefficients will absorb any phase-related effects on expression such that they will not affect estimation of the effects of other experimental factors.
 Note that users should ensure that the phase is not confounded with other factors of interest.
