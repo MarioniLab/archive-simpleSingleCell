@@ -18,10 +18,10 @@ bibliography: ref.bib
 ```{r style, echo=FALSE, results='hide', message=FALSE}
 library(BiocStyle)
 library(knitr)
-opts_chunk$set(error=FALSE)
+opts_chunk$set(error=FALSE, message=FALSE)
 opts_chunk$set(fig.width=7, fig.height=7)
 opts_chunk$set(dpi=300, dev="png", dev.args=list(pointsize=15))
-options(bitmapType="cairo")
+options(bitmapType="cairo", width=100)
 ```
 
 ```{r, message=FALSE, echo=FALSE, results='hide'}
@@ -33,6 +33,7 @@ library(gplots)
 library(gdata)
 library(R.utils)
 library(org.Mm.eg.db)
+library(TxDb.Mmusculus.UCSC.mm10.ensGene)
 ```
 
 # Introduction
@@ -1012,7 +1013,7 @@ Cell cycle phase is usually uninteresting in studies focusing on other aspects o
 However, the effects of cell cycle on the expression profile can mask other effects and interfere with the interpretation of the results.
 This cannot be avoided by simply removing cell cycle marker genes, as the cell cycle can affect a substantial number of other transcripts [@buettner2015computational].
 Rather, a more sophisticated strategy is required -- this is demonstrated below using data from a study of T Helper 2 (Th2) cells [@mahata2014singlecell].
-@buettner2015computational have already applied quality control and normalized the data, so we can use them directly as log-expression values.
+@buettner2015computational have already applied quality control and normalized the data, so we can use them directly as log-expression values (accessible as Supplementary Data 1 of https://dx.doi.org/10.1038/nbt.3102).
 
 ```{r}
 library(openxlsx)
@@ -1070,6 +1071,58 @@ For example, model fitting is not possible if all cells in one experimental cond
 
 ```{r}
 design <- model.matrix(~ factor(hard.assign))
+```
+
+```{r, echo=FALSE, results='hide'}
+gc()
+```
+
+## Extracting annotation from Ensembl identifiers
+
+Feature-counting tools typically report genes in terms of standard identifiers like Ensembl or Entrez.
+These identifiers are used as they are unambiguous and highly stable.
+However, they are difficult to interpret compared to commonly used gene symbols.
+We can easily convert from one to the other using annotation packages like `r Biocpkg("org.Mm.eg.db")`.
+This is demonstrated below for Ensembl identifiers in the mouse embryonic stem cell (mESC) data set [@kolod2015singlecell] obtained from http://www.ebi.ac.uk/teichmann-srv/espresso.
+
+```{r}
+incoming <- read.table("~/AaronDocs/Research/DataFiles/ESpresso/counttable_es.csv", 
+    header=TRUE, row.names=1)
+my.ids <- rownames(incoming)
+library(org.Mm.eg.db)
+anno <- select(org.Mm.eg.db, keys=my.ids, keytype="ENSEMBL", column="SYMBOL")
+anno <- anno[match(my.ids, anno$ENSEMBL),]
+head(anno)
+```
+
+To identify which rows correspond to mitochondrial genes, we need to use extra annotation describing the genomic location of each gene.
+For Ensembl, this involves using the `r Biocpkg("TxDb.Mmusculus.UCSC.mm10.ensGene")` package.
+
+```{r}
+library(TxDb.Mmusculus.UCSC.mm10.ensGene)
+location <- select(TxDb.Mmusculus.UCSC.mm10.ensGene, keys=my.ids, 
+    column="CDSCHROM", keytype="GENEID")
+location <- location[match(my.ids, location$GENEID),]
+is.mito <- location$CDSCHROM == "chrM" & !is.na(location$CDSCHROM)
+sum(is.mito)
+```
+
+Identification of which rows correspond to spike-in transcripts is much easier, given that the ERCC spike-ins were used.
+
+```{r}
+is.spike <- grepl("^ERCC", my.ids)
+sum(is.spike)
+```
+
+All of this information can be consolidated into a `SCESet` object for further manipulation.
+
+```{r}
+anno <- anno[,-1,drop=FALSE]
+rownames(anno) <- my.ids
+sce <- newSCESet(countData=incoming, featureData=AnnotatedDataFrame(anno))
+isSpike(sce) <- is.spike
+sce <- calculateQCMetrics(sce, feature_controls=list(Spike=is.spike, Mt=is.mito))
+dim(sce)
 ```
 
 ## Detecting DEGs between pre-defined groups of cells
