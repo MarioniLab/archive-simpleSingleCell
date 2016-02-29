@@ -605,7 +605,7 @@ feature.keep <- sce$total_features >= 1000
 sum(!feature.keep)
 ```
 
-We also examine the distribution of the proportions of total reads mapped to mitochondrial or spike-in genes.
+We also examine the distribution of the proportions of total reads mapped to mitochondrial genes or spike-in transcripts.
 
 ```{r controlplotbrain, fig.width=12, fig.height=6, fig.cap="Histogram of the proportion of reads mapped to mitochondrial genes (left) or spike-in transcripts (right) across all cells in the brain data set."}
 par(mfrow=c(1,2))
@@ -615,26 +615,26 @@ spike.props <- sce$pct_counts_feature_controls_Spike
 hist(spike.props, xlab="ERCC proportion (%)", ylab="Number of cells", breaks=20, main="")
 ```
 
-Here, a couple of clear outliers are observed for the spike-in proportions.
-We use a MAD-based threshold to define and remove these outlier cells.
-For the mitochondrial proportions, the distinction is more difficult.
-This may be due to the presence of many cell types with different mitochondria copy number or activity.
-As such, we relax the threshold (using 5 MADs instead of 3) to avoid removing potential cell types with high mitochondrial RNA.
+For the mitochondrial proportions, a couple of clear outliers are observed.
+These are defined and removed with a MAD-based threshold as previously described.
+We repeat this process to remove outlier cells with high spike-in proportions.
+Note that the spike-in proportions here are more variable than in the HSC data set.
+This may reflect a greater variability in the total amount of endogenous RNA per cell when many cell types are present.
 
 ```{r}
 spike.keep <- spike.props <= median(spike.props) + 3*mad(spike.props)
 sum(!spike.keep)
-mito.keep <- mito.props <= median(mito.props) + 5*mad(mito.props)
+mito.keep <- mito.props <= median(mito.props) + 3*mad(mito.props)
 sum(!mito.keep)
 ```
 
 Removal of low-quality cells can then be performed by combining all of the metrics.
-The vast majority of cells are retained, which suggests that the original quality control procedures were generally adequate.
+The majority of cells are retained, which suggests that the original quality control procedures were generally adequate.
 
 ```{r}
 total.keep <- count.keep & feature.keep & spike.keep & mito.keep
 sce <- sce[,total.keep]
-sum(total.keep)
+summary(total.keep)
 ```
 
 Low-abundance genes are also removed by applying a simple mean-based filter.
@@ -646,11 +646,11 @@ sce <- sce[keep,]
 sum(keep)
 ```
 
-We also filter out mitochondrial genes prior to further analysis.
-This is because systematic differences in mitochondrial RNA content are present across multiple cell types in this data set.
-Such differences will cause mitochondrial genes to dominate the top set of results (e.g., for identification of correlated HVGs).
+Some data sets may contain strong heterogeneity in mitochondrial RNA content, possibly due to differences in mitochondrial copy number or activity between cell types.
+This heterogeneity will cause mitochondrial genes to dominate the top set of results, e.g., for identification of correlated HVGs.
 However, these genes are largely uninteresting given that most studies focus on nuclear regulation.
-Other candidates for removal include pseudogenes or ribosomal RNA/protein-coding genes that are mostly uninteresting but can interfere with interpretation of the results.
+As such, we filter them out prior to further analysis.
+Other candidates for removal include pseudogenes or ribosomal RNA/protein-coding genes that might not be biologically relevant but can interfere with interpretation of the results.
 
 ```{r}
 sce <- sce[!fData(sce)$is_feature_control_Mt,]
