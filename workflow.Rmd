@@ -778,19 +778,13 @@ design <- model.matrix(~sce$tissue)
 We identify HVGs that may be involved in driving population heterogeneity.
 This is done by fitting a trend to the technical variances for the spike-in transcripts as previously described.
 We then compute the biological component of the variance for each endogenous gene by subtracting the fitted value of the trend from the total variance.
-However, this is complicated by the low coverage of the spike-in transcripts in this data set.
-We must remove cells with very low total spike-in counts (i.e., a mean count for spike-in transcripts below 1) before we can compute the technical variance.
 
 ```{r}
-has.spikes <- colMeans(spikes(sce)) > 1
-okay.sce <- sce[,has.spikes]
-okay.sce <- normalize(okay.sce)
-var.fit <- trendVar(okay.sce, trend="loess", design=design[has.spikes,], span=0.4)
-var.out <- decomposeVar(okay.sce, var.fit)
+var.fit <- trendVar(sce, trend="loess", design=design[has.spikes,], span=0.4)
+var.out <- decomposeVar(sce, var.fit)
 ```
 
 ```{r, echo=FALSE, results='hide', message=FALSE}
-rm(okay.sce)
 gc()
 ```
 
