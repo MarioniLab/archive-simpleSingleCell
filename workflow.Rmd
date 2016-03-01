@@ -1079,7 +1079,7 @@ The result of this procedure can be visualized with some PCA plots in the image 
 Before removal, cells in the G1 and G2/M phases tend to be concentrated in different parts of the plot.
 Afterwards, more intermingling is observed between the phases which suggests that the cell cycle effect has been mitigated.
 
-```{r pcaplotth2, fig.width=10, fig.height=6, fig.cap="PCA plots before (left) and after (right) removal of the cell cycle effect in the Th2 data set. Each point represents a cell, coloured according to the empirically assigned cell cycle phase. Only the top 500 HVGs were used to make the PCA plot before removal. Cells were projected onto the same PCA space after removal to facilitate comparisons between plots."}
+```{r pcaplotth2, fig.width=16, fig.height=8, fig.cap="PCA plots before (left) and after (right) removal of the cell cycle effect in the Th2 data set. Each point represents a cell, coloured according to the empirically assigned cell cycle phase. Only the top 500 HVGs were used to make the PCA plot before removal. Cells were projected onto the same PCA space after removal to facilitate comparisons between plots."}
 fit <- trendVar(sce, use.spikes=NA)
 top.hvgs <- order(fit$var, decreasing=TRUE)[1:500]
 pr.out <- prcomp(t(exprs(sce)[top.hvgs,]))
@@ -1108,6 +1108,7 @@ design <- model.matrix(~ factor(hard.assign))
 ```
 
 ```{r, echo=FALSE, results='hide'}
+saveRDS(file="th2_data.rds", sce)
 gc()
 ```
 
@@ -1250,6 +1251,7 @@ sessionInfo()
 # Author contributions
 
 A.T.L.L. developed the workflow on all data sets.
+All authors wrote and approved the final manuscript.
 
 # Competing interests
 
