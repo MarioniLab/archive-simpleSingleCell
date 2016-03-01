@@ -24,6 +24,7 @@ opts_chunk$set(dpi=300, dev="png", dev.args=list(pointsize=15))
 options(bitmapType="cairo", width=100)
 
 # Setting single-core unless explicitly specified otherwise.
+library(BiocParallel)
 whee <- bpparam()
 bpworkers(whee) <- 1
 register(whee)
@@ -145,6 +146,13 @@ A similar case can be made for the proportion of reads mapped to spike-in transc
 The quantity of spike-in RNA added to each cell should be constant, which means that the proportion should increase upon loss of endogenous RNA in low-quality cells.
 The distributions of mitochondrial and spike-in proportions across all cells are shown in the plots below.
 
+<!-- 
+It shouldn't matter too much if it's the proportion against total counts, or proportion against endogenous counts.
+This is because we're not measuring an increase in mitochondrial/spike-in counts, but rather, a depletion of endogenous RNA.
+If endogenous RNA decreases in low-quality cells, the mitochondrial/spike-in proportions against the total count should both increase.
+We don't have to worry about effects of e.g. an increase in mitochondrial counts affecting the proportion of spike-in counts.
+-->
+
 ```{r controlplothsc, fig.width=12, fig.height=6, fig.cap="Histogram of the proportion of reads mapped to mitochondrial genes (left) or spike-in transcripts (right) across all remaining cells in the HSC data set."}
 par(mfrow=c(1,2))
 mito.props <- sce$pct_counts_feature_controls_Mt
@@ -254,6 +262,8 @@ Each value is defined as the log-ratio of each count to the size factor for the 
 Division by the size factor ensures that any cell-specific biases are removed.
 The log-transformation is useful as it provides some variance stabilization -- this ensures that high-abundance genes with large variances do not dominate downstream analyses.
 The computed values are stored as an `"exprs"` matrix in addition to the other assay elements.
+
+<!-- Specifically, variance stabilization for NB-distributed counts with a constant dispersion but a variable mean. -->
 
 ```{r}
 sce <- normalize(sce)
@@ -701,7 +711,6 @@ plot(sizeFactors(sce), sce$total_counts/1e6, log="xy",
 ```
 
 We also attempt to classify cells into cell cycle phases using the `cyclone` method.
-We use additional cores to speed up classification for data sets with many cells.
 However, examination of the plot below indicates that many of the G1 and G2/M scores are ambiguous.
 This highlights the potential difficulties of training a classifier on one cell type (mouse embryonic stem cells -- see @scialdone2015computational for more details) and applying it on a substantially different cell type.
 Some neuron types are particularly problematic as they are postmitotic and do not belong in any phase of the cell cycle.
@@ -715,7 +724,7 @@ library(org.Mm.eg.db)
 anno <- select(org.Mm.eg.db, keys=rownames(sce), keytype="SYMBOL", column="ENSEMBL")
 ensembl <- anno$ENSEMBL[match(rownames(sce), anno$SYMBOL)]
 keep <- !is.na(ensembl)
-assignments <- cyclone(sce[keep,], mm.pairs, gene.names=ensembl[keep], BPPARAM=MulticoreParam(5))
+assignments <- cyclone(sce[keep,], mm.pairs, gene.names=ensembl[keep])
 plot(assignments$score$G1, assignments$score$G2M, xlab="G1 score", ylab="G2/M score", pch=16)
 ```
 
