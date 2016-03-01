@@ -119,8 +119,7 @@ In general, any cell with a library size that is an order of magnitude lower tha
 A more relaxed threshold may be necessary when strong heterogeneity in total RNA content is expected across cells.
 
 <!-- 
-MAD-based definitions don't seem to work as the MAD is too large, so median-MAD*3 ends up being negative. 
-Maybe logging it would be better before computing MADs, but then it wouldn't be as interpretable.
+Easier to interpret than using outliers here, as we'd need to log the library sizes before MAD'ing them.
 -->
 
 ```{r}
@@ -1072,18 +1071,24 @@ sce$assignments <- hard.assign
 table(hard.assign)
 ```
 
-We then use `removeBatchEffect` to remove the effect of the (empirical) cell cycle phase on the gene expression profiles.
+We use `removeBatchEffect` to remove the effect of the (empirical) cell cycle phase on the gene expression profiles.
 The result of this procedure can be visualized with some PCA plots in the image below.
 Before removal, cells in the G1 and G2/M phases tend to be concentrated in different parts of the plot.
 Afterwards, more intermingling is observed between the phases which suggests that the cell cycle effect has been mitigated.
 
-```{r pcaplotth2, fig.width=10, fig.height=6, fig.cap="PCA plots before (left) and after (right) removal of the cell cycle effect in the Th2 data set. Each point represents a cell, coloured according to the empirically assigned cell cycle phase. Bars represent the location of cells on each axis."}
+```{r pcaplotth2, fig.width=10, fig.height=6, fig.cap="PCA plots before (left) and after (right) removal of the cell cycle effect in the Th2 data set. Each point represents a cell, coloured according to the empirically assigned cell cycle phase. Only the top 500 HVGs were used to make the PCA plot before removal. Cells were projected onto the same PCA space after removal to facilitate comparison between plots."}
+par(mfrow=c(1,2))
+fit <- trendVar(sce, use.spikes=FALSE)
+top.hvgs <- order(fit$var, decreasing=TRUE)[1:500]
+pr.out <- prcomp(t(exprs(sce)[top.hvgs,]))
+colors <- c(G1="grey50", S="orange", G2M="red", unknown="dodgerblue")
+plot(pr.out$x[,1], pr.out$x[,2], col=colors[hard.assign], pch=16, 
+    xlab="PC1", ylab="PC2", main="Before removal")
+legend("bottomleft", legend=names(colors), col=colors, pch=16)
 corrected <- removeBatchEffect(exprs(sce), batch=hard.assign)
-assayDataElement(sce, "corrected") <- corrected
-pca1 <- plotPCA(sce, colour_by="assignments") + fontsize + ggtitle("Before removal")
-pca2 <- plotPCA(sce, exprs_values="corrected", colour_by="assignments") + 
-    fontsize + ggtitle("After removal")
-multiplot(pca1, pca2, cols=2)
+pr.out2 <- predict(pr.out, t(corrected[top.hvgs,]))
+plot(pr.out2[,1], pr.out2[,2], col=colors[hard.assign], pch=16,
+    xlab="PC1", ylab="PC2", main="After removal")
 ```
 
 For other analyses (e.g., detecting DEGs or HVGs), the phase-corrected values from `removeBatchEffect` should not be used directly.
