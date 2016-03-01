@@ -143,7 +143,7 @@ Another measure of quality is the proportion of reads mapped to genes in the mit
 High proportions are indicative of poor-quality cells [@islam2014quantitative;@ilicic2016classification], possibly because of increased apoptosis and/or loss of cytoplasmic RNA from lysed cells.
 A similar case can be made for the proportion of reads mapped to spike-in transcripts.
 The quantity of spike-in RNA added to each cell should be constant, which means that the proportion should increase upon loss of endogenous RNA in low-quality cells.
-The distributions of mitochondrial and spike-in proportions across all cells are shown in the plots below.
+The distributions of mitochondrial and spike-in proportions across all cells are shown in Figure ((controlplothsc)).
 
 <!-- 
 It shouldn't matter too much if it's the proportion against total counts, or proportion against endogenous counts.
@@ -180,8 +180,7 @@ ncol(sce)
 
 An alternative approach to quality control is to perform a principal components analysis (PCA) based on the quality metrics for each cell, e.g., the total number of reads, the total number of features, the proportion of mitochondrial or spike-in reads.
 Outliers on a PCA plot may be indicative of low-quality cells that have aberrant technical properties compared to the (presumed) majority of high-quality cells.
-Here, no cells were identified as outliers in the plot below.
-This is consistent with the removal of suspect cells in the preceding quality control steps.
+In Figure ((pcaqualplothsc)), no cells were identified as outliers which is consistent with the removal of suspect cells in the preceding quality control steps.
 
 ```{r pcaqualplothsc, fig.cap="PCA plot for all remaining cells in the HSC data set, constructed using quality metrics. The first and second components are shown on each axis, along with the percentage of total variance explained by each component. Bars represent the coordinates of the cells on each axis."}
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
@@ -217,7 +216,7 @@ alt.keep <- rowSums(is_exprs(sce)) >= 10
 sum(alt.keep)
 ```
 
-The relationship between the proportion of expressing cells and the mean can be examined more closely in the plot below.
+The relationship between the proportion of expressing cells and the mean can be examined more closely in Figure ((geneplothsc)).
 The two statistics tend to be well-correlated, so filtering on either should give roughly similar results.
 
 ```{r geneplothsc, fig.cap="Frequency of expression against the mean expression for each gene. Circles represent endogenous genes and triangles represent spike-in transcripts or mitochondrial genes. The bars on each axis represent the location of each gene on that axis. Genes above high technical dropout are defined as those above a non-linear trend fitted to the triangles."}
@@ -247,7 +246,7 @@ sce <- computeSumFactors(sce, sizes=c(20, 40, 60, 80))
 summary(sizeFactors(sce))
 ```
 
-In this case, the size factors are tightly correlated with the total counts for all cells.
+In this case, the size factors are tightly correlated with the total counts for all cells (Figure ((normplothsc))).
 This suggests that the systematic differences between cells are primarily driven by differences in capture efficiency or sequencing depth.
 Any DE between cells would yield a non-linear trend between the total count and size factor, and/or increased scatter around the trend.
 This does not occur here as strong DE is unlikely to exist between cells of the same type.
@@ -273,14 +272,14 @@ sce <- normalize(sce)
 
 Dimensionality reduction is often useful to examine major features of the data before more quantitative analyses.
 Of particular interest is whether the HSCs partition into distinct subpopulations.
-This can be visualized by constructing a PCA plot from the normalized log-expression values.
-Cells with similar expression profiles should be located close together on the plot.
+This can be visualized by constructing a PCA plot from the normalized log-expression values (Figure ((pcaplothsc))).
+Cells with similar expression profiles should be located close together in the plot.
 
 ```{r pcaplothsc, fig.cap="PCA plot constructed from normalized log-expression values, where each point represents a cell in the HSC data set. First and second components are shown, along with the percentage of variance explained. Bars represent the coordinates of the cells on each axis. None of the cells are controls (e.g., empty wells) so the legend can be ignored."}
 plotPCA(sce, exprs_values="exprs") + fontsize
 ```
 
-Alternatively, the PCA plot can be constructed from a matrix of correlations between cells. 
+Alternatively, the PCA plot can be constructed from a matrix of correlations between cells (Figure ((pcacorplothsc))). 
 Two cells with similar expression profiles will exhibit similar patterns of correlations to other cells.
 As a result, those two cells will be closer together in the plot.
 This approach tends to be more robust to outliers than a standard PCA plot, as a small number of aberrant genes will have little effect on the value of Spearman's rank correlation.
@@ -295,7 +294,7 @@ plot(out$x[,1], out$x[,2], xlab="PC1", ylab="PC2", pch=16)
 Another popular approach to dimensionality reduction is the _t_-stochastic neighbour embedding (_t_-SNE) method [@van2008visualizing].
 _t_-SNE tends to work better than PCA for large data sets with complex substructure, at the cost of more computational effort and complexity.
 Unlike PCA, _t_-SNE is a stochastic method -- users should run the algorithm several times to ensure that the results are representative, and then set a seed to ensure that the chosen results are reproducible.
-It is also advisable to test different settings of the "perplexity" parameter as this will affect the distribution of points in the low-dimensional space.
+It is also advisable to test different settings of the "perplexity" parameter as this will affect the distribution of points in the low-dimensional space (Figure ((tsneplothsc))).
 
 ```{r tsneplothsc, fig.cap="_t_-SNE plot constructed from normalized log-expression values using a range of perplexity values. In each plot, each point represents a cell in the HSC data set. Bars represent the coordinates of the cells on each axis.", fig.width=12, fig.height=6}
 set.seed(100)
@@ -319,6 +318,7 @@ Using a training data set, the sign of the difference in expression between two 
 Pairs with changes in the sign across cell cycle phases were chosen as markers.
 Cells in a test data set can then be classified into the appropriate phase, based on whether the observed sign for each marker pair is consistent with one phase or another.
 This approach is implemented in the `cyclone` function using a pre-trained set of marker pairs for mouse data.
+The result of phase assignment for each cell in the HSC data set is shown in Figure ((phaseplothsc)).
 (Some additional work is necessary to match the gene symbols in the data to the Ensembl annotation in the set of pairs.)
 
 ```{r phaseplothsc, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the HSC data set, where each point represents a cell."}
@@ -383,7 +383,7 @@ var.fit2 <- trendVar(sce, trend="loess", use.spikes=FALSE, span=0.2)
 var.out2 <- decomposeVar(sce, var.fit2)
 ```
 
-We assess the suitability of the trend fitted to the endogenous variances by examining whether it is consistent with the spike-in variances. 
+We assess the suitability of the trend fitted to the endogenous variances by examining whether it is consistent with the spike-in variances (Figure ((hvgplothsc))). 
 The former passes through the bulk of the latter in the plot below, indicating that our assumption (that most genes are not biologically variable) is valid.
 In contrast, the spike-in trend is less stable at mean intervals with few spike-in transcripts.
 More generally, the use of an endogenous trend is the only option in data sets where no spike-ins were added or in situations where not enough spike-in RNA was added to cover the range of means for the endogenous genes.
@@ -406,9 +406,9 @@ write.table(file="hsc_hvg.tsv", var.out2[top.hvgs,], sep="\t", quote=FALSE, col.
 head(var.out2[top.hvgs,])
 ```
 
-We recommend checking the distribution of expression values for the top HVGs to ensure that the variance estimate is not being dominated by one or two outlier cells.
+We recommend checking the distribution of expression values for the top HVGs to ensure that the variance estimate is not being dominated by one or two outlier cells (Figure ((hvgboxplothsc))).
 
-```{r, fig.cap="Boxplots of normalized log-expression values for the top 10 HVGs in the HSC data set. Points correspond to cells that are more than 1.5 interquartile ranges from the edge of each box."}
+```{r hvgboxplothsc, fig.cap="Boxplots of normalized log-expression values for the top 10 HVGs in the HSC data set. Points correspond to cells that are more than 1.5 interquartile ranges from the edge of each box."}
 examined <- top.hvgs[1:10]
 all.names <- matrix(rownames(sce)[examined], nrow=length(examined), ncol=ncol(sce))
 boxplot(split(exprs(sce)[examined,], all.names), las=2, ylab="Normalized log-expression")
@@ -491,7 +491,7 @@ my.clusters <- unname(cutreeDynamic(my.tree, distM=as.matrix(my.dist),
 my.clusters
 ```
 
-We can visualize the constructed dendrogram with a heatmap.
+We can visualize the constructed dendrogram with a heatmap (Figure ((heatmaphsc))).
 All expression values are mean-centred for each gene to highlight the relative expression between cells.
 We recommend storing the heatmap at a sufficiently high resolution so that the relevant genes can be easily identified for further examination.
 
@@ -516,7 +516,7 @@ Moreover, different algorithms can yield substantially different clusters by foc
 In short, experimental validation of the clustering results is critical to ensure that the putative subpopulations actually exist.
 
 Finally, dimensionality reduction can be applied using only the set of HVGs to highlight any substructure that might be present.
-This is shown below for both PCA and _t_-SNE plots, though in this case, focusing on HVGs does not provide any additional separation into distinct subpopulations.
+This is shown in Figure ((pcareduxhsc)) for both PCA and _t_-SNE plots, though in this case, focusing on HVGs does not provide any additional separation into distinct subpopulations.
 
 ```{r pcareduxhsc, fig.width=10, fig.height=6, fig.cap="PCA (left) and _t_-SNE plots (right) using only the expression values for significantly correlated HVGs in the HSC data set. Each cell is represented by a point in each plot, and the bars represent the cell coordinates on each axis."}
 set.seed(100)
@@ -703,7 +703,7 @@ sce <- normalize(sce)
 gc()
 ```
 
-Compared to the HSC analysis, more scatter is observed for the trend between the total count and size factor for each cell.
+Compared to the HSC analysis, more scatter is observed for the trend between the total count and size factor for each cell (Figure ((normplotbrain))).
 This is consistent with an increased amount of DE between cells of different types, which compromises the accuracy of library size normalization [@robinson2010scaling].
 In contrast, the size factors are estimated based on median ratios and are more robust to the presence of DE between cells.
 
@@ -713,7 +713,7 @@ plot(sizeFactors(sce), sce$total_counts/1e6, log="xy",
 ```
 
 We also attempt to classify cells into cell cycle phases using the `cyclone` method.
-However, examination of the plot below indicates that many of the G1 and G2/M scores are ambiguous.
+However, examination of Figure ((phaseplotbrain)) indicates that many of the G1 and G2/M scores are ambiguous.
 This highlights the potential difficulties of training a classifier on one cell type (mouse embryonic stem cells -- see @scialdone2015computational for more details) and applying it on a substantially different cell type.
 Some neuron types are particularly problematic as they are postmitotic and do not belong in any phase of the cell cycle.
 
@@ -737,7 +737,7 @@ For example, if putative subpopulations have distinctly different phase scores, 
 ## Data exploration to examine the effect of technical factors
 
 For large experiments, data exploration has two functions -- to identify interesting biology, and also to check the effect of various technical factors.
-PCA plots constructed from the expression data suggest that distinct subpopulations are present.
+PCA plots constructed from the expression data suggest that distinct subpopulations are present (Figure ((pcaplotbrain))).
 Some of the substructure may be due to differences in the tissue from which the cells were extracted, e.g.,
     cells from the cortex and hippocampus dominate the bottom-right and bottom-left corners of the plot, respectively.
 In contrast, cells taken from mice of different sexes mix throughout the plot, indicating that sex has little effect on the overall differences across the data set.
@@ -752,7 +752,7 @@ pca2 <- plotPCA(sce, exprs_values="exprs", colour_by="sex") + fontsize
 multiplot(pca1, pca2, cols=2)
 ```
 
-Similar results are observed with _t_-SNE plots.
+Similar results are observed with _t_-SNE plots (Figure ((tsneplotbrain))).
 Again, users should set the seed to a constant value to ensure that the results are reproducible.
 
 ```{r tsneplotbrain, fig.width=12, fig.height=6, fig.cap="_t_-SNE plots constructed from the normalized expression values for all remaining cells in the brain data set. Each cell is represented by a point in each plot, and the bars represent the cell coordinates on each axis. Left: cells are coloured according to the tissue of origin (cortex or hippocampus). Right: cells are coloured according to the sex of the mouse -- male (-1), female (1) or unassigned (0)."}
@@ -765,7 +765,7 @@ multiplot(tsne1, tsne2, cols=2)
 
 An additional effect to consider is the fact that cells were processed on many different C1 chips.
 This can lead to batch effects due to technical differences in library preparation between chips.
-To check that this is not the case, we examine the spread of cells from each chip on the PCA plot.
+To check that this is not the case, we examine the spread of cells from each chip on the PCA plot (Figure ((pca2plotbrain))).
 Cells from different chips seem to mix together, which suggests that the substructure is not being driven by a batch effect.
 
 ```{r pca2plotbrain, fig.width=15, fig.height=6, fig.cap="PCA plots constructed from the normalized expression values for all cells in the brain data set from the cortex (left) or hippocampus (right). Each cell is represented by a point in each plot, and the bars represent the cell coordinates on each axis. Cells are coloured according to the C1 chip from which the library was prepared."}
@@ -782,7 +782,7 @@ This hierarchical approach can be extended if sufficient annotation is available
 For example, consider a situation where multiple chips were used for each mouse, and multiple mice were used in the entire experiment.
 We could construct a PCA plot for cells in each mouse, coloured by the chip of origin -- this allows us to check whether chip effects are present in that mouse.
 We could then construct a PCA plot for all cells, coloured by the mouse of origin -- this allows us to check whether a mouse effect is present.
-This strategy reduces the complexity of the colours in each plot and improves the ease of diagnosis.
+This strategy reduces the complexity of the colours in each plot and improves the ease of diagnosis if systematic differences between chips or mice are present.
 
 <!-- 
 The prefix of the cell ID seems to be the chip, as the second half of the ID marks the well position and there's always less than 96.
@@ -813,14 +813,14 @@ var.out <- decomposeVar(sce, var.fit)
 gc()
 ```
 
-The plot below suggests that the trend is fitted accurately to the technical variances.
+Figure ((hvgplotbrain)) suggests that the trend is fitted accurately to the technical variances.
 Errors in fitting seem to be negligible relative to the size of the total variances for the endogenous genes.
 The technical variances are also much smaller than those in the HSC data set.
 This is due to the use of UMIs which reduces the noise caused by variable PCR amplification.
 Furthermore, the spike-in trend is consistently lower than the variances of the endogenous genes.
 This means the previous strategy of fitting a trend to the endogenous variances would not be appropriate here (or necessary, given the quality of the spike-in trend). 
 
-```{r, fig.cap="Variance of normalized log-expression values for each gene in the brain data set, plotted against the mean log-expression. The red line represents the mean-   dependent trend in the technical variance of the spike-in transcripts (also highlighted as red points)."}
+```{r hvgplotbrain, fig.cap="Variance of normalized log-expression values for each gene in the brain data set, plotted against the mean log-expression. The red line represents the mean-   dependent trend in the technical variance of the spike-in transcripts (also highlighted as red points)."}
 plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression", 
     ylab="Variance of log-expression")
 points(var.fit$mean, var.fit$var, col="red", pch=16)
@@ -837,9 +837,9 @@ write.table(file="brain_hvg.tsv", var.out[top.hvgs,], sep="\t", quote=FALSE, col
 head(var.out[top.hvgs,])
 ```
 
-Again, we check the distribution of expression values for the top 10 HVGs to ensure that they are not being driven by outliers.
+Again, we check the distribution of expression values for the top 10 HVGs to ensure that they are not being driven by outliers (Figure ((hvgboxplotbrain))).
 
-```{r, fig.cap="Boxplots of normalized log-expression values for the top 10 HVGs in the brain data set. Points correspond to cells that are more than 1.5 interquartile ranges from the edge of each box."}
+```{r hvgboxplotbrain, fig.cap="Boxplots of normalized log-expression values for the top 10 HVGs in the brain data set. Points correspond to cells that are more than 1.5 interquartile ranges from the edge of each box."}
 examined <- top.hvgs[1:10]
 all.names <- matrix(rownames(sce)[examined], nrow=length(examined), ncol=ncol(sce))
 boxplot(split(exprs(sce)[examined,], all.names), las=2, ylab="Normalized log-expression")
@@ -868,7 +868,7 @@ library(limma)
 norm.exprs <- removeBatchEffect(norm.exprs, batch=sce$tissue)
 ```
 
-The plot below shows systematic differences between groups of cells with distinct patterns of expression.
+The heatmap in Figure ((heatmapbrain)) shows systematic differences between groups of cells with distinct patterns of expression.
 This is consistent with the presence of well-defined subpopulations.
 The empirical clusters also correspond roughly to the visual subpopulations, which suggests that they can be reliably used for downstream analyses. 
 Greater control of the empirical clusters can be obtained by manually specifying `cutHeight` in `cutreeDynamic`.
@@ -956,11 +956,11 @@ head(marker.set)
 
 We save the list of candidate marker genes for further examination.
 We also examine their expression profiles to verify that the DE is not being driven by outlier cells.
-The heatmap below indicates that all of the top markers are strongly expressed across most cells in cluster 2, whereas expression is lower or absent in the other clusters.
+The heatmap in Figure ((heatmapmarkerbrain)) indicates that all of the top markers are strongly expressed across most cells in cluster 2, whereas expression is lower or absent in the other clusters.
 Some robustness to outliers is expected from `r Biocpkg("edgeR")`, as any outliers will inflate the dispersion and increase the maximum _p_-value for the affected genes.
 
-```{r, fig.cap="Heatmap of mean-centred normalized log-expression values for the top set of markers for cluster 2 in the brain data set. Column colours represent the cluster to which each cell is assigned."}
-write.table(marker.set, file="marker_brain_2.tsv", sep="\t", quote=FALSE, row.names=FALSE)
+```{r heatmapmarkerbrain, fig.cap="Heatmap of mean-centred normalized log-expression values for the top set of markers for cluster 2 in the brain data set. Column colours represent the cluster to which each cell is assigned."}
+write.table(marker.set, file="brain_marker_2.tsv", sep="\t", quote=FALSE, row.names=FALSE)
 top.markers <- marker.set$Gene[1:20]
 norm.exprs <- exprs(sce)[top.markers,,drop=FALSE]
 heat.vals <- norm.exprs - rowMeans(norm.exprs)
@@ -1017,11 +1017,11 @@ sce <- computeSpikeFactors(sce)
 ```
 
 Both non-DE methods (like deconvolution) and spike-in normalization will capture technical biases such as sequencing depth and capture efficiency.
-Indeed, the plot below shows a rough positive correlation between the two sets of size factors, consistent with removal of technical biases by both methods.
-However, the differences between the two sets are attributable to variability in total RNA content across the HSC population.
+Indeed, Figure ((normplotspikehsc)) shows a rough positive correlation between the two sets of size factors, consistent with removal of technical biases by both methods.
+However, differences between the two sets are still present and are attributable to variability in total RNA content across the HSC population.
 Spike-in normalization will preserve differences in RNA content, whereas non-DE normalization will eliminate them.
 
-```{r, fig.cap="Size factors from spike-in normalization, plotted against the size factors from deconvolution for all cells in the HSC data set. Axes are shown on a log-scale."}
+```{r normplotspikehsc, fig.cap="Size factors from spike-in normalization, plotted against the size factors from deconvolution for all cells in the HSC data set. Axes are shown on a log-scale."}
 plot(sizeFactors(sce), deconv.sf, pch=16, log="xy", xlab="Size factor (spike-in)",
     ylab="Size factor (deconvolution)")
 ```
@@ -1047,7 +1047,7 @@ sce <- newSCESet(exprsData=t(incoming))
 ```
 
 We empirically identify the cell cycle phase using the pair-based classifier.
-The majority of cells in the plot below are assigned to the G1 or G2/M phases, with small numbers of cells in S-phase or without clear assignments.
+The majority of cells in Figure ((phaseplotth2)) are assigned to the G1 or G2/M phases, with small numbers of cells in S-phase or without clear assignments.
 
 ```{r, echo=FALSE, results='hide', message=FALSE}
 mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", package="scran"))
@@ -1075,7 +1075,7 @@ table(hard.assign)
 ```
 
 We use `removeBatchEffect` to remove the effect of the (empirical) cell cycle phase on the gene expression profiles.
-The result of this procedure can be visualized with some PCA plots in the image below.
+The result of this procedure can be visualized with some PCA plots in Figure ((pcaplotth2)).
 Before removal, cells in the G1 and G2/M phases tend to be concentrated in different parts of the plot.
 Afterwards, more intermingling is observed between the phases which suggests that the cell cycle effect has been mitigated.
 
