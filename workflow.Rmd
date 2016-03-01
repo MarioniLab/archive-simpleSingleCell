@@ -1168,13 +1168,15 @@ gc()
 
 Some data sets contain pre-defined biological groups in the experimental design, e.g., the tissue and sex in the brain data set.
 If differences between these pre-defined groups are of interest, a DE analysis can be performed with packages like `r Biocpkg("edgeR")` or `r Biocpkg("DESeq2")`.
-The process is the same as that used to identify marker genes in the brain data set, except that the design matrix is constructed from the pre-defined variables rather than the empirical clusters.
+Briefly, a design matrix is constructed containing the pre-defined groupings for all cells.
+This design matrix and the matrix of single-cell counts can then be processed with standard DE analysis pipelines.
+This is similar to the identification of marker genes for the brain data set, except that pre-defined variables are used in the design matrix instead of empirical clusters.
 The use of pre-defined variables also avoids issues with clustering errors and allows interpretation of the DE _p_-values as measures of significance.
 
-Applying a DE analysis on the single-cell counts will treat the cells within each group as independent replicates.
+The approach outlined above treats all cells within each group as independent replicates.
 However, this may not be true for experiments involving cells from multiple plates or chips (for simplicity, we will refer to both as plates).
 All cells on a plate are processed simultaneously but the plates themselves are processed separately.
-Any uncontrolled variability in processing for one plate will cause a consistent change in expression for all cells on that plate, i.e., a plate effect [@hicks2015xxx].
+Any uncontrolled variability in processing for one plate will cause a consistent change in expression for all cells on that plate, i.e., a plate effect [@hicks2015widespread].
 If a group contains two plates, one cannot treat the cells in that group as direct replicates if a plate effect is present -- this is because cells on the same plate will be subject to the same plate effect and will not be independent.
 
 The obvious solution is to block on the plate of origin for each cell, but this is not possible in many experimental designs where the plate of origin is confounded with the groups of interest, e.g., when all cells on each plate correspond to a single group.
@@ -1221,7 +1223,7 @@ Significant differences -- in this case, between the 2i and a2i conditions -- ar
 
 ```{r}
 y <- calcNormFactors(y)
-y <- estimateDisp(y, design)
+y <- estimateDisp(y, design, robust=TRUE)
 fit <- glmFit(y, design)
 res <- glmLRT(fit, contrast=makeContrasts(culture2i-culturea2i, levels=design))
 topTags(res)
