@@ -124,7 +124,7 @@ Maybe logging it would be better before computing MADs, but then it wouldn't be 
 -->
 
 ```{r}
-lib.sizes <- sce$total_count
+lib.sizes <- sce$total_counts
 summary(lib.sizes)
 keep <- lib.sizes >= median(lib.sizes)/10
 sce <- sce[,keep]
@@ -622,7 +622,7 @@ sce <- calculateQCMetrics(sce, feature_controls=list(Spike=is.spike, Mt=is.mito)
 As previously described, we remove cells with low total counts for endogenous genes or with few total expressed features.
 
 ```{r}
-lib.sizes <- sce$total_count 
+lib.sizes <- sce$total_counts 
 count.keep <- lib.sizes >= median(lib.sizes)/10
 sum(!count.keep)
 feature.keep <- sce$total_features >= 1000
