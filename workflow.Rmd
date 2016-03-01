@@ -1076,19 +1076,22 @@ The result of this procedure can be visualized with some PCA plots in the image 
 Before removal, cells in the G1 and G2/M phases tend to be concentrated in different parts of the plot.
 Afterwards, more intermingling is observed between the phases which suggests that the cell cycle effect has been mitigated.
 
-```{r pcaplotth2, fig.width=10, fig.height=6, fig.cap="PCA plots before (left) and after (right) removal of the cell cycle effect in the Th2 data set. Each point represents a cell, coloured according to the empirically assigned cell cycle phase. Only the top 500 HVGs were used to make the PCA plot before removal. Cells were projected onto the same PCA space after removal to facilitate comparison between plots."}
-par(mfrow=c(1,2))
-fit <- trendVar(sce, use.spikes=FALSE)
+```{r pcaplotth2, fig.width=10, fig.height=6, fig.cap="PCA plots before (left) and after (right) removal of the cell cycle effect in the Th2 data set. Each point represents a cell, coloured according to the empirically assigned cell cycle phase. Only the top 500 HVGs were used to make the PCA plot before removal. Cells were projected onto the same PCA space after removal to facilitate comparisons between plots."}
+fit <- trendVar(sce, use.spikes=NA)
 top.hvgs <- order(fit$var, decreasing=TRUE)[1:500]
 pr.out <- prcomp(t(exprs(sce)[top.hvgs,]))
-colors <- c(G1="grey50", S="orange", G2M="red", unknown="dodgerblue")
-plot(pr.out$x[,1], pr.out$x[,2], col=colors[hard.assign], pch=16, 
-    xlab="PC1", ylab="PC2", main="Before removal")
-legend("bottomleft", legend=names(colors), col=colors, pch=16)
 corrected <- removeBatchEffect(exprs(sce), batch=hard.assign)
 pr.out2 <- predict(pr.out, t(corrected[top.hvgs,]))
-plot(pr.out2[,1], pr.out2[,2], col=colors[hard.assign], pch=16,
-    xlab="PC1", ylab="PC2", main="After removal")
+
+par(mfrow=c(1,2))
+xrange <- range(c(pr.out$x[,1], pr.out2[,1]))
+yrange <- range(c(pr.out$x[,2], pr.out2[,2]))
+colors <- c(G1="grey50", S="orange", G2M="red", unknown="dodgerblue")
+plot(pr.out$x[,1], pr.out$x[,2], col=colors[hard.assign], pch=16, xlab="PC1", ylab="PC2", 
+    main="Before removal", xlim=xrange, ylim=yrange)
+legend("bottomleft", legend=names(colors), col=colors, pch=16)
+plot(pr.out2[,1], pr.out2[,2], col=colors[hard.assign], pch=16, xlab="PC1", ylab="PC2", 
+    main="After removal", xlim=xrange, ylim=yrange)
 ```
 
 For other analyses (e.g., detecting DEGs or HVGs), the phase-corrected values from `removeBatchEffect` should not be used directly.
