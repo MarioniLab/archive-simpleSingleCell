@@ -1,5 +1,5 @@
 ---
-title: "Cell by cell, chart to chart: an illustrated workflow for basic analyses of single-cell RNA-seq data"
+title: "Cell by cell, count to count: a step-by-step workflow for basic analyses of single-cell RNA-seq data"
 author: 
     - name: Aaron T. L. Lun
       affiliation: Cancer Research UK Cambridge Institute, Li Ka Shing Centre, Robinson Way, Cambridge CB2 0RE, United Kingdom
@@ -112,15 +112,20 @@ sce <- calculateQCMetrics(sce, feature_controls=list(Spike=is.spike, Mt=is.mito)
 head(colnames(pData(sce)))
 ```
 
-Low-quality cells are defined as those where the endogenous RNA has not been efficiently captured (i.e., converted into cDNA and amplified) during library preparation.
-These can be identified as those cells with a low sum of counts for the endogenous genes.
-In general, any cell with a count sum that is an order of magnitude lower than the median across all cells can be considered to be of low quality and removed.
-A more relaxed threshold may need to be used when strong heterogeneity in total RNA content is expected across cells.
+One measure of quality is the library size, defined as the total sum of counts across all genes and spike-in transcripts.
+Cells with small library sizes are considered to be of low quality as the RNA has not been efficiently captured (i.e., converted into cDNA and amplified) during library preparation.
+In general, any cell with a library size that is an order of magnitude lower than the median across all cells should be removed.
+A more relaxed threshold may be necessary when strong heterogeneity in total RNA content is expected across cells.
+
+<!-- 
+MAD-based definitions don't seem to work as the MAD is too large, so median-MAD*3 ends up being negative. 
+Maybe logging it would be better before computing MADs, but then it wouldn't be as interpretable.
+-->
 
 ```{r}
-endo.sum <- sce$counts_endogenous_features
-summary(endo.sum)
-keep <- endo.sum >= median(endo.sum)/10
+lib.sizes <- sce$total_count
+summary(lib.sizes)
+keep <- lib.sizes >= median(lib.sizes)/10
 sce <- sce[,keep]
 sum(!keep)
 ```
@@ -137,6 +142,7 @@ summary(sce$total_features)
 Another measure of quality is the proportion of reads mapped to genes in the mitochondrial genome.
 High proportions are indicative of poor-quality cells [@islam2014quantitative;@ilicic2016classification], possibly because of increased apoptosis and/or loss of cytoplasmic RNA from lysed cells.
 A similar case can be made for the proportion of reads mapped to spike-in transcripts.
+The quantity of spike-in RNA added to each cell should be constant, which means that the proportion should increase upon loss of endogenous RNA in low-quality cells.
 The distributions of mitochondrial and spike-in proportions across all cells are shown in the plots below.
 
 ```{r controlplothsc, fig.width=12, fig.height=6, fig.cap="Histogram of the proportion of reads mapped to mitochondrial genes (left) or spike-in transcripts (right) across all remaining cells in the HSC data set."}
@@ -150,8 +156,10 @@ hist(spike.props, xlab="ERCC proportion", ylab="Number of cells",
 ```
 
 Defining a threshold on the proportion is not straightforward as it depends largely on the cell type and the experimental protocol.
-If we assume that most cells in the data set are not apoptotic, then the threshold can be set to remove any large outliers from the distribution of proportions.
-Here, we define outliers as those with proportions that are more than 3 median absolute deviations (MADs) above the median proportion.
+Cells with more mitochondria or more mitochondrial activity may naturally have larger mitochondrial proportions.
+Similarly, cells with more endogenous RNA or in protocols using less spike-in RNA will have lower spike-in proportions.
+If we assume that most cells in the data set are of high quality, then the threshold can be set to remove any large outliers from the distribution of proportions.
+Here, we define outliers as those with proportions that are more than 3 median absolute deviations (MADs) above the median proportion for spike-in transcripts or mitochondrial genes.
 This results in the removal of a small number of cells.
 
 ```{r}
@@ -244,7 +252,7 @@ plot(sizeFactors(sce), sce$total_counts/1e6, log="xy",
 Normalized log-expression values can be computed for use in downstream analyses.
 Each value is defined as the log-ratio of each count to the size factor for the corresponding cell (after adding a small prior count to avoid undefined values at zero counts).
 Division by the size factor ensures that any cell-specific biases are removed.
-The log-transformation is also useful as larger counts can be modelled reasonably well with a log-normal distribution [@law2014voom].
+The log-transformation is useful as it provides some variance stabilization -- this ensures that high-abundance genes with large variances do not dominate downstream analyses.
 The computed values are stored as an `"exprs"` matrix in addition to the other assay elements.
 
 ```{r}
@@ -604,8 +612,8 @@ sce <- calculateQCMetrics(sce, feature_controls=list(Spike=is.spike, Mt=is.mito)
 As previously described, we remove cells with low total counts for endogenous genes or with few total expressed features.
 
 ```{r}
-endo.sum <- sce$counts_endogenous_features 
-count.keep <- endo.sum >= median(endo.sum)/10
+lib.sizes <- sce$total_count 
+count.keep <- lib.sizes >= median(lib.sizes)/10
 sum(!count.keep)
 feature.keep <- sce$total_features >= 1000
 sum(!feature.keep)
