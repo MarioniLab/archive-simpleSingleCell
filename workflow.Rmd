@@ -1244,6 +1244,10 @@ summary(decideTestsDGE(res))
 
 # Software availability
 
+All software packages used in this workflow are publicly available from the Comprehensive R Archive Network (https://cran.r-project.org) or the Bioconductor project (http://bioconductor.org).
+The specific version numbers of the packages used are shown below, along with the version of the R installation.
+The workflow takes approximately 10-20 minutes and 5 GB of memory to run on a desktop computer.
+
 ```{r}
 sessionInfo()
 ```
@@ -1259,11 +1263,11 @@ No competing interests were disclosed.
 
 # Grant information
 
-CRUK core funding (SW73) to J.C.M.
+This work was supported by CRUK core funding (SW73) to J.C.M.
 
 # Acknowledgements
 
-Aaron is pretty awesome.
+We would like to thank Davis McCarthy, for assistance with coding for `scater`; Antonio Scialdone, for helpful discussions regarding spike-ins and HVGs; and Michael Epstein, for trialling the workflow on other data sets.
 
 # References
 
