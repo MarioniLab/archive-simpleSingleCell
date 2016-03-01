@@ -5,9 +5,9 @@ author:
       affiliation: Cancer Research UK Cambridge Institute, Li Ka Shing Centre, Robinson Way, Cambridge CB2 0RE, United Kingdom
     - name: John C. Marioni
       affiliation: Cancer Research UK Cambridge Institute, Li Ka Shing Centre, Robinson Way, Cambridge CB2 0RE, United Kingdom; EMBL European Bioinformatics Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SD, United Kingdom
-date: 29 February 2016
+date: 1 March 2016
 vignette: >
-    %\VignetteIndexEntry{A worfklow for low-level analyses of single-cell RNA-seq data}
+    %\VignetteIndexEntry{A worfklow for basic analyses of single-cell RNA-seq data}
     %\VignetteEngine{knitr::rmarkdown}
 output: 
     BiocStyle::html_document:
@@ -977,7 +977,7 @@ The (maximum) _p_-value should only be used for ranking candidate markers for fo
 
 ## Additional comments
 
-Having completed the preliminary analysis, we save the `SCESet` object with its associated data to file.
+Having completed the basic analysis, we save the `SCESet` object with its associated data to file.
 This is especially important here as the brain data set is quite large.
 If further analyses are to be performed, it would be inconvenient to have to repeat all of the pre-processing steps described above.
 
@@ -1121,8 +1121,7 @@ We can easily convert from one to the other using annotation packages like `r Bi
 This is demonstrated below for Ensembl identifiers in the mouse embryonic stem cell (mESC) data set [@kolod2015singlecell] obtained from http://www.ebi.ac.uk/teichmann-srv/espresso.
 
 ```{r}
-incoming <- read.table("~/AaronDocs/Research/DataFiles/ESpresso/counttable_es.csv", 
-    header=TRUE, row.names=1)
+incoming <- read.table("counttable_es.csv", header=TRUE, row.names=1)
 my.ids <- rownames(incoming)
 library(org.Mm.eg.db)
 anno <- select(org.Mm.eg.db, keys=my.ids, keytype="ENSEMBL", column="SYMBOL")
@@ -1167,11 +1166,11 @@ gc()
 
 ## Detecting DEGs between pre-defined groups of cells
 
-Some data sets contain pre-defined biological groups in the experimental design, e.g., the tissue and sex in the brain data set.
-If differences between these pre-defined groups are of interest, a DE analysis can be performed with packages like `r Biocpkg("edgeR")` or `r Biocpkg("DESeq2")`.
-Briefly, a design matrix is constructed containing the pre-defined groupings for all cells.
-This design matrix and the matrix of single-cell counts can then be processed with standard DE analysis pipelines.
-This is similar to the identification of marker genes for the brain data set, except that pre-defined variables are used in the design matrix instead of empirical clusters.
+Some data sets contain pre-defined biological groups in the experimental design, e.g., tissue and sex in the brain data set.
+If differences between these groups are of interest, a DE analysis can be performed using the cells in each group.
+Briefly, a design matrix is constructed that specifies the pre-defined groupings for all cells.
+This design matrix and the matrix of single-cell counts can then be processed with standard DE analysis pipelines like `r Biocpkg("edgeR")` or `r Biocpkg("DESeq2")`.
+This process is similar to the identification of marker genes for the brain data set, except that pre-defined variables are used in the design matrix instead of empirical clusters.
 The use of pre-defined variables also avoids issues with clustering errors and allows interpretation of the DE _p_-values as measures of significance.
 
 The approach outlined above treats all cells within each group as independent replicates.
@@ -1242,6 +1241,12 @@ summary(decideTestsDGE(res))
 
 # Conclusions
 
+This workflow provides a step-by-step guide for performing basic analyses of single-cell RNA-seq data.
+It provides instructions for a number of low-level steps such as quality control, normalization, cell cycle phase assignment, data exploration, HVG and DEG detection, and clustering.
+This is done with a number of different data sets to provide a range of usage examples.
+In addition, the processed data can be easily used for higher-level analyses such as pseudotime ordering with `r Biocpkg("monocle")`.
+We anticipate that this workflow will assist readers in assembling analyses of their own scRNA-seq data.
+
 # Software availability
 
 All software packages used in this workflow are publicly available from the Comprehensive R Archive Network (https://cran.r-project.org) or the Bioconductor project (http://bioconductor.org).
@@ -1254,7 +1259,7 @@ sessionInfo()
 
 # Author contributions
 
-A.T.L.L. developed the workflow on all data sets.
+A.T.L.L. developed and tested the workflow on all data sets.
 All authors wrote and approved the final manuscript.
 
 # Competing interests
