@@ -316,9 +316,9 @@ These have their own advantages and disadvantages -- for example, diffusion maps
 
 We use the prediction method described by @scialdone2015computational to classify cells into cell cycle phases based on the gene expression data.
 Using a training data set, the sign of the difference in expression between two genes was computed for each pair of genes.
-Pairs were chosen with changes in the sign across cell cycle phases.
-Cells in a test data set can then be classified into the appropriate phase, based on whether the observed sign is consistent with one phase or another.
-This is achieved using the `cyclone` function on a pre-trained set of gene pairs for mouse data.
+Pairs with changes in the sign across cell cycle phases were chosen as markers.
+Cells in a test data set can then be classified into the appropriate phase, based on whether the observed sign for each marker pair is consistent with one phase or another.
+This approach is implemented in the `cyclone` function using a pre-trained set of marker pairs for mouse data.
 (Some additional work is necessary to match the gene symbols in the data to the Ensembl annotation in the set of pairs.)
 
 ```{r phaseplothsc, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the HSC data set, where each point represents a cell."}
@@ -336,7 +336,7 @@ Here, the vast majority of cells are classified as being in G1 phase.
 We will focus on these cells for the downstream analysis.
 Cells in other phases are removed to avoid potential confounding effects from cell cycle-induced differences.
 Alternatively, if a non-negligible number of cells are in other phases, we can use the assigned phase as a blocking factor in downstream analyses.
-This protects against cell cycle effects without discarding a substantial amount of information.
+This protects against cell cycle effects without discarding information.
 
 ```{r}
 g1.only <- assignments$score$G1 > 0.5
@@ -357,7 +357,7 @@ HVGs are then identified as those genes with the highest biological components.
 This avoids prioritizing genes that are highly variable due to technical factors such as sampling noise during RNA capture and library preparation.
 
 Ideally, the technical component would be estimated by fitting a mean-variance trend to the spike-in transcripts.
-Recall that the same set of spike-ins is added in the same quantity to each cell.
+Recall that the same set of spike-ins was added in the same quantity to each cell.
 This means that the spike-in transcripts should exhibit no biological variability, such that any variance in the counts should be technical in origin.
 Fitting is performed by the `trendVar` function, using a loess curve with a low span as the trend is highly non-linear.
 (Some adjustment of the parameters may be required to obtain a satisfactory fit.)
@@ -385,7 +385,7 @@ var.out2 <- decomposeVar(sce, var.fit2)
 
 We assess the suitability of the trend fitted to the endogenous variances by examining whether it is consistent with the spike-in variances. 
 The former passes through the bulk of the latter in the plot below, indicating that our assumption (that most genes are not biologically variable) is valid.
-In contrast, the spike-in trend is less accurate at mean intervals with few spike-in transcripts.
+In contrast, the spike-in trend is less stable at mean intervals with few spike-in transcripts.
 More generally, the use of an endogenous trend is the only option in data sets where no spike-ins were added or in situations where not enough spike-in RNA was added to cover the range of means for the endogenous genes.
 
 ```{r hvgplothsc, fig.cap="Variance of normalized log-expression values for each gene in the HSC data set, plotted against the mean log-expression. The red line represents the mean-dependent trend in the technical variance of the spike-in transcripts (also highlighted as red points). The blue line represents the trend fitted to the variances of the endogenous genes."}
@@ -414,7 +414,7 @@ all.names <- matrix(rownames(sce)[examined], nrow=length(examined), ncol=ncol(sc
 boxplot(split(exprs(sce)[examined,], all.names), las=2, ylab="Normalized log-expression")
 ```
 
-Of course, there are many ways of defining HVGs, e.g., by using the coefficient of variation [@kolod2015singlecell;@kim2015characterizing], through the dispersion parameter in the negative binomial distribution [@mccarthy2012differential], or as a proportion of total variability [@vallejos2015basics].
+Of course, there are many ways of defining HVGs, e.g., by using the coefficient of variation [@kolod2015singlecell;@kim2015characterizing], with the dispersion parameter in the negative binomial distribution [@mccarthy2012differential], or as a proportion of total variability [@vallejos2015basics].
 We use the variance of the log-expression values because the log-transformation provides some protection against genes with strong expression in only one or two outlier cells.
 This ensures that the set of top HVGs is not dominated by genes with (mostly uninteresting) outlier expression patterns.
 However, the cost of this robustness is the need to fit a complex mean-variance relationship.
@@ -433,18 +433,19 @@ write.table(file="hsc_cor.tsv", var.cor, sep="\t", quote=FALSE, col.names=NA)
 head(var.cor)
 ```
 
-HVGs with significant correlations can be prioritized for follow-up studies.
-For example, a set of correlated genes can be used as markers to validate the existence of a subpopulation of cells with a specific expression pattern, e.g., via fluorescence-activated cell sorting, immunohistology or RNA flourescence _in situ_ hybridization.
-Negatively correlated pairs may be particularly useful in this respect, as they provide a clear "negative control" signal for cells outside of the subpopulation.
-
-Significant correlations are defined by testing against the null hypothesis of no correlations, i.e., expression profiles between two genes are independent.
-This yields a _p_-value representing the significance of each pairwise correlation.
+The significance of each correlation is determined using a permutation test.
+For each pair of genes, the null hypothesis is that the expression profiles of two genes are independent.
+Shuffling the profiles and recalculating the correlation will yield a null distribution that can be used to obtain a _p_-value for each observed correlation value [@phipson2010permutation].
 Correction for multiple testing across many gene pairs is performed by controlling the false discovery rate (FDR) at 5%.
 
 ```{r}
 sig.cor <- var.cor$FDR <= 0.05
 summary(sig.cor)
 ```
+
+HVGs with significant correlations can be prioritized for follow-up studies.
+For example, a set of correlated genes can be used as markers to validate the existence of a subpopulation of cells with a specific expression pattern, e.g., via fluorescence-activated cell sorting, immunohistology or RNA flourescence _in situ_ hybridization.
+Negatively correlated pairs may be particularly useful in this respect, as they provide a clear "negative control" signal for cells outside of the subpopulation.
 
 Larger sets of correlated genes can be assembled by treating genes as nodes in a graph and each pair of genes with significantly large correlations as an edge.
 In this manner, an undirected graph can be constructed using methods in the `r Biocpkg("RBGL")` package.
@@ -463,7 +464,7 @@ cl
 ## Using correlated HVGs for further data exploration
 
 For further analyses, we focus on the significantly correlated HVGs for which any substructure should be most pronounced.
-This may allow us to identify subpopulations that would have otherwise been masked by random noise in the expression profiles..
+This may allow us to identify subpopulations that would have otherwise been masked by random noise in the expression profiles.
 
 ```{r}
 chosen <- unique(c(var.cor$gene1[sig.cor], var.cor$gene2[sig.cor]))
@@ -490,7 +491,7 @@ my.clusters <- unname(cutreeDynamic(my.tree, distM=as.matrix(my.dist),
 my.clusters
 ```
 
-We can visualize this dendrogram result with a heatmap.
+We can visualize the constructed dendrogram with a heatmap.
 All expression values are mean-centred for each gene to highlight the relative expression between cells.
 We recommend storing the heatmap at a sufficiently high resolution so that the relevant genes can be easily identified for further examination.
 
@@ -526,7 +527,7 @@ multiplot(out.pca, out.tsne, cols=2)
 
 ## Additional comments
 
-Once the preliminary analysis is completed, it is often useful to save the `SCESet` object to file.
+Once the basic analysis is completed, it is often useful to save the `SCESet` object to file.
 This means that the object can be easily restored into new R sessions for further work, without having to repeat all of the processing steps described here.
 More complex analyses can then be performed on the single-cell expression data, e.g., ordering HSCs by differentiation pseudotime with `r Biocpkg("monocle")` [@trapnell2014dynamics], or characterizing cell-state hierarchies with `r Biocpkg("sincell")` [@julia2015sincell].
 
