@@ -102,7 +102,7 @@ dim(sce)
 
 We annotate those rows corresponding to ERCC spike-ins and mitochondrial genes.
 This information can be easily extracted from the row names, though in general, identifying mitochondrial genes from standard identifiers like Ensembl requires extra annotation.
-We then calculate quality control metrics such as the total number of counts, the proportion of counts for the mitochondrial genes or spike-in transcripts, etc.
+For each cell, we calculate quality control metrics such as the total number of counts or the proportion of counts in mitochondrial genes or spike-in transcripts.
 These metrics are stored in the `pData` of the `SCESet` for future reference.
 
 ```{r}
@@ -130,9 +130,9 @@ sce <- sce[,keep]
 sum(!keep)
 ```
 
-Cells with very few expressed (i.e., non-zero) counts are also removed.
-This ensures that the total count in each cell is not driven by a small number of transcripts.
-Cells with fewer than 1000 expressed genes are considered to be of poor quality, as it suggests that the diverse transcript population has not been successfully captured.
+The number of genes expressed in each cell is calculated as the number of non-zero counts.
+Any cell with very few expressed genes is considered to be of poor quality as the diverse transcript population has not been successfully captured.
+We remove cells with fewer than 1000 expressed genes to ensure that the total count in each cell is not driven by a small number of transcripts.
 Here, all cells have a reasonable number of expressed genes and so no removal is performed.
 
 ```{r}
@@ -207,9 +207,10 @@ sum(keep)
 ```
 
 An alternative approach to gene filtering is to select genes that have non-zero counts in at least _n_ cells. 
-This provides some more protection against outlier expression patterns, i.e., genes with strong expression in only one or two cells. 
-Such outlier patterns are typically uninteresting unless rare cells are of particular interest.
-An example of this approach is shown below for _n_ set to 10.
+This provides some more protection against genes with outlier expression patterns, i.e., strong expression in only one or two cells. 
+Such outliers are typically uninteresting as they can arise from amplification artifacts that are not replicable across cells.
+(The exception is for studies involving rare cells where the outliers may be biologically relevant.)
+An example of this filtering approach is shown below for _n_ set to 10.
 
 ```{r}
 alt.keep <- rowSums(is_exprs(sce)) >= 10
@@ -217,7 +218,7 @@ sum(alt.keep)
 ```
 
 The relationship between the proportion of expressing cells and the mean can be examined more closely in the plot below.
-The two statistics tend to be well-correlated, so filtering on either should give similar results.
+The two statistics tend to be well-correlated, so filtering on either should give roughly similar results.
 
 ```{r geneplothsc, fig.cap="Frequency of expression against the mean expression for each gene. Circles represent endogenous genes and triangles represent spike-in transcripts or mitochondrial genes. The bars on each axis represent the location of each gene on that axis. Genes above high technical dropout are defined as those above a non-linear trend fitted to the triangles."}
 plotQC(sce, type = "exprs") + fontsize
@@ -226,7 +227,7 @@ plotQC(sce, type = "exprs") + fontsize
 In general, we prefer the mean-based filter as it tends to be less aggressive.
 A gene will be retained as long as it has sufficient expression in any subset of cells.
 The "at least _n_" filter depends heavily on the choice of _n_ -- in this case, a gene expressed in a subset of 9 cells would be lost.
-While the mean-based filter will retain more outlier-driven genes, this can be handled downstream by choosing methods that are robust to outliers.
+While the mean-based filter will retain more outlier-driven genes, this can be handled by choosing methods that are robust to outliers in the downstream analyses.
 
 ## Normalization of cell-specific biases
 
@@ -308,7 +309,8 @@ By default, both the `plotPCA` and `plotTSNE` functions will only use the top 50
 This focuses on the genes that are driving heterogeneity in the population and should provide greater visual resolution of any systematic differences between groups of cells.
 For this data set, all methods suggest that there is no separation into distinct subpopulations.
 This is consistent with a homogenous population of cells of the same type.
-Of course, there are many dimensionality reduction techniques that we have not considered here but could also be used, e.g., multidimensional scaling.
+Of course, there are many dimensionality reduction techniques that we have not considered here but could also be used, e.g., multidimensional scaling, diffusion maps.
+These have their own advantages and disadvantages -- for example, diffusion maps are particularly suited to mapping cells along some continuous process like differentiation.
 
 ## Classification of cell cycle phase 
 
