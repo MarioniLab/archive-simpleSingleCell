@@ -292,7 +292,7 @@ plot(out$x[,1], out$x[,2], xlab="PC1", ylab="PC2", pch=16)
 ```
 
 Another popular approach to dimensionality reduction is the _t_-stochastic neighbour embedding (_t_-SNE) method [@van2008visualizing].
-_t_-SNE tends to work better than PCA for large data sets with complex substructure, at the cost of more computational effort and complexity.
+_t_-SNE tends to work better than PCA for large data sets with many subpopulations, at the cost of more computational effort and complexity.
 Unlike PCA, _t_-SNE is a stochastic method -- users should run the algorithm several times to ensure that the results are representative, and then set a seed to ensure that the chosen results are reproducible.
 It is also advisable to test different settings of the "perplexity" parameter as this will affect the distribution of points in the low-dimensional space (Figure ((tsneplothsc))).
 
@@ -443,10 +443,6 @@ sig.cor <- var.cor$FDR <= 0.05
 summary(sig.cor)
 ```
 
-HVGs with significant correlations can be prioritized for follow-up studies.
-For example, a set of correlated genes can be used as markers to validate the existence of a subpopulation of cells with a specific expression pattern, e.g., via fluorescence-activated cell sorting, immunohistology or RNA flourescence _in situ_ hybridization.
-Negatively correlated pairs may be particularly useful in this respect, as they provide a clear "negative control" signal for cells outside of the subpopulation.
-
 Larger sets of correlated genes can be assembled by treating genes as nodes in a graph and each pair of genes with significantly large correlations as an edge.
 In this manner, an undirected graph can be constructed using methods in the `r Biocpkg("RBGL")` package.
 Highly connected subgraphs can then be identified and defined as gene sets.
@@ -460,6 +456,12 @@ cl <- cl[order(lengths(cl), decreasing=TRUE)]
 cl <- cl[lengths(cl) > 2]
 cl
 ```
+
+Significant correlations provide evidence for substructure in the data set, i.e., subpopulations of cells with systematic differences in their expression profiles.
+This can be verified by directly using sets of correlated HVGs as markers in procedures such as fluorescence-activated cell sorting, immunohistology or RNA flourescence _in situ_ hybridization.
+In this manner, the existence of subpopulations with distinct expression patterns for the chosen HVGs can be experimentally validated.
+Negatively correlated pairs may be particularly useful as they provide more power to discriminate between subpopulations.
+In the simplest example, a subpopulation is positive for one marker in the pair and negative for the other marker, while the reverse is true for a different subpopulation.
 
 ## Using correlated HVGs for further data exploration
 
@@ -527,13 +529,18 @@ multiplot(out.pca, out.tsne, cols=2)
 
 ## Additional comments
 
-Once the basic analysis is completed, it is often useful to save the `SCESet` object to file.
-This means that the object can be easily restored into new R sessions for further work, without having to repeat all of the processing steps described here.
-More complex analyses can then be performed on the single-cell expression data, e.g., ordering HSCs by differentiation pseudotime with `r Biocpkg("monocle")` [@trapnell2014dynamics], or characterizing cell-state hierarchies with `r Biocpkg("sincell")` [@julia2015sincell].
+Once the basic analysis is completed, it is often useful to save the `SCESet` object to file with the `saveRDS` function.
+The object can then be easily restored into new R sessions using the `readRDS` function.
+This allows further work to be conducted without having to repeat all of the processing steps described above.
 
 ```{r}
 saveRDS(file="hsc_data.rds", sce)
 ```
+
+A variety of methods are available to perform more complex analyses on the processed expression data.
+For example, cells can be ordered by pseudotime (e.g., for differentiation) with the `r Biocpkg("monocle")` package [@trapnell2014dynamics], or cell-state hierarchies can be characterized with the `r Biocpkg("sincell")` package [@julia2015sincell].
+HVGs can be used in gene set enrichment analyses with packages like `r Biocpkg("topGO")` and `r Biocpkg("goseq")`, to identify biological pathways and processes with heterogeneous activity.
+Full descriptions of these analyses are outside the scope of this workflow, so interested users are advised to consult the relevant documentation.
 
 # A more complex analysis on brain cell types
 
