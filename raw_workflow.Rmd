@@ -191,6 +191,7 @@ Methods like outlier detection and support vector machines can provide greater p
 This is because they are able to detect subtle patterns across many quality metrics simultaneously. 
 However, this comes at some cost to interpretability, as the reason for removing a given cell may not always be obvious.
 Thus, for this workflow, we will use the simple approach whereby each quality metric is considered separately.
+Users interested in the more sophisticated approaches are advised to refer to the `r Biocpkg("scater")` and `r Biocpkg("cellity")` packages.
 
 ## Filtering out low-abundance genes
 
@@ -538,8 +539,8 @@ saveRDS(file="hsc_data.rds", sce)
 ```
 
 A variety of methods are available to perform more complex analyses on the processed expression data.
-For example, cells can be ordered by pseudotime (e.g., for differentiation) with the `r Biocpkg("monocle")` package [@trapnell2014dynamics], or cell-state hierarchies can be characterized with the `r Biocpkg("sincell")` package [@julia2015sincell].
-HVGs can be used in gene set enrichment analyses with packages like `r Biocpkg("topGO")` and `r Biocpkg("goseq")`, to identify biological pathways and processes with heterogeneous activity.
+For example, cells can be ordered by pseudotime (e.g., for differentiation) with `r Biocpkg("monocle")` [@trapnell2014dynamics]; cell-state hierarchies can be characterized with the `r Biocpkg("sincell")` package [@julia2015sincell]; and oscillatory behaviour can be identified using `r Biocpkg("Oscope")` [@leng2015oscope].
+HVGs can be used in gene set enrichment analyses to identify biological pathways and processes with heterogeneous activity, using packages designed for bulk data like `r Biocpkg("topGO")` or with dedicated single-cell methods like `r Biocpkg("scde")` [@fan2016characterizing].
 Full descriptions of these analyses are outside the scope of this workflow, so interested users are advised to consult the relevant documentation.
 
 # A more complex analysis on brain cell types
