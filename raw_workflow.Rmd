@@ -917,13 +917,15 @@ colnames(design)
 
 The `r Biocpkg("edgeR")` package uses negative binomial (NB) distributions to model the read counts for each sample.
 We estimate the NB dispersion parameter that quantifies the biological variability in expression across cells in the same cluster.
+Large dispersion estimates above 0.5 are often observed in scRNA-seq data due to technical noise, in contrast to bulk data where values of 0.05-0.2 are more typical.
 We then fit a generalized linear model (GLM) to the counts for each gene [@mccarthy2012differential].
-We log-transform the size factors and use them as GLM offsets to normalize cell-specific biases.
+The size factors are log-transformed and used throughout as GLM offsets to normalize cell-specific biases.
 
 ```{r}
 y <- DGEList(counts(sce))
 y$offset <- log(sizeFactors(sce))
 y <- estimateDisp(y, design, robust=TRUE)
+summary(y$tagwise.dispersion)
 fit <- glmFit(y, design)
 ```
 
