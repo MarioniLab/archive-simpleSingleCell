@@ -459,7 +459,7 @@ cl
 ```
 
 Significant correlations provide evidence for substructure in the data set, i.e., subpopulations of cells with systematic differences in their expression profiles.
-This can be verified by directly using sets of correlated HVGs as markers in procedures such as fluorescence-activated cell sorting, immunohistology or RNA flourescence _in situ_ hybridization.
+This can be verified by directly using sets of correlated HVGs as markers in procedures such as fluorescence-activated cell sorting, immunohistochemistry or RNA flourescence _in situ_ hybridization.
 In this manner, the existence of subpopulations with distinct expression patterns for the chosen HVGs can be experimentally validated.
 Negatively correlated pairs may be particularly useful as they provide more power to discriminate between subpopulations.
 In the simplest example, a subpopulation is positive for one marker in the pair and negative for the other marker, while the reverse is true for a different subpopulation.
