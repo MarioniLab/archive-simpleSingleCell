@@ -1301,11 +1301,11 @@ res2 <- glmQLFTest(fit2, contrast=makeContrasts(culture22i-culture2a2i, levels=d
 topTags(res2)
 ```
 
-Figure ((hvgboxplotmesc)) suggests that each of the top genes is exhibiting robust DE across a number of cells.
+The boxplots in Figure ((hvgboxplotmescbulk)) suggest that each of the top genes is exhibiting robust DE across a number of cells.
 It should be stressed that DE detection does not require a shift in the entire distribution of expression values for all cells in one condition.
-An increase in the upper tail of the distribution is also relevant and will be detected, provided there are sufficient cells in that tail.
+An increase in expression in the upper tail of the distribution is also relevant and will be detected, provided there are sufficient cells in that tail.
 
-```{r hvgboxplotmesc, fit.width=10, fig.height=6, fig.cap="Boxplots of batch-corrected normalized log-expression values for the top 10 DEGs in the mESC data set, detected after        summing counts for all cells on each plate."}
+```{r hvgboxplotmescbulk, fit.width=10, fig.height=6, fig.cap="Boxplots of batch-corrected normalized log-expression values for the top 10 DEGs in the mESC data set, detected by QL methods after summing counts for all cells on each plate."}
 examined <- order(res2$table$PValue)[1:10]
 cur.genes <- fData(sce)$SYMBOL[examined]
 all.names <- outer(cur.genes, culture[is.tested], FUN=function(x, y) paste0(x, " (", y, ")"))
