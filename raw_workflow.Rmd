@@ -1176,77 +1176,150 @@ gc()
 
 ## Detecting DEGs between pre-defined groups of cells
 
+### Using the single-cell counts
+
 Some data sets contain pre-defined biological groups in the experimental design, e.g., tissue and sex in the brain data set.
 If differences between these groups are of interest, a DE analysis can be performed using the cells in each group.
-Briefly, a design matrix is constructed that specifies the pre-defined groupings for all cells.
-This design matrix and the matrix of single-cell counts can then be processed with standard DE analysis pipelines like `r Biocpkg("edgeR")` or `r Biocpkg("DESeq2")`.
-This process is similar to the identification of marker genes for the brain data set, except that pre-defined variables are used in the design matrix instead of empirical clusters.
-The use of pre-defined variables also avoids issues with clustering errors and allows interpretation of the DE _p_-values as measures of significance.
-
-The approach outlined above treats all cells within each group as independent replicates.
-However, this may not be true for experiments involving cells from multiple plates or chips (for simplicity, we will refer to both as plates).
-All cells on a plate are processed simultaneously but the plates themselves are processed separately.
-Any uncontrolled variability in processing for one plate will cause a consistent change in expression for all cells on that plate, i.e., a plate effect [@hicks2015widespread].
-If a group contains two plates, one cannot treat the cells in that group as direct replicates if a plate effect is present -- this is because cells on the same plate will be subject to the same plate effect and will not be independent.
-
-The obvious solution is to block on the plate of origin for each cell, but this is not possible in many experimental designs where the plate of origin is confounded with the groups of interest, e.g., when all cells on each plate correspond to a single group.
-Another solution is to treat the plate of origin as a random effect, but mixed modelling is time-consuming and may not be accurate for low numbers of plates.
-Instead, a simple and effective approach is to sum all cells in each plate and treat each plate as a replicate sample [@lun2015overcoming].
-In the presence of a plate effect, the plates are independent of each other whereas the cells are not.
-This effectively performs an _in silico_ conversion of single-cell data to bulk RNA-seq data -- DEGs can then be detected with standard methods.
-
-We will use `r Biocpkg("edgeR")` to demonstrate this approach on the mESC data set.
-This data set contains several batches where each batch contains one or more C1 chips.
+This is demonstrated with the mESC data set which contains several batches of one or more C1 chips.
 Each chip contains cells from only one culture condition, with three conditions in total across the entire experiment.
-The first task is to identify which cells come from the same plate and to sum them together with the `sumTechReps` function.
-
-```{r}
-plate.of.origin <- sub("ola_mES_([^_]+_[0-9]+)_[0-9]+\\.counts", "\\1", colnames(sce))
-summed <- sumTechReps(counts(sce), plate.of.origin)
-head(summed)
-```
-
 We set up the design matrix, using an additive design to account for the different culture conditions and the batch effect.
-Each plate is effectively treated as an independent sample within this design.
 
 ```{r}
-culture <- sub("^([^_]+)_.*", "\\1", colnames(summed))
-batch <- sub("[^_]+_([^_]+)$", "\\1", colnames(summed))
+culture <- sub("^ola_mES_([^_]+)_.*", "\\1", colnames(sce))
+batch <- sub("^ola_mES_[^_]+_([^_]+)_.*", "\\1", colnames(sce))
 design <- model.matrix(~0 + culture + batch)
 colnames(design)
 ```
 
-We perform some filtering to retain only endogenous genes that are present in high abundance.
+We perform some filtering to retain only endogenous genes that are present in moderate to high abundance.
+Note that quality control on the cells is not required as it has already been performed by @kolod2015singlecell. 
 
 ```{r}
-y <- DGEList(summed)
-y$genes <- fData(sce)[,"SYMBOL",drop=FALSE]
-keep <- grepl("^ENSMUS", rownames(y)) & aveLogCPM(y) >= 1
-y <- y[keep,]
-dim(y)
+keep <- grepl("^ENSMUS", rownames(sce)) & rowMeans(counts(sce)) >= 1
+sce <- sce[keep,]
+dim(sce)
 ```
 
-The rest of the analysis can proceed as described for bulk RNA-seq data [@chen2014differential].
-Standard normalization methods can be applied as the counts are large enough to avoid problems with zeros.
-The NB dispersion is estimated and a GLM is fitted to the counts using the specified design matrix.
-Significant differences -- in this case, between the 2i and a2i conditions -- are identified using the LRT.
+To normalize cell-specific biases, we use the deconvolution approach to compute size factors.
+We assume that most genes are not DE, which seems reasonable given that all cells are of the same type.
 
 ```{r}
-y <- calcNormFactors(y)
+cluster <- quickCluster(sce)
+sce <- computeSumFactors(sce, cluster=cluster)
+summary(sizeFactors(sce))
+```
+
+Size factors are log-transformed to use as offsets during GLM fitting in the `r Biocpkg("edgeR")` pipeline.
+We also add some gene symbol annotation for easier interpretation of the results.
+
+```{r}
+y <- DGEList(counts(sce))
+y$offset <- log(sizeFactors(sce)) 
+y$genes <- fData(sce)[,"SYMBOL",drop=FALSE]
+```
+
+We then test for DEGs between the ground state culture (2i) and the alternative ground state (a2i) using the LRT.
+This process is similar to the identification of marker genes for the brain data set, except that pre-defined variables are used in the design matrix instead of empirical clusters.
+Keep in mind that dispersion estimation may take some time for large data sets.
+
+```{r}
 y <- estimateDisp(y, design, robust=TRUE)
 fit <- glmFit(y, design)
 res <- glmLRT(fit, contrast=makeContrasts(culture2i-culturea2i, levels=design))
 topTags(res)
 ```
 
-Several hundred DEGs are detected between the two culture conditions at a FDR of 5%.
-In general, the summation approach will yield fewer DEGs compared to using the single-cell counts directly.
-This is because type I error control is lost in the latter when the independence assumption is violated by plate effects.
-As such, the FDR may be (much) higher than the nominal threshold of 5%.
-This is not a concern in the summation approach where the plate effects are accounted for. 
+We examine the top DEGs with boxplots of batch-corrected log-expression values (Figure ((hvgboxplotmesc)).
+Robust differences in expression are generally observed between the culture conditions, indicating that the results are not driven by outlier cells.
+
+```{r hvgboxplotmesc, fit.width=10, fig.height=6, fig.cap="Boxplots of batch-corrected normalized log-expression values for the top 10 DEGs in the mESC data set. Points correspond to cells that are more than 1.5 interquartile ranges from the edge of each box."}
+sce <- normalize(sce)
+debatched <- removeBatchEffect(exprs(sce), batch=batch)
+is.tested <- culture %in% c("2i", "a2i")
+examined <- order(res$table$PValue)[1:10]
+cur.genes <- fData(sce)$SYMBOL[examined]
+all.names <- outer(cur.genes, culture[is.tested], FUN=function(x, y) paste0(x, " (", y, ")"))
+par(mar=c(7.1, 4.1, 1.1, 1.1))
+boxplot(split(debatched[examined,is.tested], all.names), ylab="Normalized log-expression",
+    las=2, col=rep(rep(c("grey80", "lightblue"), each=2), length(examined)/2))
+```
+
+As the groups of cells are pre-defined, issues with clustering errors are avoided.
+This means that the DE _p_-values can be directly interpreted as measures of significance.
+For example, the number of DEGs in each direction at a FDR threshold of 5% can be identified.
 
 ```{r}
 summary(decideTestsDGE(res))
+```
+
+```{r, echo=FALSE, results='hide'}
+gc()
+```
+
+### Using pseudo-bulk counts after summation
+
+An alternative approach is to sum the counts for all cells within each plate/chip.
+Each plate is equivalent to a sample in a bulk RNA-seq experiment, with plates in the same group becoming replicate samples.
+Processing of this "pseudo-bulk" counts can then be performed to detect DEGs between groups.
+This approach avoids problems from plate effects that can invalidate analyses based on single-cell counts [@lun2015overcoming].
+It also increases the size and precision of the counts, making them more amenable for analysis with methods designed for bulk data.
+
+This strategy can be demonstrated using the mESC data set.
+Cells from the same plate are identified and their counts are summed together with the `sumTechReps` function.
+In this case, only one C1 chip is used for each culture in each batch.
+Identification can thus be performed based on the combination of the culture/batch factors defined for each cell.
+
+```{r}
+plate.of.origin <- paste0(culture, ".", batch)
+summed <- sumTechReps(counts(sce), plate.of.origin)
+head(summed)
+```
+
+We set up the design matrix using the culture and batch factors for each plate.
+Each plate is effectively treated as an independent sample within this design.
+
+```{r}
+culture2 <- sub("\\..*$", "", colnames(summed))
+batch2 <- sub("^.*\\.", "", colnames(summed))
+design2 <- model.matrix(~0 + culture2 + batch2)
+colnames(design2)
+```
+
+The rest of the analysis can proceed using any bulk analysis pipeline.
+Standard normalization methods can be applied as the counts are large enough to avoid problems with zeros.
+The NB dispersion is estimated and a GLM is fitted to the counts using the specified design matrix.
+We also estimate the quasi-likelihood (QL) dispersion to account for the uncertainty in dispersion estimation [@lund2012detecting].
+Significant differences between the 2i and a2i conditions are identified using the QL F-test. 
+
+```{r}
+y2 <- DGEList(summed)
+y2$genes <- fData(sce)[,"SYMBOL",drop=FALSE]
+y2 <- calcNormFactors(y2)
+y2 <- estimateDisp(y2, design2, robust=TRUE)
+fit2 <- glmQLFit(y2, design2, robust=TRUE)
+res2 <- glmQLFTest(fit2, contrast=makeContrasts(culture22i-culture2a2i, levels=design2))
+topTags(res2)
+```
+
+Figure ((hvgboxplotmesc)) suggests that each of the top genes is exhibiting robust DE across a number of cells.
+It should be stressed that DE detection does not require a shift in the entire distribution of expression values for all cells in one condition.
+An increase in the upper tail of the distribution is also relevant and will be detected, provided there are sufficient cells in that tail.
+
+```{r hvgboxplotmesc, fit.width=10, fig.height=6, fig.cap="Boxplots of batch-corrected normalized log-expression values for the top 10 DEGs in the mESC data set, detected after        summing counts for all cells on each plate."}
+examined <- order(res2$table$PValue)[1:10]
+cur.genes <- fData(sce)$SYMBOL[examined]
+all.names <- outer(cur.genes, culture[is.tested], FUN=function(x, y) paste0(x, " (", y, ")"))
+par(mar=c(7.1, 4.1, 1.1, 1.1))
+boxplot(split(debatched[examined,is.tested], all.names), ylab="Normalized log-expression",
+    las=2, col=rep(rep(c("grey80", "lightblue"), each=2), length(examined)/2))
+```
+
+Several hundred DEGs are detected between the two culture conditions at a FDR of 5%.
+In general, the summation approach will yield fewer DEGs compared to using the single-cell counts directly.
+This is because type I error control is lost in the latter when the analysis is compromised by plate effects [@lun2015overcoming].
+
+```{r}
+summary(decideTestsDGE(res2))
 ```
 
 # Conclusions
@@ -1261,7 +1334,7 @@ We anticipate that this workflow will assist readers in assembling analyses of t
 
 All software packages used in this workflow are publicly available from the Comprehensive R Archive Network (https://cran.r-project.org) or the Bioconductor project (http://bioconductor.org).
 The specific version numbers of the packages used are shown below, along with the version of the R installation.
-The workflow takes approximately 10-20 minutes and 5 GB of memory to run on a desktop computer.
+The workflow takes less than an hour and 5 GB of memory to run on a desktop computer.
 
 ```{r}
 sessionInfo()
