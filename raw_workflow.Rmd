@@ -1288,16 +1288,14 @@ colnames(design2)
 The rest of the analysis can proceed using any bulk analysis pipeline.
 Standard normalization methods can be applied as the counts are large enough to avoid problems with zeros.
 The NB dispersion is estimated and a GLM is fitted to the counts using the specified design matrix.
-We also estimate the quasi-likelihood (QL) dispersion to account for the uncertainty in dispersion estimation [@lund2012detecting].
-Significant differences between the 2i and a2i conditions are identified using the QL F-test. 
+Significant differences between the 2i and a2i conditions are identified using the LRT.
 
 ```{r}
 y2 <- DGEList(summed)
 y2$genes <- fData(sce)[,"SYMBOL",drop=FALSE]
 y2 <- calcNormFactors(y2)
 y2 <- estimateDisp(y2, design2, robust=TRUE)
-fit2 <- glmQLFit(y2, design2, robust=TRUE)
-res2 <- glmQLFTest(fit2, contrast=makeContrasts(culture22i-culture2a2i, levels=design2))
+res2 <- glmLRT(fit2, contrast=makeContrasts(culture22i-culture2a2i, levels=design2))
 topTags(res2)
 ```
 
@@ -1305,7 +1303,7 @@ The boxplots in Figure ((hvgboxplotmescbulk)) suggest that each of the top genes
 It should be stressed that DE detection does not require a shift in the entire distribution of expression values for all cells in one condition.
 An increase in expression in the upper tail of the distribution is also relevant and will be detected, provided there are sufficient cells in that tail.
 
-```{r hvgboxplotmescbulk, fit.width=10, fig.height=6, fig.cap="Boxplots of batch-corrected normalized log-expression values for the top 10 DEGs in the mESC data set, detected by QL methods after summing counts for all cells on each plate."}
+```{r hvgboxplotmescbulk, fit.width=10, fig.height=6, fig.cap="Boxplots of batch-corrected normalized log-expression values for the top 10 DEGs in the mESC data set, detected by after summing counts for all cells on each plate."}
 examined <- order(res2$table$PValue)[1:10]
 cur.genes <- fData(sce)$SYMBOL[examined]
 all.names <- outer(cur.genes, culture[is.tested], FUN=function(x, y) paste0(x, " (", y, ")"))
