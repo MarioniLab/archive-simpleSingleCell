@@ -1300,8 +1300,9 @@ topTags(res2)
 ```
 
 The boxplots in Figure ((hvgboxplotmescbulk)) suggest that each of the top genes is exhibiting robust DE across a number of cells.
-It should be stressed that DE detection does not require a shift in the entire distribution of expression values for all cells in one condition.
-An increase in expression in the upper tail of the distribution is also relevant and will be detected, provided there are sufficient cells in that tail.
+It should be stressed that the concept of DE is not limited to a global shift in the distribution of expression values for all cells in one group.
+An increase in expression across the upper tail of the distribution will also be detected as DE, provided there are sufficient cells in that tail.
+This may be relevant, e.g., if a gene is only upregulated in a particular subpopulation of one group.
 
 ```{r hvgboxplotmescbulk, fit.width=10, fig.height=6, fig.cap="Boxplots of batch-corrected normalized log-expression values for the top 10 DEGs in the mESC data set, detected by after summing counts for all cells on each plate."}
 examined <- order(res2$table$PValue)[1:10]
