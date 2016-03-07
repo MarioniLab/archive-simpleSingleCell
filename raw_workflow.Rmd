@@ -915,22 +915,29 @@ design <- model.matrix(~0 + cluster + sce$tissue)
 colnames(design)
 ```
 
-The `r Biocpkg("edgeR")` package uses negative binomial (NB) distributions to model the read counts for each sample.
-We estimate the NB dispersion parameter that quantifies the biological variability in expression across cells in the same cluster.
-Large dispersion estimates above 0.5 are often observed in scRNA-seq data due to technical noise, in contrast to bulk data where values of 0.05-0.2 are more typical.
-We then fit a generalized linear model (GLM) to the counts for each gene [@mccarthy2012differential].
-The size factors are log-transformed and used throughout as GLM offsets to normalize cell-specific biases.
+We set up a `DGEList` object for entry into the `r Biocpkg("edgeR")` analysis.
+The size factors are log-transformed and used as normalization offsets in the generalized linear models (GLMs).
+Spike-in transcripts are removed as they are not relevant for marker identification.
 
 ```{r}
 y <- DGEList(counts(sce))
 y$offset <- log(sizeFactors(sce))
+y <- y[!isSpike(sce),]
+```
+
+`r Biocpkg("edgeR")` uses negative binomial (NB) distributions to model the read counts for each sample.
+We estimate the NB dispersion parameter that quantifies the biological variability in expression across cells in the same cluster.
+Large dispersion estimates above 0.5 are often observed in scRNA-seq data due to technical noise, in contrast to bulk data where values of 0.05-0.2 are more typical.
+We then use the design matrix to fit a NB GLM to the counts for each gene [@mccarthy2012differential].
+
+```{r}
 y <- estimateDisp(y, design, robust=TRUE)
-summary(y$tagwise.dispersion)
 fit <- glmFit(y, design)
+summary(y$tagwise.dispersion)
 ```
 
 To identify marker genes for a particular cluster, we test each gene for DE between that cluster and each other cluster.
-This is done using the likelihood ratio test (LRT) for each comparison, which is demonstrated below for cluster 2.
+This is done using the likelihood ratio test (LRT) for each comparison, as demonstrated below for cluster 2.
 
 ```{r}
 result.logFC <- result.PValue <- list()
@@ -1191,11 +1198,11 @@ design <- model.matrix(~0 + culture + batch)
 colnames(design)
 ```
 
-We perform some filtering to retain only endogenous genes that are present in moderate to high abundance.
+We perform some filtering to retain only genes that are present in moderate to high abundance.
 Note that quality control on the cells is not required as it has already been performed by @kolod2015singlecell. 
 
 ```{r}
-keep <- grepl("^ENSMUS", rownames(sce)) & rowMeans(counts(sce)) >= 1
+keep <- rowMeans(counts(sce)) >= 1
 sce <- sce[keep,]
 dim(sce)
 ```
@@ -1209,13 +1216,15 @@ sce <- computeSumFactors(sce, cluster=cluster)
 summary(sizeFactors(sce))
 ```
 
-Size factors are log-transformed to use as offsets during GLM fitting in the `r Biocpkg("edgeR")` pipeline.
-We also add some gene symbol annotation for easier interpretation of the results.
+We construct a `DGEList` to prepare for a DE analysis with `r Biocpkg("edgeR")`.
+We add some gene symbol annotation to simplify the interpretation of the results.
+Spike-in transcripts are removed as differences in spike-in coverage are neither expected or interesting.
+Size factors are also log-transformed to use as offsets during GLM fitting.
 
 ```{r}
-y <- DGEList(counts(sce))
+y <- DGEList(counts(sce), genes=fData(sce)[,"SYMBOL",drop=FALSE])
+y <- y[!isSpike(sce),]
 y$offset <- log(sizeFactors(sce)) 
-y$genes <- fData(sce)[,"SYMBOL",drop=FALSE]
 ```
 
 We then test for DEGs between the ground state culture (2i) and the alternative ground state (a2i) using the LRT.
@@ -1285,16 +1294,17 @@ design2 <- model.matrix(~0 + culture2 + batch2)
 colnames(design2)
 ```
 
-The rest of the analysis can proceed using any bulk analysis pipeline.
-Standard normalization methods can be applied as the counts are large enough to avoid problems with zeros.
-The NB dispersion is estimated and a GLM is fitted to the counts using the specified design matrix.
+The rest of the DE analysis can proceed using any bulk-based pipeline such as `r Biocpkg("edgeR")`.
+Normalization between plates can be performed using standard methods like `calcNormFactors`, as the counts are large enough to avoid problems with zeros.
+For each gene, the NB dispersion is estimated and a GLM is fitted to the counts using the specified design matrix.
 Significant differences between the 2i and a2i conditions are identified using the LRT.
 
 ```{r}
-y2 <- DGEList(summed)
-y2$genes <- fData(sce)[,"SYMBOL",drop=FALSE]
+y2 <- DGEList(summed, genes=fData(sce)[,"SYMBOL",drop=FALSE])
+y2 <- y2[!isSpike(sce),]
 y2 <- calcNormFactors(y2)
 y2 <- estimateDisp(y2, design2, robust=TRUE)
+fit2 <- glmFit(y2, design2)
 res2 <- glmLRT(fit2, contrast=makeContrasts(culture22i-culture2a2i, levels=design2))
 topTags(res2)
 ```
