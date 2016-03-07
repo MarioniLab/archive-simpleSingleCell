@@ -916,13 +916,13 @@ colnames(design)
 ```
 
 We set up a `DGEList` object for entry into the `r Biocpkg("edgeR")` analysis.
-The size factors are log-transformed and used as normalization offsets in the generalized linear models (GLMs).
 Spike-in transcripts are removed as they are not relevant for marker identification.
+The size factors are log-transformed and used as normalization offsets in the generalized linear models (GLMs).
 
 ```{r}
 y <- DGEList(counts(sce))
-y$offset <- log(sizeFactors(sce))
 y <- y[!isSpike(sce),]
+y$offset <- log(sizeFactors(sce))
 ```
 
 `r Biocpkg("edgeR")` uses negative binomial (NB) distributions to model the read counts for each sample.
@@ -1172,7 +1172,13 @@ anno <- anno[,-1,drop=FALSE]
 rownames(anno) <- my.ids
 sce <- newSCESet(countData=incoming, featureData=AnnotatedDataFrame(anno))
 isSpike(sce) <- is.spike
-sce <- calculateQCMetrics(sce, feature_controls=list(Spike=is.spike, Mt=is.mito))
+```
+
+We remove rows that do not correspond to endogenous genes or spike-in transcripts.
+This includes rows containing mapping statistics, e.g., the number of unaligned or unassigned reads.
+
+```{r}
+sce <- sce[grepl("ENSMUS", rownames(sce)) | isSpike(sce),]
 dim(sce)
 ```
 
@@ -1288,10 +1294,10 @@ We set up the design matrix using the culture and batch factors for each plate.
 Each plate is effectively treated as an independent sample within this design.
 
 ```{r}
-culture2 <- sub("\\..*$", "", colnames(summed))
-batch2 <- sub("^.*\\.", "", colnames(summed))
-design2 <- model.matrix(~0 + culture2 + batch2)
-colnames(design2)
+culture.sum <- sub("\\..*$", "", colnames(summed))
+batch.sum <- sub("^.*\\.", "", colnames(summed))
+design.sum <- model.matrix(~0 + culture.sum + batch.sum)
+colnames(design.sum)
 ```
 
 The rest of the DE analysis can proceed using any bulk-based pipeline such as `r Biocpkg("edgeR")`.
@@ -1300,13 +1306,13 @@ For each gene, the NB dispersion is estimated and a GLM is fitted to the counts 
 Significant differences between the 2i and a2i conditions are identified using the LRT.
 
 ```{r}
-y2 <- DGEList(summed, genes=fData(sce)[,"SYMBOL",drop=FALSE])
-y2 <- y2[!isSpike(sce),]
-y2 <- calcNormFactors(y2)
-y2 <- estimateDisp(y2, design2, robust=TRUE)
-fit2 <- glmFit(y2, design2)
-res2 <- glmLRT(fit2, contrast=makeContrasts(culture22i-culture2a2i, levels=design2))
-topTags(res2)
+y.sum <- DGEList(summed, genes=fData(sce)[,"SYMBOL",drop=FALSE])
+y.sum <- y.sum[!isSpike(sce),]
+y.sum <- calcNormFactors(y.sum)
+y.sum <- estimateDisp(y.sum, design.sum, robust=TRUE)
+fit.sum <- glmFit(y.sum, design.sum)
+res.sum <- glmLRT(fit.sum, contrast=makeContrasts(culture.sum2i-culture.suma2i, levels=design.sum))
+topTags(res.sum)
 ```
 
 The boxplots in Figure ((hvgboxplotmescbulk)) suggest that each of the top genes is exhibiting robust DE across a number of cells.
