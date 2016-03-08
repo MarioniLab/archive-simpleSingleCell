@@ -917,12 +917,11 @@ colnames(design)
 
 We set up a `DGEList` object for entry into the `r Biocpkg("edgeR")` analysis.
 Spike-in transcripts are removed as they are not relevant for marker identification.
-The size factors are log-transformed and used as normalization offsets in the generalized linear models (GLMs).
+The size factors are divided by the library sizes to obtain normalization factors for all cells.
+(The normalization factor is simply an alternative formulation of the size factor, and quantifies the bias that is not caused by differences in library size between samples.)
 
 ```{r}
-y <- DGEList(counts(sce))
-y <- y[!isSpike(sce),]
-y$offset <- log(sizeFactors(sce))
+y <- convertTo(sce)
 ```
 
 `r Biocpkg("edgeR")` uses negative binomial (NB) distributions to model the read counts for each sample.
@@ -1225,12 +1224,10 @@ summary(sizeFactors(sce))
 We construct a `DGEList` to prepare for a DE analysis with `r Biocpkg("edgeR")`.
 We add some gene symbol annotation to simplify the interpretation of the results.
 Spike-in transcripts are removed as differences in spike-in coverage are neither expected or interesting.
-Size factors are also log-transformed to use as offsets during GLM fitting.
+Size factors are also converted to normalization factors, as previously described.
 
 ```{r}
-y <- DGEList(counts(sce), genes=fData(sce)[,"SYMBOL",drop=FALSE])
-y <- y[!isSpike(sce),]
-y$offset <- log(sizeFactors(sce)) 
+y <- convertTo(sce, fData.col='SYMBOL')
 ```
 
 We then test for DEGs between the ground state culture (2i) and the alternative ground state (a2i) using the LRT.
@@ -1306,8 +1303,7 @@ For each gene, the NB dispersion is estimated and a GLM is fitted to the counts 
 Significant differences between the 2i and a2i conditions are identified using the LRT.
 
 ```{r}
-y.sum <- DGEList(summed, genes=fData(sce)[,"SYMBOL",drop=FALSE])
-y.sum <- y.sum[!isSpike(sce),]
+y.sum <- DGEList(summed, genes=fData(sce)[,"SYMBOL",drop=FALSE])[!isSpike(sce),]
 y.sum <- calcNormFactors(y.sum)
 y.sum <- estimateDisp(y.sum, design.sum, robust=TRUE)
 fit.sum <- glmFit(y.sum, design.sum)
@@ -1321,7 +1317,7 @@ An increase in expression across the upper tail of the distribution will also be
 This may be relevant, e.g., if a gene is only upregulated in a particular subpopulation of one group.
 
 ```{r hvgboxplotmescbulk, fit.width=10, fig.height=6, fig.cap="Boxplots of batch-corrected normalized log-expression values for the top 10 DEGs in the mESC data set, detected by after summing counts for all cells on each plate."}
-examined <- order(res2$table$PValue)[1:10]
+examined <- order(res.sum$table$PValue)[1:10]
 cur.genes <- fData(sce)$SYMBOL[examined]
 all.names <- outer(cur.genes, culture[is.tested], FUN=function(x, y) paste0(x, " (", y, ")"))
 par(mar=c(7.1, 4.1, 1.1, 1.1))
@@ -1334,7 +1330,7 @@ In general, the summation approach will yield fewer DEGs compared to using the s
 This is because type I error control is lost in the latter when the analysis is compromised by plate effects [@lun2015overcoming].
 
 ```{r}
-summary(decideTestsDGE(res2))
+summary(decideTestsDGE(res.sum))
 ```
 
 # Conclusions
