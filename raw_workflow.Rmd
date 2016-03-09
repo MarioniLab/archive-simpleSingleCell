@@ -462,7 +462,7 @@ Significant correlations provide evidence for substructure in the data set, i.e.
 The number of significantly correlated HVG pairs represents the strength of the substructure.
 If many pairs were significant, this would indicate that the subpopulations were clearly defined and distinct from one another.
 For this particular data set, a relatively low number of HVGs exhibit significant correlations.
-This suggests that any substructure in the data will be modest, which may not be unexpected given that rigorous selection was performed to obtain a homogeneous population of HSCs [@@wilson2015combined].
+This suggests that any substructure in the data will be modest, which may not be unexpected given that rigorous selection was performed to obtain a homogeneous population of HSCs [@wilson2015combined].
 
 The correlation results can also be used directly in follow-up experiments to verify if any substructure is present.
 This is done by using sets of correlated HVGs as markers in procedures such as fluorescence-activated cell sorting, immunohistochemistry or RNA flourescence _in situ_ hybridization.
@@ -1250,10 +1250,10 @@ res <- glmLRT(fit, contrast=makeContrasts(culture2i-culturea2i, levels=design))
 topTags(res)
 ```
 
-We examine the top DEGs with boxplots of batch-corrected log-expression values (Figure ((hvgboxplotmesc)).
+We examine the top DEGs with boxplots of batch-corrected log-expression values (Figure ((deboxplotmesc))).
 Robust differences in expression are generally observed between the culture conditions, indicating that the results are not driven by outlier cells.
 
-```{r hvgboxplotmesc, fit.width=10, fig.height=6, fig.cap="Boxplots of batch-corrected normalized log-expression values for the top 10 DEGs in the mESC data set. Points correspond to cells that are more than 1.5 interquartile ranges from the edge of each box."}
+```{r deboxplotmesc, fit.width=10, fig.height=6, fig.cap="Boxplots of batch-corrected normalized log-expression values for the top 10 DEGs in the mESC data set. Points correspond to cells that are more than 1.5 interquartile ranges from the edge of each box."}
 sce <- normalize(sce)
 debatched <- removeBatchEffect(exprs(sce), batch=batch)
 is.tested <- culture %in% c("2i", "a2i")
@@ -1320,7 +1320,7 @@ res.sum <- glmLRT(fit.sum, contrast=makeContrasts(culture.sum2i-culture.suma2i, 
 topTags(res.sum)
 ```
 
-The boxplots in Figure ((hvgboxplotmescbulk)) suggest that each of the top genes is exhibiting robust DE across a number of cells.
+The boxplots in Figure ((deboxplotmescbulk)) suggest that each of the top genes is exhibiting robust DE across a number of cells.
 It should be stressed that the concept of DE is not limited to a global shift in the distribution of expression values for all cells in one group.
 An increase in expression across the upper tail of the distribution will also be detected as DE, provided there are sufficient cells in that tail.
 This may be relevant, e.g., if a gene is only upregulated in a particular subpopulation of one group.
@@ -1330,7 +1330,7 @@ Follow-up on genes that are DE in a particular subpopulation can be done by brea
 Genes that are DE across the entire group give you nothing beyond what you would have gotten with bulk.
 -->
 
-```{r hvgboxplotmescbulk, fit.width=10, fig.height=6, fig.cap="Boxplots of batch-corrected normalized log-expression values for the top 10 DEGs in the mESC data set, detected by after summing counts for all cells on each plate."}
+```{r deboxplotmescbulk, fit.width=10, fig.height=6, fig.cap="Boxplots of batch-corrected normalized log-expression values for the top 10 DEGs in the mESC data set, detected by after summing counts for all cells on each plate."}
 examined <- order(res.sum$table$PValue)[1:10]
 cur.genes <- fData(sce)$SYMBOL[examined]
 all.names <- outer(cur.genes, culture[is.tested], FUN=function(x, y) paste0(x, " (", y, ")"))
