@@ -1352,7 +1352,7 @@ summary(decideTestsDGE(res.sum))
 This workflow provides a step-by-step guide for performing basic analyses of single-cell RNA-seq data.
 It provides instructions for a number of low-level steps such as quality control, normalization, cell cycle phase assignment, data exploration, HVG and DEG detection, and clustering.
 This is done with a number of different data sets to provide a range of usage examples.
-In addition, the processed data can be easily used for higher-level analyses such as pseudotime ordering with `r Biocpkg("monocle")`.
+In addition, the processed data can be easily used for higher-level analyses with other Bioconductor packages.
 We anticipate that this workflow will assist readers in assembling analyses of their own scRNA-seq data.
 
 # Software availability
