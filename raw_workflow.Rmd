@@ -956,7 +956,7 @@ for (clust in as.integer(levels(cluster))) {
     contrast[chosen.clust] <- 1
     contrast[clust] <- -1
     res <- glmLRT(fit, contrast=contrast)
-    con.name <- paste0('against.', clust)
+    con.name <- paste0('vs.', clust)
     result.logFC[[con.name]] <- res$table$logFC
     result.PValue[[con.name]] <- res$table$PValue
 }
