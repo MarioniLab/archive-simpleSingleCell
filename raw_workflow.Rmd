@@ -543,9 +543,13 @@ saveRDS(file="hsc_data.rds", sce)
 ```
 
 A variety of methods are available to perform more complex analyses on the processed expression data.
-For example, cells can be ordered by pseudotime (e.g., for differentiation) with `r Biocpkg("monocle")` [@trapnell2014dynamics]; cell-state hierarchies can be characterized with the `r Biocpkg("sincell")` package [@julia2015sincell]; and oscillatory behaviour can be identified using `r Biocpkg("Oscope")` [@leng2015oscope].
+For example, cells can be ordered by pseudotime (e.g., for progress along a differentiation pathway) with `r Biocpkg("monocle")` [@trapnell2014dynamics]; cell-state hierarchies can be characterized with the `r Biocpkg("sincell")` package [@julia2015sincell]; and oscillatory behaviour can be identified using `r Biocpkg("Oscope")` [@leng2015oscope].
 HVGs can be used in gene set enrichment analyses to identify biological pathways and processes with heterogeneous activity, using packages designed for bulk data like `r Biocpkg("topGO")` or with dedicated single-cell methods like `r Biocpkg("scde")` [@fan2016characterizing].
 Full descriptions of these analyses are outside the scope of this workflow, so interested users are advised to consult the relevant documentation.
+
+<!-- 
+Pseudotime coordinates can be extracted for DE analyses with edgeR/DESeq, a la empirical clustering.
+-->
 
 # A more complex analysis on brain cell types
 
