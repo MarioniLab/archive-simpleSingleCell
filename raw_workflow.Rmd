@@ -310,7 +310,7 @@ This focuses on the genes that are driving heterogeneity in the population and s
 For this data set, all methods suggest that there is no separation into distinct subpopulations.
 This is consistent with a homogenous population of cells of the same type.
 Of course, there are many dimensionality reduction techniques that we have not considered here but could also be used, e.g., multidimensional scaling, diffusion maps.
-These have their own advantages and disadvantages -- for example, diffusion maps are particularly suited to mapping cells along some continuous process like differentiation.
+These have their own advantages and disadvantages -- for example, diffusion maps (see `plotDiffusionMap`) place cells along a continuous trajectory and are suited for visualizing graduated processes like differentiation [@angerer2015destiny].
 
 ## Classification of cell cycle phase 
 
