@@ -260,10 +260,13 @@ plot(sizeFactors(sce), sce$total_counts/1e6, log="xy",
 Normalized log-expression values can be computed for use in downstream analyses.
 Each value is defined as the log-ratio of each count to the size factor for the corresponding cell (after adding a small prior count to avoid undefined values at zero counts).
 Division by the size factor ensures that any cell-specific biases are removed.
-The log-transformation is useful as it provides some variance stabilization -- this ensures that high-abundance genes with large variances do not dominate downstream analyses.
+The log-transformation provides some measure of variance stabilization [@law2014voom], so that high-abundance genes with large variances do not dominate downstream analyses.
 The computed values are stored as an `"exprs"` matrix in addition to the other assay elements.
 
-<!-- Specifically, variance stabilization for NB-distributed counts with a constant dispersion but a variable mean. -->
+<!-- 
+Specifically, variance stabilization for NB-distributed counts with a constant dispersion but a variable mean. 
+This seems better than square-rooting it, which only works for the Poisson.
+-->
 
 ```{r}
 sce <- normalize(sce)
@@ -549,6 +552,7 @@ Full descriptions of these analyses are outside the scope of this workflow, so i
 
 <!-- 
 Pseudotime coordinates can be extracted for DE analyses with edgeR/DESeq, a la empirical clustering.
+This might be more robust than clustering for continuous trajectories where the cluster boundaries would be more or less arbitrary.
 -->
 
 # A more complex analysis on brain cell types
