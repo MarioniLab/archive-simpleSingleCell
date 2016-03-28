@@ -1149,9 +1149,10 @@ gc()
 
 Feature-counting tools typically report genes in terms of standard identifiers like Ensembl or Entrez.
 These identifiers are used as they are unambiguous and highly stable.
-However, they are difficult to interpret compared to commonly used gene symbols.
+However, they are difficult to interpret compared to gene symbols, which are more often used in the literature.
 We can easily convert from one to the other using annotation packages like `r Biocpkg("org.Mm.eg.db")`.
 This is demonstrated below for Ensembl identifiers in the mouse embryonic stem cell (mESC) data set [@kolod2015singlecell] obtained from http://www.ebi.ac.uk/teichmann-srv/espresso.
+The `select` call extracts the specified data from the annotation object, and the `match` call ensures that the first gene symbol is used if multiple symbols correspond to a single Ensembl identifier.
 
 ```{r}
 incoming <- read.table("counttable_es.csv", header=TRUE, row.names=1)
