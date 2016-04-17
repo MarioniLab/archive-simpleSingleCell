@@ -36,8 +36,11 @@ library(DESeq2)
 library(scran)
 library(edgeR)
 library(scater)
+library(Rtsne)
+library(mvoutlier)
 library(gplots)
 library(gdata)
+library(openxlsx)
 library(R.utils)
 library(org.Mm.eg.db)
 library(TxDb.Mmusculus.UCSC.mm10.ensGene)
@@ -504,9 +507,9 @@ We recommend storing the heatmap at a sufficiently high resolution so that the r
 ```{r heatmaphsc, message=FALSE, fig.width=7, fig.height=7, fig.cap="Heatmap of mean-centred normalized log-expression values for correlated HVGs in the HSC data set. Dendrograms are formed by hierarchical clustering on the Euclidean distances between genes (row) or cells (column). Column colours represent the cluster to which each cell is assigned after a tree cut."}
 library(gplots)
 heat.vals <- norm.exprs - rowMeans(norm.exprs)
+clust.col <- rainbow(max(my.clusters))
 heatmap.2(heat.vals[chosen,], col=bluered, symbreak=TRUE, trace='none', cexRow=0.8,
-    ColSideColors=c("darkgreen", "orange", "dodgerblue", "grey80")[my.clusters],
-    Colv=as.dendrogram(my.tree))
+    ColSideColors=clust.col[my.clusters], Colv=as.dendrogram(my.tree))
 ```
 
 Modest substructure in Figure ((heatmaphsc)) is consistent with the low number of correlated HVGs.
