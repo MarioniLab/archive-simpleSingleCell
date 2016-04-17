@@ -263,10 +263,13 @@ plot(sizeFactors(sce), sce$total_counts/1e6, log="xy",
 Normalized log-expression values can be computed for use in downstream analyses.
 Each value is defined as the log-ratio of each count to the size factor for the corresponding cell (after adding a small prior count to avoid undefined values at zero counts).
 Division by the size factor ensures that any cell-specific biases are removed.
-The log-transformation is useful as it provides some variance stabilization -- this ensures that high-abundance genes with large variances do not dominate downstream analyses.
+The log-transformation provides some measure of variance stabilization [@law2014voom], so that high-abundance genes with large variances do not dominate downstream analyses.
 The computed values are stored as an `"exprs"` matrix in addition to the other assay elements.
 
-<!-- Specifically, variance stabilization for NB-distributed counts with a constant dispersion but a variable mean. -->
+<!-- 
+Specifically, variance stabilization for NB-distributed counts with a constant dispersion but a variable mean. 
+This seems better than square-rooting it, which only works for the Poisson.
+-->
 
 ```{r}
 sce <- normalize(sce)
@@ -552,6 +555,7 @@ Full descriptions of these analyses are outside the scope of this workflow, so i
 
 <!-- 
 Pseudotime coordinates can be extracted for DE analyses with edgeR/DESeq, a la empirical clustering.
+This might be more robust than clustering for continuous trajectories where the cluster boundaries would be more or less arbitrary.
 -->
 
 # A more complex analysis on brain cell types
@@ -1148,9 +1152,10 @@ gc()
 
 Feature-counting tools typically report genes in terms of standard identifiers like Ensembl or Entrez.
 These identifiers are used as they are unambiguous and highly stable.
-However, they are difficult to interpret compared to commonly used gene symbols.
+However, they are difficult to interpret compared to gene symbols, which are more often used in the literature.
 We can easily convert from one to the other using annotation packages like `r Biocpkg("org.Mm.eg.db")`.
 This is demonstrated below for Ensembl identifiers in the mouse embryonic stem cell (mESC) data set [@kolod2015singlecell] obtained from http://www.ebi.ac.uk/teichmann-srv/espresso.
+The `select` call extracts the specified data from the annotation object, and the `match` call ensures that the first gene symbol is used if multiple symbols correspond to a single Ensembl identifier.
 
 ```{r}
 incoming <- read.table("counttable_es.csv", header=TRUE, row.names=1)
