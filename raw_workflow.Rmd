@@ -315,7 +315,7 @@ multiplot(out5, out10, out20, cols=3)
 By default, both the `plotPCA` and `plotTSNE` functions will only use the top 500 genes with the highest variances.
 This focuses on the genes that are driving heterogeneity in the population and should provide greater visual resolution of any systematic differences between groups of cells.
 For this data set, all methods suggest that there is no separation into distinct subpopulations.
-This is consistent with a homogenous population of cells of the same type.
+This might be expected for a homogenous population of cells of the same type.
 Of course, there are many dimensionality reduction techniques that we have not considered here but could also be used, e.g., multidimensional scaling, diffusion maps.
 These have their own advantages and disadvantages -- for example, diffusion maps (see `plotDiffusionMap`) place cells along a continuous trajectory and are suited for visualizing graduated processes like differentiation [@angerer2015destiny].
 
@@ -392,9 +392,9 @@ var.out2 <- decomposeVar(sce, var.fit2)
 ```
 
 We assess the suitability of the trend fitted to the endogenous variances by examining whether it is consistent with the spike-in variances (Figure ((hvgplothsc))). 
-The former passes through the bulk of the latter in the plot below, indicating that our assumption (that most genes are not biologically variable) is valid.
-In contrast, the spike-in trend is less stable at mean intervals with few spike-in transcripts.
-More generally, the use of an endogenous trend is the only option in data sets where no spike-ins were added or in situations where not enough spike-in RNA was added to cover the range of means for the endogenous genes.
+The former passes through the bulk of the latter in the plot below, indicating that our assumption (that most genes have low levels of biological variability) is valid.
+In contrast, the spike-in trend lies below the variances at mean intervals with few spike-in transcripts.
+The use of an endogenous trend is the only option in data sets where no spike-ins were added or in situations where not enough spike-in RNA was added to cover the range of means for the endogenous genes.
 
 ```{r hvgplothsc, fig.cap="Variance of normalized log-expression values for each gene in the HSC data set, plotted against the mean log-expression. The red line represents the mean-dependent trend in the technical variance of the spike-in transcripts (also highlighted as red points). The blue line represents the trend fitted to the variances of the endogenous genes."}
 plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression", 
@@ -956,6 +956,7 @@ summary(y$tagwise.dispersion)
 
 To identify marker genes for a particular cluster, we test each gene for DE between that cluster and each other cluster.
 This is done using the likelihood ratio test (LRT) for each comparison, as demonstrated below for cluster 2.
+The same process can be repeated for each cluster by changing `chosen.clust`, to identify markers specific to the corresponding subpopulation.
 
 ```{r}
 result.logFC <- result.PValue <- list()
@@ -1004,11 +1005,12 @@ heatmap.2(heat.vals, col=bluered, symbreak=TRUE, trace='none', cexRow=1,
 legend("bottomleft", col=clust.col, legend=sort(unique(my.clusters)), pch=16)
 ```
 
-This process can be repeated for each cluster to identify markers specific to the corresponding subpopulation.
-However, it must be stressed that the _p_-values cannot be interpreted as measures of significance.
+It must be stressed that the _p_-values cannot be interpreted as measures of significance.
 This is because the clusters have been empirically identified from the data.
 `r Biocpkg("edgeR")` does not account for the uncertainty and stochasticity in clustering, which means that the _p_-values are much lower than they should be. 
-The (maximum) _p_-value should only be used for ranking candidate markers for follow-up studies.
+The maximum _p_-value calculated here should only be used for ranking candidate markers for follow-up studies.
+However, this is not a concern in other analyses where the groups are pre-defined.
+For such analyses, the FDR-corrected _p_-value can be directly used to define significant genes for each DE comparison, though some care may be required to deal with plate effects [@hicks2015widespread; @lun2016overcoming].
 
 ## Additional comments
 
@@ -1195,6 +1197,7 @@ isSpike(sce) <- is.spike
 
 We remove rows that do not correspond to endogenous genes or spike-in transcripts.
 This includes rows containing mapping statistics, e.g., the number of unaligned or unassigned reads.
+The object is then ready for downstream analyses as previously described. 
 
 ```{r}
 sce <- sce[grepl("ENSMUS", rownames(sce)) | isSpike(sce),]
