@@ -154,46 +154,48 @@ If endogenous RNA decreases in low-quality cells, the mitochondrial/spike-in pro
 We don't have to worry about effects of e.g. an increase in mitochondrial counts affecting the proportion of spike-in counts.
 -->
 
-```{r controlplothsc, fig.width=12, fig.height=6, fig.cap="Histogram of the proportion of reads mapped to mitochondrial genes (left) or spike-in transcripts (right) across all remaining cells in the HSC data set."}
+```{r controlplothsc, fig.width=12, fig.height=6, fig.cap="Histogram of the proportion of reads mapped to mitochondrial genes (left) or spike-in transcripts (right) across all cells in the HSC data set."}
 par(mfrow=c(1,2))
-mito.props <- sce$pct_counts_feature_controls_Mt
-hist(mito.props, xlab="Mitochondrial proportion", ylab="Number of cells", 
-    breaks=20, main="", col="grey80")
-spike.props <- sce$pct_counts_feature_controls_Spike
-hist(spike.props, xlab="ERCC proportion", ylab="Number of cells",
-    breaks=20, main="", col="grey80")
+hist(sce$pct_counts_feature_controls_Mt, xlab="Mitochondrial proportion (%)", 
+    ylab="Number of cells", breaks=20, main="", col="grey80")
+hist(sce$pct_counts_feature_controls_Spike, xlab="ERCC proportion (%)", 
+    ylab="Number of cells", breaks=20, main="", col="grey80")
 ```
 
-Defining a threshold on the proportion is not straightforward as it depends largely on the cell type and the experimental protocol.
+Again, the ideal threshold for these proportions depends on the cell type and the experimental protocol.
 Cells with more mitochondria or more mitochondrial activity may naturally have larger mitochondrial proportions.
 Similarly, cells with more endogenous RNA or in protocols using less spike-in RNA will have lower spike-in proportions.
 If we assume that most cells in the data set are of high quality, then the threshold can be set to remove any large outliers from the distribution of proportions.
-Here, we define outliers as those with proportions that are more than 3 median absolute deviations (MADs) above the median proportion for spike-in transcripts or mitochondrial genes.
-This results in the removal of a small number of cells.
+We use the MAD-based definition of outliers to remove putative low-quality cells from the data set.
 
 ```{r}
-mito.keep <- mito.props < median(mito.props) + 3*mad(mito.props)
-sum(!mito.keep)
-spike.keep <- spike.props < median(spike.props) + 3*mad(spike.props)
-sum(!spike.keep)
-sce <- sce[,mito.keep & spike.keep]
-ncol(sce)
+mito.drop <- isOutlier(sce$pct_counts_feature_controls_Mt, n=3, type="higher")
+spike.drop <- isOutlier(sce$pct_counts_feature_controls_Spike, n=3, type="higher")
+```
+
+Subsetting by column will retain only the high-quality cells that pass each filter described above.
+We can examine the number of cells removed by each filter, and the total number remaining in the data set.
+
+```{r}
+sce <- sce[,!(libsize.drop | feature.drop | mito.drop | spike.drop)]
+data.frame(ByLibSize=sum(libsize.drop), ByFeature=sum(feature.drop),
+    ByMito=sum(mito.drop), BySpike=sum(spike.drop), Remaining=ncol(sce))
 ```
 
 An alternative approach to quality control is to perform a principal components analysis (PCA) based on the quality metrics for each cell, e.g., the total number of reads, the total number of features, the proportion of mitochondrial or spike-in reads.
 Outliers on a PCA plot may be indicative of low-quality cells that have aberrant technical properties compared to the (presumed) majority of high-quality cells.
-In Figure ((pcaqualplothsc)), no cells were identified as outliers which is consistent with the removal of suspect cells in the preceding quality control steps.
+In Figure ((pcaqualplothsc)), no obvious outliers are present which is consistent with the removal of suspect cells in the preceding quality control steps.
 
 ```{r pcaqualplothsc, fig.cap="PCA plot for all remaining cells in the HSC data set, constructed using quality metrics. The first and second components are shown on each axis, along with the percentage of total variance explained by each component. Bars represent the coordinates of the cells on each axis."}
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
-plotPCA(sce, pca_data_input = "pdata", detect_outliers=TRUE) + fontsize
+plotPCA(sce, pca_data_input="pdata") + fontsize
 ```
 
-Methods like outlier detection and support vector machines can provide greater power to distinguish low-quality cells from high-quality counterparts [@ilicic2016classification].
+Methods like PCA-based outlier detection and support vector machines can provide more power to distinguish low-quality cells from high-quality counterparts [@ilicic2016classification].
 This is because they are able to detect subtle patterns across many quality metrics simultaneously. 
 However, this comes at some cost to interpretability, as the reason for removing a given cell may not always be obvious.
 Thus, for this workflow, we will use the simple approach whereby each quality metric is considered separately.
-Users interested in the more sophisticated approaches are advised to refer to the `r Biocpkg("scater")` and `r Biocpkg("cellity")` packages.
+Users interested in the more sophisticated approaches are referred to the `r Biocpkg("scater")` and `r Biocpkg("cellity")` packages.
 
 ## Filtering out low-abundance genes
 
