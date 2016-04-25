@@ -531,11 +531,13 @@ In short, experimental validation of the clustering results is critical to ensur
 
 Finally, dimensionality reduction can be applied using only the set of HVGs to highlight any substructure that might be present.
 This is shown in Figure ((pcareduxhsc)) for both PCA and _t_-SNE plots, though in this case, focusing on HVGs does not provide any additional separation into distinct subpopulations.
+A more useful strategy is to colour cells in the plot based on the expression of a gene of interest.
+This improves visualization by highlighting changes in expression across the cell population.
 
-```{r pcareduxhsc, fig.width=10, fig.height=6, fig.cap="PCA (left) and _t_-SNE plots (right) using only the expression values for significantly correlated HVGs in the HSC data set. Each cell is represented by a point in each plot, and the bars represent the cell coordinates on each axis."}
+```{r pcareduxhsc, fig.width=10, fig.height=6, fig.cap="PCA (left) and _t_-SNE plots (right) using only the expression values for significantly correlated HVGs in the HSC data set. Cells are coloured according to the level of _H2-Aa_ expression."}
+out.pca <- plotPCA(sce, exprs_values="exprs", feature_set=chosen, colour_by="H2-Aa") + fontsize
 set.seed(100)
-out.pca <- plotPCA(sce, exprs_values="exprs", feature_set=chosen) + fontsize
-out.tsne <- plotTSNE(sce, exprs_values="exprs", feature_set=chosen) + fontsize
+out.tsne <- plotTSNE(sce, exprs_values="exprs", feature_set=chosen, colour_by="H2-Aa") + fontsize
 multiplot(out.pca, out.tsne, cols=2)
 ```
 
