@@ -224,8 +224,8 @@ sum(alt.keep)
 The relationship between the proportion of expressing cells and the mean can be examined more closely in Figure ((geneplothsc)).
 The two statistics tend to be well-correlated, so filtering on either should give roughly similar results.
 
-```{r geneplothsc, fig.cap="Frequency of expression against the mean expression for each gene. Circles represent endogenous genes and triangles represent spike-in transcripts or mitochondrial genes. The bars on each axis represent the location of each gene on that axis. Genes above high technical dropout are defined as those above a non-linear trend fitted to the triangles."}
-plotQC(sce, type = "exprs") + fontsize
+```{r geneplothsc, fig.cap="Frequency of expression against the mean expression for each gene. Circles represent endogenous genes and triangles represent spike-in transcripts or mitochondrial genes. The bars on each axis represent the location of each gene on that axis. Genes with expression frequencies higher than the dropout rate are defined as those above a non-linear trend fitted to the spike-in transcripts."}
+plotQC(sce, type = "exprs-freq-vs-mean") + fontsize
 ```
 
 In general, we prefer the mean-based filter as it tends to be less aggressive.
@@ -258,7 +258,7 @@ This does not occur here as strong DE is unlikely to exist between cells of the 
 
 ```{r normplothsc, fig.cap="Size factors from deconvolution, plotted against the total counts for all cells in the HSC data set. Axes are shown on a log-scale."}
 plot(sizeFactors(sce), sce$total_counts/1e6, log="xy",
-    ylab="Total count (per million)", xlab="Size factor")
+    ylab="Library size (millions)", xlab="Size factor")
 ```
 
 Normalized log-expression values can be computed for use in downstream analyses.
@@ -294,7 +294,7 @@ This approach tends to be more robust to outliers than a standard PCA plot, as a
 However, this comes at the cost of being less sensitive to subtle differences in the expression profiles.
 
 ```{r pcacorplothsc, fig.cap="PCA plot constructed from a matrix of Spearman rank correlations between cells, where each point represents a cell in the HSC data set."}
-cor.mat <- cor(assayDataElement(sce, "exprs"), method="spearman")
+cor.mat <- cor(exprs(sce), method="spearman")
 out <- prcomp(cor.mat)
 plot(out$x[,1], out$x[,2], xlab="PC1", ylab="PC2", pch=16)
 ```
@@ -419,10 +419,10 @@ We recommend checking the distribution of expression values for the top HVGs to 
 ```{r hvgboxplothsc, fig.cap="Boxplots of normalized log-expression values for the top 10 HVGs in the HSC data set. Points correspond to cells that are more than 1.5 interquartile ranges from the edge of each box."}
 examined <- top.hvgs[1:10]
 all.names <- matrix(rownames(sce)[examined], nrow=length(examined), ncol=ncol(sce))
-boxplot(split(exprs(sce)[examined,], all.names), las=2, ylab="Normalized log-expression")
+boxplot(split(exprs(sce)[examined,], all.names), las=2, ylab="Normalized log-expression", col="grey80")
 ```
 
-Of course, there are many ways of defining HVGs, e.g., by using the coefficient of variation [@kolod2015singlecell;@kim2015characterizing], with the dispersion parameter in the negative binomial distribution [@mccarthy2012differential], or as a proportion of total variability [@vallejos2015basics].
+There are many other ways of defining HVGs, e.g., by using the coefficient of variation [@kolod2015singlecell;@kim2015characterizing], with the dispersion parameter in the negative binomial distribution [@mccarthy2012differential], or as a proportion of total variability [@vallejos2015basics].
 We use the variance of the log-expression values because the log-transformation provides some protection against genes with strong expression in only one or two outlier cells.
 This ensures that the set of top HVGs is not dominated by genes with (mostly uninteresting) outlier expression patterns.
 However, the cost of this robustness is the need to fit a complex mean-variance relationship.
@@ -768,7 +768,7 @@ In contrast, cells taken from mice of different sexes mix throughout the plot, i
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
 ```
 
-```{r pcaplotbrain, fig.width=12, fig.height=6, fig.cap="PCA plots constructed from the normalized expression values for all remaining cells in the brain data set. Each cell is represented by a point in each plot, and the bars represent the cell coordinates on each axis. Left: cells are coloured according to the tissue of origin (cortex or hippocampus). Right: cells are coloured according to the sex of the mouse -- male (-1), female (1) or unassigned (0)."}
+```{r pcaplotbrain, fig.width=12, fig.height=6, fig.cap="PCA plots constructed from the normalized expression values for all remaining cells in the brain data set. Left: cells are coloured according to the tissue of origin (cortex or hippocampus). Right: cells are coloured according to the sex of the mouse -- male (-1), female (1) or unassigned (0)."}
 pca1 <- plotPCA(sce, exprs_values="exprs", colour_by="tissue") + fontsize
 pca2 <- plotPCA(sce, exprs_values="exprs", colour_by="sex") + fontsize
 multiplot(pca1, pca2, cols=2)
@@ -777,7 +777,7 @@ multiplot(pca1, pca2, cols=2)
 Similar results are observed with _t_-SNE plots (Figure ((tsneplotbrain))).
 Again, users should set the seed to a constant value to ensure that the results are reproducible.
 
-```{r tsneplotbrain, fig.width=12, fig.height=6, fig.cap="_t_-SNE plots constructed from the normalized expression values for all remaining cells in the brain data set. Each cell is represented by a point in each plot, and the bars represent the cell coordinates on each axis. Left: cells are coloured according to the tissue of origin (cortex or hippocampus). Right: cells are coloured according to the sex of the mouse -- male (-1), female (1) or unassigned (0)."}
+```{r tsneplotbrain, fig.width=12, fig.height=6, fig.cap="_t_-SNE plots constructed from the normalized expression values for all remaining cells in the brain data set. Left: cells are coloured according to the tissue of origin (cortex or hippocampus). Right: cells are coloured according to the sex of the mouse -- male (-1), female (1) or unassigned (0)."}
 set.seed(100)
 tsne1 <- plotTSNE(sce, exprs_values="exprs", colour_by="tissue") + fontsize
 set.seed(100)
@@ -864,7 +864,7 @@ Again, we check the distribution of expression values for the top 10 HVGs to ens
 ```{r hvgboxplotbrain, fig.cap="Boxplots of normalized log-expression values for the top 10 HVGs in the brain data set. Points correspond to cells that are more than 1.5 interquartile ranges from the edge of each box."}
 examined <- top.hvgs[1:10]
 all.names <- matrix(rownames(sce)[examined], nrow=length(examined), ncol=ncol(sce))
-boxplot(split(exprs(sce)[examined,], all.names), las=2, ylab="Normalized log-expression")
+boxplot(split(exprs(sce)[examined,], all.names), las=2, ylab="Normalized log-expression", col="grey80")
 ```
 
 To identify genes involved in defining subpopulations, the top 200 HVGs can be tested for significant pairwise correlations.
