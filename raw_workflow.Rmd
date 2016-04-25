@@ -113,30 +113,32 @@ sce <- calculateQCMetrics(sce, feature_controls=list(Spike=is.spike, Mt=is.mito)
 head(colnames(pData(sce)))
 ```
 
-One measure of quality is the library size, defined as the total sum of counts across all genes and spike-in transcripts.
+Two common measures of cell quality are the library size and the number of expressed features in each library.
+The library size is defined as the total sum of counts across all features, i.e., genes and spike-in transcripts.
 Cells with small library sizes are considered to be of low quality as the RNA has not been efficiently captured (i.e., converted into cDNA and amplified) during library preparation.
-In general, any cell with a library size that is an order of magnitude lower than the median across all cells should be removed.
-A more relaxed threshold may be necessary when strong heterogeneity in total RNA content is expected across cells.
+The number of expressed features in each cell is defined as the number of features with non-zero counts for that cell.
+Any cell with very few expressed genes is likely to be of poor quality as the diverse transcript population has not been successfully captured.
+The distributions of both of these metrics are shown in Figure ((libplothsc)).
 
-<!-- 
-Easier to interpret than using outliers here, as we'd need to log the library sizes before MAD'ing them.
--->
-
-```{r}
-lib.sizes <- sce$total_counts
-summary(lib.sizes)
-keep <- lib.sizes >= median(lib.sizes)/10
-sce <- sce[,keep]
-sum(!keep)
+```{r libplothsc, fig.height=6, fig.width=12, fig.cap="Histograms of library sizes (left) and number of expressed genes (right) for all cells in the HSC data set."}
+par(mfrow=c(1,2))
+hist(sce$total_counts/1e6, xlab="Library sizes (millions)", main="", 
+    breaks=20, col="grey80", ylab="Number of cells")
+hist(sce$total_features, xlab="Number of expressed genes", main="", 
+    breaks=20, col="grey80", ylab="Number of cells")
 ```
 
-The number of genes expressed in each cell is calculated as the number of non-zero counts.
-Any cell with very few expressed genes is considered to be of poor quality as the diverse transcript population has not been successfully captured.
-We remove cells with fewer than 1000 expressed genes to ensure that the total count in each cell is not driven by a small number of transcripts.
-Here, all cells have a reasonable number of expressed genes and so no removal is performed.
+Picking a threshold for these metrics is not straightforward as their absolute values depend on the protocol and biological system.
+For example, sequencing to greater depth will lead to more reads, regardless of the quality of the cells.
+To obtain an adaptive threshold, we assume that most of the data set consists of high quality cells.
+We remove cells with log-library sizes that are more than 3 median absolute deviations (MADs) below the median log-library size.  
+The wide range of library sizes requires a log-transformation, as the MAD would be too large on the raw scale.
+We also remove cells where the number of expressed genes is 3 MADs below the median.
+This eliminates low-quality cells corresponding to small outliers.
 
 ```{r}
-summary(sce$total_features)
+libsize.drop <- isOutlier(sce$total_counts, n=3, type="lower", log=TRUE)
+feature.drop <- isOutlier(sce$total_features, n=3, type="lower")
 ```
 
 Another measure of quality is the proportion of reads mapped to genes in the mitochondrial genome.
@@ -641,46 +643,44 @@ Nonetheless, we can compute some metrics to check that whether the remaining cel
 sce <- calculateQCMetrics(sce, feature_controls=list(Spike=is.spike, Mt=is.mito)) 
 ```
 
-As previously described, we remove cells with low total counts for endogenous genes or with few total expressed features.
+We examine the distribution of library sizes and numbers of expressed genes across cells (Figure ((libplotbrain))).
 
-```{r}
-lib.sizes <- sce$total_counts 
-count.keep <- lib.sizes >= median(lib.sizes)/10
-sum(!count.keep)
-feature.keep <- sce$total_features >= 1000
-sum(!feature.keep)
-```
-
-We also examine the distribution of the proportions of total reads mapped to mitochondrial genes or spike-in transcripts.
-
-```{r controlplotbrain, fig.width=12, fig.height=6, fig.cap="Histogram of the proportion of reads mapped to mitochondrial genes (left) or spike-in transcripts (right) across all cells in the brain data set."}
+```{r libplotbrain, fig.width=12, fig.height=6, fig.cap="Histograms of library sizes (left) and number of expressed genes (right) for all cells in the brain data set."}
 par(mfrow=c(1,2))
-mito.props <- sce$pct_counts_feature_controls_Mt
-hist(mito.props, xlab="Mitochondrial proportion (%)", ylab="Number of cells", breaks=20, main="")
-spike.props <- sce$pct_counts_feature_controls_Spike
-hist(spike.props, xlab="ERCC proportion (%)", ylab="Number of cells", breaks=20, main="")
+hist(sce$total_counts/1e3, xlab="Library sizes (thousands)", main="", 
+    breaks=20, col="grey80", ylab="Number of cells")
+hist(sce$total_features, xlab="Number of expressed genes", main="", 
+    breaks=20, col="grey80", ylab="Number of cells")
 ```
 
-For the mitochondrial proportions, a couple of clear outliers are observed.
-These are defined and removed with a MAD-based threshold as previously described.
-We repeat this process to remove outlier cells with high spike-in proportions.
+We also examine the distribution of the proportions of total reads mapped to mitochondrial genes or spike-in transcripts (Figure ((controlplotbrain))).
 Note that the spike-in proportions here are more variable than in the HSC data set.
 This may reflect a greater variability in the total amount of endogenous RNA per cell when many cell types are present.
 
+```{r controlplotbrain, fig.width=12, fig.height=6, fig.cap="Histogram of the proportion of reads mapped to mitochondrial genes (left) or spike-in transcripts (right) across all cells in the brain data set."}
+par(mfrow=c(1,2))
+hist(sce$pct_counts_feature_controls_Mt, xlab="Mitochondrial proportion (%)", 
+    ylab="Number of cells", breaks=20, main="", col="grey80")
+hist(sce$pct_counts_feature_controls_Spike, xlab="ERCC proportion (%)",
+    ylab="Number of cells", breaks=20, main="", col="grey80")
+```
+
+We remove small outliers in Figure ((libplotbrain)) and large outliers in Figure ((controlplotbrain)), using a MAD-based threshold as previously described.
+
 ```{r}
-spike.keep <- spike.props <= median(spike.props) + 3*mad(spike.props)
-sum(!spike.keep)
-mito.keep <- mito.props <= median(mito.props) + 3*mad(mito.props)
-sum(!mito.keep)
+libsize.drop <- isOutlier(sce$total_counts, n=3, type="lower", log=TRUE)
+feature.drop <- isOutlier(sce$total_features, n=3, type="lower")
+mito.drop <- isOutlier(sce$pct_counts_feature_controls_Mt, n=3, type="higher")
+spike.drop <- isOutlier(sce$pct_counts_feature_controls_Spike, n=3, type="higher")
 ```
 
 Removal of low-quality cells can then be performed by combining all of the metrics.
 The majority of cells are retained, which suggests that the original quality control procedures were generally adequate.
 
 ```{r}
-total.keep <- count.keep & feature.keep & spike.keep & mito.keep
-sce <- sce[,total.keep]
-summary(total.keep)
+sce <- sce[,!(libsize.drop | feature.drop | spike.drop | mito.drop)]
+data.frame(ByLibSize=sum(libsize.drop), ByFeature=sum(feature.drop), 
+    ByMito=sum(mito.drop), BySpike=sum(spike.drop), Remaining=ncol(sce))
 ```
 
 Low-abundance genes are also removed by applying a simple mean-based filter.
