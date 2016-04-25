@@ -1,5 +1,5 @@
 ---
-title: "Cell by cell, count to count: a step-by-step workflow for basic analyses of single-cell RNA-seq data"
+title: "A step-by-step workflow for basic analyses of single-cell RNA-seq data"
 author: 
     - name: Aaron T. L. Lun
       affiliation: Cancer Research UK Cambridge Institute, Li Ka Shing Centre, Robinson Way, Cambridge CB2 0RE, United Kingdom
@@ -25,10 +25,7 @@ options(bitmapType="cairo", width=100)
 
 # Setting single-core unless explicitly specified otherwise.
 library(BiocParallel)
-whee <- bpparam()
-bpworkers(whee) <- 1
-register(whee)
-rm(whee)
+register(SerialParam())
 ```
 
 ```{r, message=FALSE, echo=FALSE, results='hide'}
