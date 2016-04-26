@@ -131,7 +131,7 @@ hist(sce$total_features, xlab="Number of expressed genes", main="",
 Picking a threshold for these metrics is not straightforward as their absolute values depend on the protocol and biological system.
 For example, sequencing to greater depth will lead to more reads, regardless of the quality of the cells.
 To obtain an adaptive threshold, we assume that most of the data set consists of high quality cells.
-We remove cells with log-library sizes that are more than 3 median absolute deviations (MADs) below the median log-library size.  
+We remove cells with log-library sizes that are more than 3 median absolute deviations (MADs) below the median log-library size.
 The wide range of library sizes requires a log-transformation, as the MAD would be too large on the raw scale.
 We also remove cells where the number of expressed genes is 3 MADs below the median.
 This eliminates low-quality cells corresponding to small outliers.
@@ -243,7 +243,7 @@ More specifically, "size factors" are calculated that represent the extent to wh
 
 Size factors can be computed with several different approaches, e.g., using the `estimateSizeFactorsFromMatrix` function in the `r Biocpkg("DESeq2")` package [@anders2010differential;@love2014moderated], or with the `calcNormFactors` function [@robinson2010scaling] in the `r Biocpkg("edgeR")` package (this requires an additional multiplication by the library size).
 However, single-cell data can be problematic for these bulk data-based methods due to the dominance of low and zero counts.
-To overcome this, we pool counts from many cells to increase the count size for accurate size factor estimation [@lun2016much].
+To overcome this, we pool counts from many cells to increase the count size for accurate size factor estimation [@lun2016pooling].
 Pool-based size factors are then "deconvolved" into cell-based factors for cell-specific normalization.
 
 ```{r, warning=FALSE}
@@ -265,7 +265,7 @@ Normalized log-expression values can be computed for use in downstream analyses.
 Each value is defined as the log-ratio of each count to the size factor for the corresponding cell (after adding a small prior count to avoid undefined values at zero counts).
 Division by the size factor ensures that any cell-specific biases are removed.
 The log-transformation provides some measure of variance stabilization [@law2014voom], so that high-abundance genes with large variances do not dominate downstream analyses.
-The computed values are stored as an `"exprs"` matrix in addition to the other assay elements.
+The computed values are stored as an `exprs` matrix in addition to the other assay elements.
 
 <!-- 
 Specifically, variance stabilization for NB-distributed counts with a constant dispersion but a variable mean. 
@@ -341,7 +341,7 @@ plot(assignments$score$G1, assignments$score$G2M, xlab="G1 score", ylab="G2/M sc
 
 Cells are classified as being in G1 phase if the G1 score is above 0.5; in G2/M phase if the G2/M score is above 0.5; and in S phase, if neither is above 0.5.
 Here, the vast majority of cells are classified as being in G1 phase.
-We will focus on these cells for the downstream analysis.
+We will focus on these cells in the downstream analysis.
 Cells in other phases are removed to avoid potential confounding effects from cell cycle-induced differences.
 Alternatively, if a non-negligible number of cells are in other phases, we can use the assigned phase as a blocking factor in downstream analyses.
 This protects against cell cycle effects without discarding information.
@@ -351,7 +351,7 @@ g1.only <- assignments$score$G1 > 0.5
 sce <- sce[,g1.only]
 ```
 
-Pre-trained classifiers are available in `r Rpackage("scran")` for human and mouse data. 
+Pre-trained classifiers are available in `r Biocpkg("scran")` for human and mouse data. 
 The mouse classifier used here was trained on embryonic stem cells but can still be generally applied -- the pair-based method is a non-parametric procedure that should be robust to technical differences between data sets, and the transcriptional program associated with cell cycling should be mostly conserved across cell types.
 However, it will (inevitably) be less accurate for cell types that are substantially different from those used in the training set.
 Users can also construct a custom classifier from their own training data using the `sandbag` function.
@@ -393,7 +393,7 @@ var.out2 <- decomposeVar(sce, var.fit2)
 
 We assess the suitability of the trend fitted to the endogenous variances by examining whether it is consistent with the spike-in variances (Figure ((hvgplothsc))). 
 The former passes through the bulk of the latter in the plot below, indicating that our assumption (that most genes have low levels of biological variability) is valid.
-In contrast, the spike-in trend lies below the variances at mean intervals with few spike-in transcripts.
+In contrast, the spike-in trend fits poorly as it lies below the variance estimates at mean intervals with few spike-in transcripts.
 The use of an endogenous trend is the only option in data sets where no spike-ins were added or in situations where not enough spike-in RNA was added to cover the range of means for the endogenous genes.
 
 ```{r hvgplothsc, fig.cap="Variance of normalized log-expression values for each gene in the HSC data set, plotted against the mean log-expression. The red line represents the mean-dependent trend in the technical variance of the spike-in transcripts (also highlighted as red points). The blue line represents the trend fitted to the variances of the endogenous genes."}
@@ -475,7 +475,7 @@ The correlation results can also be used directly in follow-up experiments to ve
 This is done by using sets of correlated HVGs as markers in procedures such as fluorescence-activated cell sorting, immunohistochemistry or RNA flourescence _in situ_ hybridization.
 In this manner, the existence of subpopulations with distinct expression patterns for the chosen HVGs can be experimentally validated.
 Negatively correlated pairs may be particularly useful as they provide more power to discriminate between subpopulations.
-In the simplest example, a subpopulation is positive for one marker in the pair and negative for the other marker, while the reverse is true for a different subpopulation.
+In the simplest example, a subpopulation would be positive for one marker and negative for the other while the reverse would be true for a different subpopulation, thus allowing the two subpopulations to be easily distinguished.
 
 ## Using correlated HVGs for further data exploration
 
@@ -531,7 +531,7 @@ In short, experimental validation of the clustering results is critical to ensur
 
 Finally, dimensionality reduction can be applied using only the set of HVGs to highlight any substructure that might be present.
 This is shown in Figure ((pcareduxhsc)) for both PCA and _t_-SNE plots, though in this case, focusing on HVGs does not provide any additional separation into distinct subpopulations.
-A more useful strategy is to colour cells in the plot based on the expression of a gene of interest.
+A more informative strategy is to colour cells in the plot based on the expression of a gene of interest.
 This improves visualization by highlighting changes in expression across the cell population.
 
 ```{r pcareduxhsc, fig.width=10, fig.height=6, fig.cap="PCA (left) and _t_-SNE plots (right) using only the expression values for significantly correlated HVGs in the HSC data set. Cells are coloured according to the level of _H2-Aa_ expression."}
@@ -565,7 +565,7 @@ This might be more robust than clustering for continuous trajectories where the 
 
 ## Overview
 
-We proceed to tackle a more complex data set from a study of cell types in the mouse brain [@zeisel2015brain].
+We proceed to a more complex data set from a study of cell types in the mouse brain [@zeisel2015brain].
 This contains approximately 3000 cells of varying types such as oligodendrocytes, microglia and neurons.
 Individual cells were isolated using the Fluidigm C1 microfluidics system and library preparation was performed on each cell using a UMI-based protocol.
 After sequencing, expression was quantified by counting the number of UMIs mapped to each gene.
@@ -727,7 +727,7 @@ sce <- normalize(sce)
 gc()
 ```
 
-Compared to the HSC analysis, more scatter is observed for the trend between the total count and size factor for each cell (Figure ((normplotbrain))).
+Compared to the HSC analysis, more scatter is observed around the trend between the total count and size factor for each cell (Figure ((normplotbrain))).
 This is consistent with an increased amount of DE between cells of different types, which compromises the accuracy of library size normalization [@robinson2010scaling].
 In contrast, the size factors are estimated based on median ratios and are more robust to the presence of DE between cells.
 
@@ -756,14 +756,13 @@ plot(assignments$score$G1, assignments$score$G2M, xlab="G1 score", ylab="G2/M sc
 
 Given the lack of definitive classification, we will not perform any processing of the data set by cell cycle phase.
 However, this information is still useful for verifying downstream results.
-For example, if putative subpopulations have distinctly different phase scores, we might suspect that the differences between subpopulations are being driven by cell cycle effects.
+For example, if we were to identify putative subpopulations, and those subpopulations had systematically different phase scores, we might be wary of the possibility that the differences between subpopulations are being driven by cell cycle effects.
 
 ## Data exploration to examine the effect of technical factors
 
 For large experiments, data exploration has two functions -- to identify interesting biology, and also to check the effect of various technical factors.
 PCA plots constructed from the expression data suggest that distinct subpopulations are present (Figure ((pcaplotbrain))).
-Some of the substructure may be due to differences in the tissue from which the cells were extracted, e.g.,
-    cells from the cortex and hippocampus dominate the bottom-right and bottom-left corners of the plot, respectively.
+Some of the substructure may be due to differences in the tissue from which the cells were extracted, e.g., cells from the cortex and hippocampus dominate different parts of the plot.
 In contrast, cells taken from mice of different sexes mix throughout the plot, indicating that sex has little effect on the overall differences across the data set.
 
 ```{r, echo=FALSE, results='hide', message=FALSE}
@@ -1237,7 +1236,7 @@ No competing interests were disclosed.
 
 # Grant information
 
-This work was supported by CRUK core funding (SW73) to J.C.M.
+A.T.L.L. and J.C.M. were supported by core funding from Cancer Research UK (award no. A17197).
 
 # Acknowledgements
 
