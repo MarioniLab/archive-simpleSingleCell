@@ -806,6 +806,7 @@ multiplot(pca1, pca2, cols=2)
 <!-- 
 The prefix of the cell ID seems to be the chip, as the second half of the ID marks the well position and there's always less than 96.
 It should at least be the mouse, as the prefix is nested in tissue/sex. 
+There is some imbalance in the spread of colours, but it's not overwhelming (i.e., you don't get distinct blobs containing only one colour) so I'll let it pass.
 -->
 
 In summary, the major difference between cells seems to be associated with the tissue of origin.
