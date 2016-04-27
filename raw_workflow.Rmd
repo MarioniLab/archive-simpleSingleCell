@@ -241,7 +241,7 @@ This is often done by assuming that most genes are not differentially expressed 
 Any systematic difference in count size across the non-DE majority of genes between two cells is assumed to represent bias and is removed by scaling.
 More specifically, "size factors" are calculated that represent the extent to which counts should be scaled in each library.
 
-Size factors can be computed with several different approaches, e.g., using the `estimateSizeFactorsFromMatrix` function in the `r Biocpkg("DESeq2")` package [@anders2010differential;@love2014moderated], or with the `calcNormFactors` function [@robinson2010scaling] in the `r Biocpkg("edgeR")` package (this requires an additional multiplication by the library size).
+Size factors can be computed with several different approaches, e.g., using the `estimateSizeFactorsFromMatrix` function in the `r Biocpkg("DESeq2")` package [@anders2010differential;@love2014moderated], or with the `calcNormFactors` function [@robinson2010scaling] in the `r Biocpkg("edgeR")` package.
 However, single-cell data can be problematic for these bulk data-based methods due to the dominance of low and zero counts.
 To overcome this, we pool counts from many cells to increase the count size for accurate size factor estimation [@lun2016pooling].
 Pool-based size factors are then "deconvolved" into cell-based factors for cell-specific normalization.
@@ -251,12 +251,12 @@ sce <- computeSumFactors(sce, sizes=c(20, 40, 60, 80))
 summary(sizeFactors(sce))
 ```
 
-In this case, the size factors are tightly correlated with the total counts for all cells (Figure ((normplothsc))).
+In this case, the size factors are tightly correlated with the library sizes for all cells (Figure ((normplothsc))).
 This suggests that the systematic differences between cells are primarily driven by differences in capture efficiency or sequencing depth.
 Any DE between cells would yield a non-linear trend between the total count and size factor, and/or increased scatter around the trend.
 This does not occur here as strong DE is unlikely to exist between cells of the same type.
 
-```{r normplothsc, fig.cap="Size factors from deconvolution, plotted against the total counts for all cells in the HSC data set. Axes are shown on a log-scale."}
+```{r normplothsc, fig.cap="Size factors from deconvolution, plotted against library sizes for all cells in the HSC data set. Axes are shown on a log-scale."}
 plot(sizeFactors(sce), sce$total_counts/1e6, log="xy",
     ylab="Library size (millions)", xlab="Size factor")
 ```
@@ -731,9 +731,9 @@ Compared to the HSC analysis, more scatter is observed around the trend between 
 This is consistent with an increased amount of DE between cells of different types, which compromises the accuracy of library size normalization [@robinson2010scaling].
 In contrast, the size factors are estimated based on median ratios and are more robust to the presence of DE between cells.
 
-```{r normplotbrain, fig.cap="Size factors from deconvolution, plotted against the total counts for all cells in the brain data set. Axes are shown on a log-scale."}
+```{r normplotbrain, fig.cap="Size factors from deconvolution, plotted against library sizes for all cells in the brain data set. Axes are shown on a log-scale."}
 plot(sizeFactors(sce), sce$total_counts/1e6, log="xy",
-    ylab="Total count (per million)", xlab="Size factor")
+    ylab="Library size (millions)", xlab="Size factor")
 ```
 
 We also attempt to classify cells into cell cycle phases using the `cyclone` method.
