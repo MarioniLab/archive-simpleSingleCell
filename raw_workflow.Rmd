@@ -5,7 +5,7 @@ author:
       affiliation: Cancer Research UK Cambridge Institute, Li Ka Shing Centre, Robinson Way, Cambridge CB2 0RE, United Kingdom
     - name: John C. Marioni
       affiliation: Cancer Research UK Cambridge Institute, Li Ka Shing Centre, Robinson Way, Cambridge CB2 0RE, United Kingdom; EMBL European Bioinformatics Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SD, United Kingdom; Wellcome Trust Sanger Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SA, United Kingdom
-date: 26 April 2016
+date: 6 May 2016
 vignette: >
     %\VignetteIndexEntry{A worfklow for basic analyses of single-cell RNA-seq data}
     %\VignetteEngine{knitr::rmarkdown}
@@ -407,6 +407,9 @@ lines(var.out2$mean[o], var.out2$tech[o], col="dodgerblue", lwd=2)
 
 The top HVGs are identified by ranking genes on their biological components.
 This can be used to prioritize interesting genes for further investigation.
+(The _p_-value shown below tests for whether the biological component is significantly greater than 1.
+A variance of 1 for log~2~-counts means that significant genes will vary, for biological reasons, by at least 2-fold around the mean.
+However, ranking on the _p_-value tends to be less effective as it favours genes that have more precise variance estimates, even if they are smaller than estimates for other genes.)
 
 ```{r}
 top.hvgs <- order(var.out2$bio, decreasing=TRUE)
@@ -732,8 +735,8 @@ This is consistent with an increased amount of DE between cells of different typ
 In contrast, the size factors are estimated based on median ratios and are more robust to the presence of DE between cells.
 
 ```{r normplotbrain, fig.cap="Size factors from deconvolution, plotted against library sizes for all cells in the brain data set. Axes are shown on a log-scale."}
-plot(sizeFactors(sce), sce$total_counts/1e6, log="xy",
-    ylab="Library size (millions)", xlab="Size factor")
+plot(sizeFactors(sce), sce$total_counts/1e3, log="xy",
+    ylab="Library size (thousands)", xlab="Size factor")
 ```
 
 We also attempt to classify cells into cell cycle phases using the `cyclone` method.
