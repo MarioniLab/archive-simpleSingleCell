@@ -298,27 +298,18 @@ sce <- normalize(sce)
 Dimensionality reduction is often useful to examine major features of the data before more quantitative analyses.
 Of particular interest is whether the HSCs partition into distinct subpopulations.
 This can be visualized by constructing a PCA plot from the normalized log-expression values (Figure ((pcaplothsc))).
-Cells with similar expression profiles should be located close together in the plot.
+Cells with similar expression profiles should be located close together in the plot, while dissimilar cells should be far apart.
+By default, the `plotPCA` function will only use the top 500 genes with the largest variances.
+This focuses on the genes that are driving heterogeneity in the population and should provide greater visual resolution of any systematic differences between groups of cells.
 
 ```{r pcaplothsc, fig.cap="PCA plot constructed from normalized log-expression values, where each point represents a cell in the HSC data set. First and second components are shown, along with the percentage of variance explained. Bars represent the coordinates of the cells on each axis. None of the cells are controls (e.g., empty wells) so the legend can be ignored."}
 plotPCA(sce, exprs_values="exprs") + fontsize
 ```
 
-Alternatively, the PCA plot can be constructed from a matrix of correlations between cells (Figure ((pcacorplothsc))). 
-Two cells with similar expression profiles will exhibit similar patterns of correlations to other cells.
-As a result, those two cells will be closer together in the plot.
-This approach tends to be more robust to outliers than a standard PCA plot, as a small number of aberrant genes will have little effect on the value of Spearman's rank correlation.
-However, this comes at the cost of being less sensitive to subtle differences in the expression profiles.
-
-```{r pcacorplothsc, fig.cap="PCA plot constructed from a matrix of Spearman rank correlations between cells, where each point represents a cell in the HSC data set."}
-cor.mat <- cor(exprs(sce), method="spearman")
-out <- prcomp(cor.mat)
-plot(out$x[,1], out$x[,2], xlab="PC1", ylab="PC2", pch=16)
-```
-
 Another popular approach to dimensionality reduction is the _t_-stochastic neighbour embedding (_t_-SNE) method [@van2008visualizing].
-_t_-SNE tends to work better than PCA for large data sets with many subpopulations, at the cost of more computational effort and complexity.
-Unlike PCA, _t_-SNE is a stochastic method -- users should run the algorithm several times to ensure that the results are representative, and then set a seed to ensure that the chosen results are reproducible.
+_t_-SNE tends to work better than PCA for separating cells in large data sets with many subpopulations, at the cost of more computational effort and complexity.
+Like `plotPCA`, the `plotTSNE` function will use the genes with the largest variances to focus on heterogeneity in the population.
+However, unlike PCA, _t_-SNE is a stochastic method -- users should run the algorithm several times to ensure that the results are representative, and then set a seed to ensure that the chosen results are reproducible.
 It is also advisable to test different settings of the "perplexity" parameter as this will affect the distribution of points in the low-dimensional space (Figure ((tsneplothsc))).
 
 ```{r tsneplothsc, fig.cap="_t_-SNE plot constructed from normalized log-expression values using a range of perplexity values. In each plot, each point represents a cell in the HSC data set. Bars represent the coordinates of the cells on each axis.", fig.width=12, fig.height=6}
@@ -329,8 +320,6 @@ out20 <- plotTSNE(sce, exprs_values="exprs", perplexity=20) + fontsize + ggtitle
 multiplot(out5, out10, out20, cols=3)
 ```
 
-By default, both the `plotPCA` and `plotTSNE` functions will only use the top 500 genes with the highest variances.
-This focuses on the genes that are driving heterogeneity in the population and should provide greater visual resolution of any systematic differences between groups of cells.
 For this data set, all methods suggest that there is no separation into distinct subpopulations.
 This might be expected for a homogenous population of cells of the same type.
 Of course, there are many dimensionality reduction techniques that we have not considered here but could also be used, e.g., multidimensional scaling, diffusion maps.
@@ -424,9 +413,8 @@ lines(var.out2$mean[o], var.out2$tech[o], col="dodgerblue", lwd=2)
 
 The top HVGs are identified by ranking genes on their biological components.
 This can be used to prioritize interesting genes for further investigation.
-(The _p_-value shown below tests for whether the biological component is significantly greater than 1.
-A variance of 1 for log~2~-counts means that significant genes will vary, for biological reasons, by at least 2-fold around the mean.
-However, ranking on the _p_-value tends to be less effective as it favours genes that have more precise variance estimates, even if they are smaller than estimates for other genes.)
+In general, we consider a gene to be a HVG if it has a biological component of at least 1.
+For log~2~-counts, this means that gene expression will vary, for biological reasons, by at least 2-fold around the mean.
 
 ```{r}
 top.hvgs <- order(var.out2$bio, decreasing=TRUE)
@@ -549,7 +537,7 @@ As such, determining whether a cluster is "real" or not usually depends on subje
 Moreover, different algorithms can yield substantially different clusters by focusing on different aspects of the data.
 In short, experimental validation of the clustering results is critical to ensure that the putative subpopulations actually exist.
 
-Finally, dimensionality reduction can be applied using only the set of HVGs to highlight any substructure that might be present.
+Finally, dimensionality reduction can be applied using only the set of correlated HVGs to highlight any substructure that might be present.
 This is shown in Figure ((pcareduxhsc)) for both PCA and _t_-SNE plots, though in this case, focusing on HVGs does not provide any additional separation into distinct subpopulations.
 A more informative strategy is to colour cells in the plot based on the expression of a gene of interest.
 This improves visualization by highlighting changes in expression across the cell population.
@@ -582,7 +570,7 @@ This might be more robust than clustering for continuous trajectories where the 
 -->
 
 ```{r, echo=FALSE, results='hide'}
-rm(setdiff(ls(), all.basenames))
+rm(list=setdiff(ls(), "all.basenames"))
 gc()
 ```
 
