@@ -581,6 +581,11 @@ Pseudotime coordinates can be extracted for DE analyses with edgeR/DESeq, a la e
 This might be more robust than clustering for continuous trajectories where the cluster boundaries would be more or less arbitrary.
 -->
 
+```{r, echo=FALSE, results='hide'}
+rm(setdiff(ls(), all.basenames))
+gc()
+```
+
 # A more complex analysis on brain cell types
 
 ## Overview
@@ -707,6 +712,10 @@ data.frame(ByLibSize=sum(libsize.drop), ByFeature=sum(feature.drop),
     ByMito=sum(mito.drop), BySpike=sum(spike.drop), Remaining=ncol(sce))
 ```
 
+```{r echo=FALSE, results='hide'}
+gc()
+```
+
 Low-abundance genes are also removed by applying a simple mean-based filter.
 This yields fewer genes than in the HSC data set, mostly because the sequencing depth per cell is much lower.
 
@@ -714,6 +723,10 @@ This yields fewer genes than in the HSC data set, mostly because the sequencing 
 keep <- rowMeans(counts(sce)) >= 1
 sce <- sce[keep,]
 sum(keep)
+```
+
+```{r echo=FALSE, results='hide'}
+gc()
 ```
 
 Some data sets may contain strong heterogeneity in mitochondrial RNA content, possibly due to differences in mitochondrial copy number or activity between cell types.
@@ -726,7 +739,7 @@ Other candidates for removal include pseudogenes or ribosomal RNA/protein-coding
 sce <- sce[!fData(sce)$is_feature_control_Mt,]
 ```
 
-```{r echo=FALSE, results='hide', message=FALSE}
+```{r echo=FALSE, results='hide'}
 gc()
 ```
 
@@ -743,7 +756,7 @@ sce <- computeSumFactors(sce, cluster=clusters)
 sce <- normalize(sce)
 ```
 
-```{r echo=FALSE, results='hide', message=FALSE}
+```{r echo=FALSE, results='hide'}
 gc()
 ```
 
