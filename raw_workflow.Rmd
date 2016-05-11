@@ -1105,12 +1105,13 @@ Spike-in normalization will preserve this difference and may provide more accura
 Cell cycle phase is usually uninteresting in studies focusing on other aspects of biology.
 However, the effects of cell cycle on the expression profile can mask other effects and interfere with the interpretation of the results.
 This cannot be avoided by simply removing cell cycle marker genes, as the cell cycle can affect a substantial number of other transcripts [@buettner2015computational].
-Rather, a more sophisticated strategy is required -- this is demonstrated below using data from a study of T Helper 2 (Th2) cells [@mahata2014singlecell].
+Rather, a more sophisticated strategy is required, which is demonstrated below using data from a study of T Helper 2 (Th2) cells [@mahata2014singlecell].
 @buettner2015computational have already applied quality control and normalized the data, so we can use them directly as log-expression values (accessible as Supplementary Data 1 of https://dx.doi.org/10.1038/nbt.3102).
 
 ```{r}
 library(openxlsx)
 incoming <- read.xlsx("nbt.3102-S7.xlsx", sheet=1, rowNames=TRUE)
+incoming <- incoming[,!duplicated(colnames(incoming))] # Remove duplicated genes.
 sce <- newSCESet(exprsData=t(incoming))
 ```
 
@@ -1126,7 +1127,7 @@ set.seed(100)
 ```{r phaseplotth2, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the Th2 data set, where each point represents a cell."}
 anno <- select(org.Mm.eg.db, keys=rownames(sce), keytype="SYMBOL", column="ENSEMBL")
 ensembl <- anno$ENSEMBL[match(rownames(sce), anno$SYMBOL)]
-keep <- !is.na(ensembl)
+keep <- !is.na(ensembl) # Remove genes without ENSEMBL IDs.
 assignments <- cyclone(exprs(sce)[keep,], mm.pairs, gene.names=ensembl[keep])
 plot(assignments$score$G1, assignments$score$G2M, xlab="G1 score", ylab="G2/M score", pch=16)
 ```
@@ -1144,25 +1145,23 @@ table(hard.assign)
 
 We use `removeBatchEffect` to remove the effect of the (empirical) cell cycle phase on the gene expression profiles.
 The result of this procedure can be visualized with some PCA plots in Figure ((pcaplotth2)).
-Before removal, cells in the G1 and G2/M phases tend to be concentrated in different parts of the plot.
+Before removal, cells in the G1 and non-G1 phases tend to be concentrated in different parts of the plot.
 Afterwards, more intermingling is observed between the phases which suggests that the cell cycle effect has been mitigated.
 
-```{r pcaplotth2, fig.width=16, fig.height=8, fig.cap="PCA plots before (left) and after (right) removal of the cell cycle effect in the Th2 data set. Each point represents a cell, coloured according to the empirically assigned cell cycle phase. Only the top 500 HVGs were used to make the PCA plot before removal. Cells were projected onto the same PCA space after removal to facilitate comparisons between plots."}
-fit <- trendVar(sce, use.spikes=NA)
-top.hvgs <- order(fit$var, decreasing=TRUE)[1:500]
-pr.out <- prcomp(t(exprs(sce)[top.hvgs,]))
+```{r pcaplotth2, fig.width=16, fig.height=8, fig.cap="PCA plots before (left) and after (right) removal of the cell cycle effect in the Th2 data set. Each point represents a cell, coloured according to the empirically assigned cell cycle phase (G2/M and S phases were pooled prior to coloration, due to the low numbers of cells in each phase). Only the top 500 HVGs were used to make each PCA plot."}
+fit <- trendVar(sce, use.spikes=NA, trend="loess")
+dec <- decomposeVar(sce, fit)
+top.hvgs <- order(dec$bio, decreasing=TRUE)[1:500]
+pr.out <- prcomp(t(exprs(sce)[top.hvgs,]), scale=TRUE)
 corrected <- removeBatchEffect(exprs(sce), batch=hard.assign)
-pr.out2 <- predict(pr.out, t(corrected[top.hvgs,]))
+pr.out2 <- prcomp(t(corrected[top.hvgs,]), scale=TRUE)
 
 par(mfrow=c(1,2))
-xrange <- range(c(pr.out$x[,1], pr.out2[,1]))
-yrange <- range(c(pr.out$x[,2], pr.out2[,2]))
-colors <- c(G1="grey50", S="orange", G2M="red", unknown="dodgerblue")
-plot(pr.out$x[,1], pr.out$x[,2], col=colors[hard.assign], pch=16, xlab="PC1", ylab="PC2", 
-    main="Before removal", xlim=xrange, ylim=yrange)
-legend("bottomleft", legend=names(colors), col=colors, pch=16)
-plot(pr.out2[,1], pr.out2[,2], col=colors[hard.assign], pch=16, xlab="PC1", ylab="PC2", 
-    main="After removal", xlim=xrange, ylim=yrange)
+base.colors <- c(G1="grey50", "not G1"="red")
+colors <- base.colors[ifelse(hard.assign=="G1", 1, 2)]
+plot(pr.out$x[,1], pr.out$x[,2], col=colors, pch=16, xlab="PC1", ylab="PC2", main="Before removal")
+legend("bottomleft", legend=names(base.colors), col=base.colors, pch=16)
+plot(pr.out2$x[,1], pr.out2$x[,2], col=colors, pch=16, xlab="PC1", ylab="PC2", main="After removal")
 ```
 
 For other analyses (e.g., detecting DEGs or HVGs), the phase-corrected values from `removeBatchEffect` should not be used directly.
