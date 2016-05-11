@@ -570,7 +570,7 @@ This might be more robust than clustering for continuous trajectories where the 
 -->
 
 ```{r, echo=FALSE, results='hide'}
-rm(list=setdiff(ls(), "all.basenames"))
+rm(list=setdiff(ls(), c("all.basenames", "on.bioc")))
 gc()
 ```
 
