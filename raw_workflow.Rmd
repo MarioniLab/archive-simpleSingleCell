@@ -26,6 +26,9 @@ options(bitmapType="cairo", width=100)
 # Setting single-core unless explicitly specified otherwise.
 library(BiocParallel)
 register(SerialParam())
+
+# Deciding whether we want to re-download everything or not.
+on.bioc <- FALSE
 ```
 
 ```{r, message=FALSE, echo=FALSE, results='hide'}
@@ -41,6 +44,20 @@ library(openxlsx)
 library(R.utils)
 library(org.Mm.eg.db)
 library(TxDb.Mmusculus.UCSC.mm10.ensGene)
+```
+
+```{r, eval=on.bioc, echo=FALSE, results='hide'}
+all.urls <- c("https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE61533&format=file&file=GSE61533%5FHTSEQ%5Fcount%5Fresults%2Exls%2Egz", 
+"http://linnarssonlab.org/blobs/cortex/expression_mRNA_17-Aug-2014.txt", 
+"http://linnarssonlab.org/blobs/cortex/expression_mito_17-Aug-2014.txt", 
+"http://linnarssonlab.org/blobs/cortex/expression_spikes_17-Aug-2014.txt",
+"http://www.ebi.ac.uk/teichmann-srv/espresso/static/counttable_es.csv", 
+"http://www.nature.com/nbt/journal/v33/n2/extref/nbt.3102-S7.xlsx")
+all.basenames <- basename(all.urls)
+all.basenames[1] <- "GSE61533_HTSEQ_count_results.xls.gz"
+for (x in seq_along(all.urls)) { 
+    download.file(all.urls[x], all.basenames[x])
+}
 ```
 
 # Introduction
@@ -1228,6 +1245,10 @@ The workflow takes less than an hour and 5 GB of memory to run on a desktop comp
 sessionInfo()
 ```
 
+```{r, eval=on.bioc, echo=FALSE, results='hide'}
+unlink(all.basenames)
+```
+
 # Author contributions
 
 A.T.L.L. developed and tested the workflow on all data sets.
@@ -1240,6 +1261,7 @@ No competing interests were disclosed.
 # Grant information
 
 A.T.L.L. and J.C.M. were supported by core funding from Cancer Research UK (award no. A17197).
+J.C.M. was also supported by core funding from EMBL.
 
 # Acknowledgements
 
