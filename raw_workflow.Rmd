@@ -38,6 +38,7 @@ library(edgeR)
 library(scater)
 library(Rtsne)
 library(mvoutlier)
+library(destiny)
 library(gplots)
 library(gdata)
 library(openxlsx)
@@ -1131,7 +1132,18 @@ sce$assignments <- hard.assign
 table(hard.assign)
 ```
 
-We use `removeBatchEffect` to remove the effect of the (empirical) cell cycle phase on the gene expression profiles.
+We block on the (empirical) cell cycle phases in the design matrix prior to downstream analyses.
+The additional model coefficients will absorb any phase-related effects on expression such that they will not affect estimation of the effects of other experimental factors.
+Note that users should ensure that the phase is not confounded with other factors of interest.
+For example, model fitting is not possible if all cells in one experimental condition are in one phase, and all cells in another condition are in a different phase.
+
+```{r}
+design <- model.matrix(~ factor(hard.assign))
+fit.block <- trendVar(sce, use.spikes=NA, trend="loess", design=design)
+dec.block <- decomposeVar(sce, fit.block)
+```
+
+For downstream steps that do _not_ use a design matrix, we can use `removeBatchEffect` to remove the effect of cell cycle phase on the gene expression profiles.
 The result of this procedure can be visualized with some PCA plots in Figure ((pcaplotth2)).
 Before removal, cells in the G1 and non-G1 phases tend to be concentrated in different parts of the plot.
 Afterwards, more intermingling is observed between the phases which suggests that the cell cycle effect has been mitigated.
@@ -1141,8 +1153,10 @@ fit <- trendVar(sce, use.spikes=NA, trend="loess")
 dec <- decomposeVar(sce, fit)
 top.hvgs <- order(dec$bio, decreasing=TRUE)[1:500]
 pr.out <- prcomp(t(exprs(sce)[top.hvgs,]), scale=TRUE)
+
 corrected <- removeBatchEffect(exprs(sce), batch=hard.assign)
-pr.out2 <- prcomp(t(corrected[top.hvgs,]), scale=TRUE)
+top.hvgs2 <- order(dec.block$bio, decreasing=TRUE)[1:500]
+pr.out2 <- prcomp(t(corrected[top.hvgs2,]), scale=TRUE)
 
 par(mfrow=c(1,2))
 base.colors <- c(G1="grey50", "not G1"="red")
@@ -1152,14 +1166,16 @@ legend("bottomleft", legend=names(base.colors), col=base.colors, pch=16)
 plot(pr.out2$x[,1], pr.out2$x[,2], col=colors, pch=16, xlab="PC1", ylab="PC2", main="After removal")
 ```
 
-For other analyses (e.g., detecting DEGs or HVGs), the phase-corrected values from `removeBatchEffect` should not be used directly.
-Rather, an equivalent result can be obtained by blocking on the assigned phase in the design matrix.
-The additional model coefficients will absorb any phase-related effects on expression such that they will not affect estimation of the effects of other experimental factors.
-Note that users should ensure that the phase is not confounded with other factors of interest.
-For example, model fitting is not possible if all cells in one experimental condition are in one phase, and all cells in another condition are in a different phase.
+Note that, if an analysis can accept a design matrix, then blocking on nuisance factors in the design matrix is preferable to manipulating the expression values with `removeBatchEffect`.
+This is because the latter does not account for the loss of residual degrees of freedom, nor the uncertainty of estimation of the blocking factor terms.
 
-```{r}
-design <- model.matrix(~ factor(hard.assign))
+As an aside, this data set contains Th2 cells in various states of differentiation [@mahata2014singlecell].
+This is an ideal use case for diffusion maps which perform dimensionality reduction along a continuous process.
+In Figure ((diffusionth2)), cells are arranged along a trajectory corresponding to increasing levels of differentiation.
+This is evident from the left-to-right change in the expression levels of _Gata3_, which is a gene involved in Th2 differentiation.
+
+```{r diffusionth2, fig.cap="A diffusion map for the Th2 data set, where each cell is coloured by its expression of _Gata3_."}
+plotDiffusionMap(sce, colour_by="Gata3") + fontsize
 ```
 
 ```{r, echo=FALSE, results='hide'}
