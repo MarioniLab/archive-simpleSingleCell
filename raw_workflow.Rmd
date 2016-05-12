@@ -904,6 +904,8 @@ Correlated HVGs can also be used to construct a heatmap that can be inspected fo
 Here, we use the normalized log-expression values for the top HVGs that have significant correlations at a FDR of 5%.
 We also apply the `removeBatchEffect` function from the `r Biocpkg("limma")` package [@ritchie2015limma] to remove the tissue effect.
 This ensures that any differences due to the tissue of origin will not dominate the visualization of the expression profiles.
+(Note that, if an analysis method can accept a design matrix, then blocking on nuisance factors in the design matrix is preferable to manipulating the expression values with `removeBatchEffect`.
+This is because the latter does not account for the loss of residual degrees of freedom, nor the uncertainty of estimation of the blocking factor terms.)
 
 ```{r}
 chosen <- unique(c(var.cor$gene1[sig.cor], var.cor$gene2[sig.cor]))
@@ -1094,7 +1096,7 @@ Spike-in normalization will preserve this difference and may provide more accura
 Cell cycle phase is usually uninteresting in studies focusing on other aspects of biology.
 However, the effects of cell cycle on the expression profile can mask other effects and interfere with the interpretation of the results.
 This cannot be avoided by simply removing cell cycle marker genes, as the cell cycle can affect a substantial number of other transcripts [@buettner2015computational].
-Rather, a more sophisticated strategy is required, which is demonstrated below using data from a study of T Helper 2 (Th2) cells [@mahata2014singlecell].
+Rather, more sophisticated strategies are required, which are demonstrated below using data from a study of T Helper 2 (T~H~2) cells [@mahata2014singlecell].
 @buettner2015computational have already applied quality control and normalized the data, so we can use them directly as log-expression values (accessible as Supplementary Data 1 of https://dx.doi.org/10.1038/nbt.3102).
 
 ```{r}
@@ -1104,16 +1106,17 @@ incoming <- incoming[,!duplicated(colnames(incoming))] # Remove duplicated genes
 sce <- newSCESet(exprsData=t(incoming))
 ```
 
-We empirically identify the cell cycle phase using the pair-based classifier.
-The majority of cells in Figure ((phaseplotth2)) are assigned to the G1 or G2/M phases, with small numbers of cells in S-phase or without clear assignments.
+We empirically identify the cell cycle phase using the pair-based classifier in `cyclone`.
+The majority of cells in Figure ((phaseplotth2)) seem to lie in G1 phase, with small numbers of cells in the other phases.
 
 ```{r, echo=FALSE, results='hide', message=FALSE}
 mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", package="scran"))
 library(org.Mm.eg.db)
+fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
 set.seed(100)
 ```
 
-```{r phaseplotth2, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the Th2 data set, where each point represents a cell."}
+```{r phaseplotth2, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the T~H~2 data set, where each point represents a cell."}
 anno <- select(org.Mm.eg.db, keys=rownames(sce), keytype="SYMBOL", column="ENSEMBL")
 ensembl <- anno$ENSEMBL[match(rownames(sce), anno$SYMBOL)]
 keep <- !is.na(ensembl) # Remove genes without ENSEMBL IDs.
@@ -1121,61 +1124,43 @@ assignments <- cyclone(exprs(sce)[keep,], mm.pairs, gene.names=ensembl[keep])
 plot(assignments$score$G1, assignments$score$G2M, xlab="G1 score", ylab="G2/M score", pch=16)
 ```
 
-The assignment for each cell can be explicitly defined by applying a threshold of 0.5 on the scores.
-
-```{r}
-hard.assign <- rep("S", ncol(sce))
-hard.assign[assignments$score$G1 > 0.5] <- "G1"
-hard.assign[assignments$score$G2M > 0.5] <- "G2M"
-hard.assign[assignments$score$G1 > 0.5 & assignments$score$G2M > 0.5] <- "unknown"
-sce$assignments <- hard.assign
-table(hard.assign)
-```
-
-We block on the (empirical) cell cycle phases in the design matrix prior to downstream analyses.
-The additional model coefficients will absorb any phase-related effects on expression such that they will not affect estimation of the effects of other experimental factors.
-Note that users should ensure that the phase is not confounded with other factors of interest.
+We can block directly on the phase scores in downstream analyses, which is more graduated than using a strict assignment of each cell to a specific phase.
+This will absorb any phase-related effects on expression such that they will not affect estimation of the effects of other experimental factors.
+Note that users should ensure that the phase score is not confounded with other factors of interest.
 For example, model fitting is not possible if all cells in one experimental condition are in one phase, and all cells in another condition are in a different phase.
 
 ```{r}
-design <- model.matrix(~ factor(hard.assign))
+design <- model.matrix(~ G1 + G2M, assignments$score)
 fit.block <- trendVar(sce, use.spikes=NA, trend="loess", design=design)
 dec.block <- decomposeVar(sce, fit.block)
 ```
 
-For downstream steps that do _not_ use a design matrix, we can use `removeBatchEffect` to remove the effect of cell cycle phase on the gene expression profiles.
+For analyses that do not use design matrices, we can remove the cell cycle effect directly from the expression values using `removeBatchEffect`.
 The result of this procedure can be visualized with some PCA plots in Figure ((pcaplotth2)).
 Before removal, cells in the G1 and non-G1 phases tend to be concentrated in different parts of the plot.
 Afterwards, more intermingling is observed between the phases which suggests that the cell cycle effect has been mitigated.
 
-```{r pcaplotth2, fig.width=16, fig.height=8, fig.cap="PCA plots before (left) and after (right) removal of the cell cycle effect in the Th2 data set. Each point represents a cell, coloured according to the empirically assigned cell cycle phase (G2/M and S phases were pooled prior to coloration, due to the low numbers of cells in each phase). Only the top 500 HVGs were used to make each PCA plot."}
+```{r pcaplotth2, fig.width=12, fig.height=6, fig.cap="PCA plots before (left) and after (right) removal of the cell cycle effect in the T~H~2 data set. Each point represents a cell, coloured according to its G1 score. Only the top 500 HVGs were used to make each PCA plot."}
 fit <- trendVar(sce, use.spikes=NA, trend="loess")
 dec <- decomposeVar(sce, fit)
 top.hvgs <- order(dec$bio, decreasing=TRUE)[1:500]
-pr.out <- prcomp(t(exprs(sce)[top.hvgs,]), scale=TRUE)
+sce$G1score <- assignments$score$G1
+out <- plotPCA(sce, select=top.hvgs, colour_by="G1score") + fontsize + ggtitle("Before removal")
 
-corrected <- removeBatchEffect(exprs(sce), batch=hard.assign)
 top.hvgs2 <- order(dec.block$bio, decreasing=TRUE)[1:500]
-pr.out2 <- prcomp(t(corrected[top.hvgs2,]), scale=TRUE)
-
-par(mfrow=c(1,2))
-base.colors <- c(G1="grey50", "not G1"="red")
-colors <- base.colors[ifelse(hard.assign=="G1", 1, 2)]
-plot(pr.out$x[,1], pr.out$x[,2], col=colors, pch=16, xlab="PC1", ylab="PC2", main="Before removal")
-legend("bottomleft", legend=names(base.colors), col=base.colors, pch=16)
-plot(pr.out2$x[,1], pr.out2$x[,2], col=colors, pch=16, xlab="PC1", ylab="PC2", main="After removal")
+corrected <- removeBatchEffect(exprs(sce), covariates=assignments$score[,c("G1", "G2M")])
+sce2 <- newSCESet(exprsData=corrected, phenoData=phenoData(sce))
+out2 <- plotPCA(sce2, select=top.hvgs2, colour_by="G1score") + fontsize + ggtitle("After removal")
+multiplot(out, out2, cols=2)
 ```
 
-Note that, if an analysis can accept a design matrix, then blocking on nuisance factors in the design matrix is preferable to manipulating the expression values with `removeBatchEffect`.
-This is because the latter does not account for the loss of residual degrees of freedom, nor the uncertainty of estimation of the blocking factor terms.
+As an aside, this data set contains cells at various stages of differentiation [@mahata2014singlecell].
+This is an ideal use case for diffusion maps, which perform dimensionality reduction along a continuous process.
+In Figure ((diffusionth2)), cells are arranged along a trajectory in the low-dimensional space.
+The first diffusion component is likely to correspond to T~H~2 differentiation, given that a key regulator _Gata3_ [@zhu2006gata3] changes in expression from left to right.
 
-As an aside, this data set contains Th2 cells in various states of differentiation [@mahata2014singlecell].
-This is an ideal use case for diffusion maps which perform dimensionality reduction along a continuous process.
-In Figure ((diffusionth2)), cells are arranged along a trajectory corresponding to increasing levels of differentiation.
-This is evident from the left-to-right change in the expression levels of _Gata3_, which is a gene involved in Th2 differentiation.
-
-```{r diffusionth2, fig.cap="A diffusion map for the Th2 data set, where each cell is coloured by its expression of _Gata3_."}
-plotDiffusionMap(sce, colour_by="Gata3") + fontsize
+```{r diffusionth2, fig.cap="A diffusion map for the T~H~2 data set, where each cell is coloured by its expression of _Gata3_."}
+plotDiffusionMap(sce2, colour_by="Gata3") + fontsize
 ```
 
 ```{r, echo=FALSE, results='hide'}
