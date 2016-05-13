@@ -1248,6 +1248,7 @@ sessionInfo()
 
 ```{r, eval=on.bioc, echo=FALSE, results='hide'}
 unlink(all.basenames)
+unlink("GSE61533_HTSEQ_count_results.xls")
 ```
 
 # Author contributions
