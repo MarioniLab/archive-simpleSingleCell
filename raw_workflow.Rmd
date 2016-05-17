@@ -193,8 +193,13 @@ spike.drop <- isOutlier(sce$pct_counts_feature_controls_Spike, n=3, type="higher
 
 Subsetting by column will retain only the high-quality cells that pass each filter described above.
 We can examine the number of cells removed by each filter, and the total number remaining in the data set.
-If many cells are removed, this may be indicative of an overall issue with data quality.
+Removal of a substantial proportion of cells (> 10%) may be indicative of an overall issue with data quality.
 It may also reflect genuine biology in extreme cases (e.g., low numbers of expressed genes in erythrocytes) for which the filters described here are not appropriate.
+
+<!-- 
+There's an additional implicit assumption that these technical metrics are homogeneous across cells.
+That won't be true for extreme cases like erythrocytes.
+-->
 
 ```{r}
 sce <- sce[,!(libsize.drop | feature.drop | mito.drop | spike.drop)]
