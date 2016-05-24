@@ -498,7 +498,8 @@ In the simplest example, a subpopulation would be positive for one marker and ne
 For further analyses, we focus on the significantly correlated HVGs for which any substructure should be most pronounced.
 This may allow us to identify subpopulations that would have otherwise been masked by random noise in the expression profiles.
 (Even greater resolution can be achieved by looking at one or more subsets of correlated HVGs, identified above as the highly connected subgraphs. 
-This focuses on specific aspects of biology corresponding to the genes in the selected subsets, that might have been otherwise masked by stronger effects in the data, e.g., metabolic state being masked by cell type.)
+This focuses on specific aspects of biology that might have been otherwise masked by stronger effects in the data, e.g., metabolic state being masked by cell type.
+However, this requires some pre-existing knowledge to determine which genes are relevant and which subsets should be used.)
 
 ```{r}
 chosen <- unique(c(var.cor$gene1[sig.cor], var.cor$gene2[sig.cor]))
