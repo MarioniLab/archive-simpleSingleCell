@@ -992,14 +992,14 @@ The same process can be repeated for each cluster by changing `chosen.clust`, to
 
 ```{r}
 result.logFC <- result.PValue <- list()
-chosen.clust <- 2
-for (clust in as.integer(levels(cluster))) {
+chosen.clust <- which(levels(cluster)=="2") # character, as 'cluster' is a factor.
+for (clust in seq_len(nlevels(cluster))) {
     if (clust==chosen.clust) { next }
     contrast <- numeric(ncol(design))
     contrast[chosen.clust] <- 1
     contrast[clust] <- -1
     res <- glmLRT(fit, contrast=contrast)
-    con.name <- paste0('vs.', clust)
+    con.name <- paste0('vs.', levels(cluster)[clust])
     result.logFC[[con.name]] <- res$table$logFC
     result.PValue[[con.name]] <- res$table$PValue
 }
@@ -1035,6 +1035,35 @@ heat.vals <- norm.exprs - rowMeans(norm.exprs)
 heatmap.2(heat.vals, col=bluered, symbreak=TRUE, trace='none', cexRow=1,
     ColSideColors=clust.col[my.clusters], Colv=as.dendrogram(my.tree), dendrogram='none')
 legend("bottomleft", col=clust.col, legend=sort(unique(my.clusters)), pch=16)
+```
+
+An alternative approach is to identify DE genes across _any_ clusters using an ANOVA-like contrast.
+This is less stringent than identifying markers for a specific cluster, which may overlook important genes that are expressed in two or more clusters.
+(For example, in a mixed population of CD4^+^-only, CD8^+^-only, double-positive and double-negative T-cells, neither _Cd4_ or _Cd8_ would be detected as subpopulation-specific markers because each gene is expressed in two subpopulations.)
+Here, we report the log-fold changes for each cluster against the average of all other clusters for each gene.
+This facilitates interpretation of the results as the relevant cluster(s) expressing each gene can be quickly determined.
+
+```{r}
+# Automatic construction of the contrast matrix.
+nclusters <- nlevels(cluster)
+contrast.matrix <- matrix(0, ncol(design), nclusters) 
+contrast.matrix[1,] <- -1 
+diag(contrast.matrix) <- 1
+contrast.matrix <- contrast.matrix[,-1]
+res.any <- glmLRT(fit, contrast=contrast.matrix)
+
+# Computing log-fold changes between each cluster and the average of the rest.
+cluster.expression <- fit$coefficients[,seq_len(nclusters)] 
+other.expression <- (rowSums(cluster.expression) - cluster.expression)/(nclusters-1)
+log.fold.changes <- cluster.expression - other.expression
+colnames(log.fold.changes) <- paste0("LogFC.for.", levels(cluster))
+rownames(log.fold.changes) <- NULL
+
+# Ordering by the likelihood ratio; p-values affected by numerical imprecision.
+any.de <- data.frame(Gene=rownames(y), log.fold.changes, 
+    LR=res.any$table$LR, stringsAsFactors=FALSE)
+any.de <- any.de[order(any.de$LR, decreasing=TRUE),]
+head(any.de)
 ```
 
 It must be stressed that the _p_-values cannot be interpreted as measures of significance.
