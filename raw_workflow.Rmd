@@ -497,6 +497,8 @@ In the simplest example, a subpopulation would be positive for one marker and ne
 
 For further analyses, we focus on the significantly correlated HVGs for which any substructure should be most pronounced.
 This may allow us to identify subpopulations that would have otherwise been masked by random noise in the expression profiles.
+(Even greater resolution can be achieved by looking at one or more subsets of correlated HVGs, identified above as the highly connected subgraphs. 
+This focuses on specific aspects of biology corresponding to the genes in the selected subsets, that might have been otherwise masked by stronger effects in the data, e.g., metabolic state being masked by cell type.)
 
 ```{r}
 chosen <- unique(c(var.cor$gene1[sig.cor], var.cor$gene2[sig.cor]))
@@ -541,8 +543,9 @@ Further analyses can then be performed on those empirical clusters -- for exampl
 
 That being said, users should treat clustering results with some caution.
 It is difficult to maintain statistical rigour during clustering to protect against the formation of spurious clusters.
-As such, determining whether a cluster is "real" or not usually depends on subjective judgement, unless the clusters are very clearly defined (e.g., strong separation on a PCA plot, widespread differences in the expression profiles).
+As such, determining whether a cluster is "real" or not usually depends on subjective judgement, unless the clusters are very clearly defined (i.e., strong separation on a PCA plot, widespread differences in the expression profiles).
 Moreover, different algorithms can yield substantially different clusters by focusing on different aspects of the data.
+Some genes may support clustering based on cell type, whereas others may support clustering based on metabolic state, immune activation status, cell cycle, and so on.
 In short, experimental validation of the clustering results is critical to ensure that the putative subpopulations actually exist.
 
 Finally, dimensionality reduction can be applied using only the set of correlated HVGs to highlight any substructure that might be present.
