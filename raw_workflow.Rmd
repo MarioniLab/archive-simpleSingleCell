@@ -48,7 +48,7 @@ library(TxDb.Mmusculus.UCSC.mm10.ensGene)
 ```
 
 ```{r, eval=on.bioc, echo=FALSE, results='hide'}
-all.urls <- c("https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE61533&format=file&file=GSE61533%5FHTSEQ%5Fcount%5Fresults%2Exls%2Egz", 
+all.urls <- c("http://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE61533&format=file&file=GSE61533%5FHTSEQ%5Fcount%5Fresults%2Exls%2Egz", 
 "http://linnarssonlab.org/blobs/cortex/expression_mRNA_17-Aug-2014.txt", 
 "http://linnarssonlab.org/blobs/cortex/expression_mito_17-Aug-2014.txt", 
 "http://linnarssonlab.org/blobs/cortex/expression_spikes_17-Aug-2014.txt",
@@ -56,8 +56,10 @@ all.urls <- c("https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE61533&format=fi
 "http://www.nature.com/nbt/journal/v33/n2/extref/nbt.3102-S7.xlsx")
 all.basenames <- basename(all.urls)
 all.basenames[1] <- "GSE61533_HTSEQ_count_results.xls.gz"
+all.modes <- rep("w", length(all.urls))
+all.modes[c(1, 6)] <- "wb"
 for (x in seq_along(all.urls)) { 
-    download.file(all.urls[x], all.basenames[x])
+    download.file(all.urls[x], all.basenames[x], mode=all.modes[x])
 }
 ```
 
@@ -578,7 +580,7 @@ This might be more robust than clustering for continuous trajectories where the 
 -->
 
 ```{r, echo=FALSE, results='hide'}
-rm(list=setdiff(ls(), c("all.basenames", "on.bioc")))
+rm(sce, all.counts)
 gc()
 ```
 
@@ -714,6 +716,7 @@ gc()
 
 Low-abundance genes are also removed by applying a simple mean-based filter.
 This yields fewer genes than in the HSC data set, mostly because the sequencing depth per cell is much lower.
+While more genes can be retained by decreasing the threshold, the extra genes usually do not have enough information to contribute to downstream analyses.
 
 ```{r}
 keep <- rowMeans(counts(sce)) >= 1
