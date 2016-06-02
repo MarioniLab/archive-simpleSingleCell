@@ -226,10 +226,15 @@ Users interested in the more sophisticated approaches are referred to the `r Bio
 
 ## Filtering out low-abundance genes
 
-Low-abundance genes are removed as the counts are too low for reliable statistical inferences.
+Low-abundance genes are problematic as zero or near-zero counts do not contain enough information for reliable statistical inference.
 In addition, the discreteness of the counts may interfere with downstream statistical procedures, e.g., by compromising the accuracy of asymptotic approximations.
-Here, low-abundance genes are defined as those with an average count across cells below 1.
-Removing them avoids problems with discreteness and also reduces the amount of computational work.
+Here, low-abundance genes are defined as those with an average count below 1.
+This threshold is chosen as genes with lower averages are more likely to be dominated by zero counts (based roughly on a negative binomial distribution for the counts).
+Removing such genes mitigates discreteness and reduces the amount of computational work without major loss of information.
+
+<!--
+Simulations indicate that number of zeros from a NB with mean of 1 and dispersion of 1 is ~50%, e.g., sum(rnbinom(1000, mu=1, size=1)==0)
+-->
 
 ```{r}
 keep <- rowMeans(counts(sce)) >= 1
@@ -259,6 +264,11 @@ In general, we prefer the mean-based filter as it tends to be less aggressive.
 A gene will be retained as long as it has sufficient expression in any subset of cells.
 The "at least _n_" filter depends heavily on the choice of _n_ -- in this case, a gene expressed in a subset of 9 cells would be lost.
 While the mean-based filter will retain more outlier-driven genes, this can be handled by choosing methods that are robust to outliers in the downstream analyses.
+
+<!--
+The mean-based filter also means that, if a gene is only expressed in 'p' proportion of cells, then the expression in each cell must be '1/p' to be retained.
+This makes sense; the fewer cells a gene is expressed in, the more highly that gene must be expressed in order for us to believe that it's not just noise.
+-->
 
 ## Normalization of cell-specific biases
 
@@ -455,7 +465,7 @@ Note that we only apply this function for the top set of HVGs -- doing so for al
 ```{r}
 set.seed(100)
 var.cor <- correlatePairs(sce[top.hvgs[1:200],])
-write.table(file="hsc_cor.tsv", var.cor, sep="\t", quote=FALSE, col.names=NA)
+write.table(file="hsc_cor.tsv", var.cor, sep="\t", quote=FALSE, row.names=FALSE)
 head(var.cor)
 ```
 
@@ -719,11 +729,18 @@ gc()
 ```
 
 Low-abundance genes are also removed by applying a simple mean-based filter.
-This yields fewer genes than in the HSC data set, mostly because the sequencing depth per cell is much lower.
-While more genes can be retained by decreasing the threshold, the extra genes usually do not have enough information to contribute to downstream analyses.
+We use a lower threshold for UMI counts compared to that used for read counts.
+This is because the number of transcript molecules will always be lower than the number of reads generated from such molecules.
+(The technical noise is also lower, which reduces the risk of being dominated by zeroes and allows retention of genes with lower means.)
+Even so, the number of retained genes is lower than that in the HSC data set, simply because the library sizes are much smaller for UMI counts.
+
+<!--
+sum(rpois(1000, lambda=0.5)==0) # around 50-60%.
+Also interpretable as you need at least expression in half of your cells; genes that are lost won't even have that.
+-->
 
 ```{r}
-keep <- rowMeans(counts(sce)) >= 1
+keep <- rowMeans(counts(sce)) >= 0.5
 sce <- sce[keep,]
 sum(keep)
 ```
@@ -908,7 +925,7 @@ These results are also saved to file for use in designing validation experiments
 ```{r}
 set.seed(100)
 var.cor <- correlatePairs(sce[top.hvgs[1:200],], design=design)
-write.table(file="brain_cor.tsv", var.cor, sep="\t", quote=FALSE, col.names=NA)
+write.table(file="brain_cor.tsv", var.cor, sep="\t", quote=FALSE, row.names=FALSE)
 head(var.cor)
 sig.cor <- var.cor$FDR <= 0.05
 sum(sig.cor)
