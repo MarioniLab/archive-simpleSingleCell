@@ -103,10 +103,10 @@ The only additional consideration is that the spike-in information must be inclu
 Typically, spike-in sequences can be included as additional FASTA files during genome index building prior to alignment, while genomic intervals for both spike-in transcripts and endogenous genes can be concatenated into a single GTF file prior to counting.
 For users favouring a R-based approach to read alignment and counting, we suggest using the methods in the `r Biocpkg("Rsubread")` package [@liao2013subread;@liao2014featurecounts].
 
-## Count loading and quality control
+## Count loading
 
 The first task is to load the count matrix into memory.
-This requires some work to decompress and retreive the data from the Excel format.
+In this case, some work is required to decompress and retreive the data from the Excel format.
 Each row of the matrix represents an endogenous gene or a spike-in transcript, and each column represents a single HSC.
 For convenience, the counts for spike-in transcripts and endogenous genes are stored in a `SCESet` object from the `r Biocpkg("scater")` package.
 
@@ -122,17 +122,32 @@ dim(sce)
 
 We annotate those rows corresponding to ERCC spike-ins and mitochondrial genes.
 This information can be easily extracted from the row names, though in general, identifying mitochondrial genes from standard identifiers like Ensembl requires extra annotation.
-For each cell, we calculate quality control metrics such as the total number of counts or the proportion of counts in mitochondrial genes or spike-in transcripts.
-These metrics are stored in the `pData` of the `SCESet` for future reference.
 
 ```{r}
 is.spike <- grepl("^ERCC", rownames(sce))
-isSpike(sce) <- is.spike
 is.mito <- grepl("^mt-", rownames(sce))
-sce <- calculateQCMetrics(sce, feature_controls=list(Spike=is.spike, Mt=is.mito))
+```
+
+For each cell, we calculate quality control metrics such as the total number of counts or the proportion of counts in mitochondrial genes or spike-in transcripts.
+These are stored in the `pData` of the `SCESet` for future reference.
+
+```{r}
+asdasd
+sce <- calculateQCMetrics(sce, feature_controls=list(ERCC=is.spike, Mt=is.mito))
 head(colnames(pData(sce)))
 ```
 
+We need to explicitly indicate that the ERCC set is, in fact, a spike-in set.
+This is necessary as spike-ins require special treatment in some downstream steps (e.g., normalization, see below).
+We can do this easily by indicating the name of the spike-in set to `isSpike`.
+
+```{r}
+isSpike(sce) <- "ERCC"
+```
+
+## Quality control on the cells 
+
+Low-quality cells need to removed to ensure that technical effects do not distort downstream analysis results.
 Two common measures of cell quality are the library size and the number of expressed features in each library.
 The library size is defined as the total sum of counts across all features, i.e., genes and spike-in transcripts.
 Cells with small library sizes are considered to be of low quality as the RNA has not been efficiently captured (i.e., converted into cDNA and amplified) during library preparation.
@@ -178,7 +193,7 @@ We don't have to worry about effects of e.g. an increase in mitochondrial counts
 par(mfrow=c(1,2))
 hist(sce$pct_counts_feature_controls_Mt, xlab="Mitochondrial proportion (%)", 
     ylab="Number of cells", breaks=20, main="", col="grey80")
-hist(sce$pct_counts_feature_controls_Spike, xlab="ERCC proportion (%)", 
+hist(sce$pct_counts_feature_controls_ERCC, xlab="ERCC proportion (%)", 
     ylab="Number of cells", breaks=20, main="", col="grey80")
 ```
 
@@ -190,7 +205,7 @@ We use the MAD-based definition of outliers to remove putative low-quality cells
 
 ```{r}
 mito.drop <- isOutlier(sce$pct_counts_feature_controls_Mt, n=3, type="higher")
-spike.drop <- isOutlier(sce$pct_counts_feature_controls_Spike, n=3, type="higher")
+spike.drop <- isOutlier(sce$pct_counts_feature_controls_ERCC, n=3, type="higher")
 ```
 
 Subsetting by column will retain only the high-quality cells that pass each filter described above.
@@ -237,9 +252,18 @@ Simulations indicate that number of zeros from a NB with mean of 1 and dispersio
 -->
 
 ```{r}
-keep <- rowMeans(counts(sce)) >= 1
+ave.counts <- rowMeans(counts(sce))
+keep <- ave.counts >= 1
 sce <- sce[keep,] 
 sum(keep)
+```
+
+We can also have a look at the identities of the top set of retained high-abundance genes.
+This should generally be dominated by constitutively expressed transcripts, such as those for ribosomal or mitochondrial proteins, actin and histones.
+If other features are present, e.g., pseudogenes or predicted transcripts, this may be indicative of some upstream processing error.
+
+```{r}
+sort(ave.counts, decreasing=TRUE)[1:50]
 ```
 
 An alternative approach to gene filtering is to select genes that have non-zero counts in at least _n_ cells. 
@@ -272,6 +296,8 @@ This makes sense; the fewer cells a gene is expressed in, the more highly that g
 
 ## Normalization of cell-specific biases
 
+### Using the deconvolution method to deal with zero counts
+
 Read counts are subject to differences in capture efficiency and sequencing depth between cells [@stegle2015computational].
 Normalization is required to eliminate these cell-specific biases prior to downstream quantitative analyses.
 This is often done by assuming that most genes are not differentially expressed (DE) between cells.
@@ -298,9 +324,35 @@ plot(sizeFactors(sce), sce$total_counts/1e6, log="xy",
     ylab="Library size (millions)", xlab="Size factor")
 ```
 
+### Computing separate size factors for spike-in transcripts
+
+The size factors computed from gene counts include differences in total RNA content between cells.
+Specifically, cells with more RNA will have greater counts and, thus, larger size factors to scale down those counts.
+However, the same amount of spike-in RNA is added to each cell, regardless of the quantity of endogenous RNA.
+This means that the counts for spike-in transcripts are not subject to the effects of RNA content.
+Attempting to normalize the spike-in counts with the gene-based size factors will lead to over-normalization and incorrect quantification.
+
+To avoid this, we compute a separate set of size factors for each set of spike-ins.
+For each cell, the spike-in-specific size factor is defined as the total count across all transcripts in the spike-in set.
+This assumes that all spike-in transcripts are not differentially expressed -- which is a reasonable assumption, as the same spike-ins should have been added to each cell.
+(See below for a more detailed discussion on spike-in normalization.)
+These size factors are stored in the `SCESet` object and will be used instead of the gene-based factors in downstream analyses.
+
+```{r}
+sizeFactors(sce, type="ERCC") <- computeSpikeFactors(sce, type="ERCC", sf.out=TRUE)
+```
+
+### Applying the size factors to normalize gene expression
+
 Normalized log-expression values can be computed for use in downstream analyses.
-Each value is defined as the log-ratio of each count to the size factor for the corresponding cell (after adding a small prior count to avoid undefined values at zero counts).
+Each value is defined as the log-ratio of each count to the size factor for the corresponding cell, after adding a small prior count to avoid undefined values at zero counts.
 Division by the size factor ensures that any cell-specific biases are removed.
+In addition, spike-in transcripts will be normalized separately from the endogenous genes if specific size factors are present in `sce`.
+
+```{r}
+sce <- normalize(sce)
+```
+
 The log-transformation provides some measure of variance stabilization [@law2014voom], so that high-abundance genes with large variances do not dominate downstream analyses.
 The computed values are stored as an `exprs` matrix in addition to the other assay elements.
 
@@ -308,10 +360,6 @@ The computed values are stored as an `exprs` matrix in addition to the other ass
 Specifically, variance stabilization for NB-distributed counts with a constant dispersion but a variable mean. 
 This seems better than square-rooting it, which only works for the Poisson.
 -->
-
-```{r}
-sce <- normalize(sce)
-```
 
 ## Data exploration with dimensionality reduction techniques
 
@@ -665,7 +713,6 @@ We also add annotation identifying which rows correspond to each class of featur
 ```{r}
 nrows <- c(nrow(endo.data$counts), nrow(mito.data$counts), nrow(spike.data$counts))
 is.spike <- rep(c(FALSE, FALSE, TRUE), nrows)
-isSpike(sce) <- is.spike
 is.mito <- rep(c(FALSE, TRUE, FALSE), nrows)
 ```
 
@@ -682,6 +729,7 @@ Nonetheless, we can compute some metrics to check that whether the remaining cel
 
 ```{r}
 sce <- calculateQCMetrics(sce, feature_controls=list(Spike=is.spike, Mt=is.mito)) 
+isSpike(sce) <- "Spike"
 ```
 
 We examine the distribution of library sizes and numbers of expressed genes across cells (Figure ((libplotbrain))).
@@ -1271,7 +1319,8 @@ All of this information can be consolidated into a `SCESet` object for further m
 anno <- anno[,-1,drop=FALSE]
 rownames(anno) <- my.ids
 sce <- newSCESet(countData=incoming, featureData=AnnotatedDataFrame(anno))
-isSpike(sce) <- is.spike
+sce <- calculateQCMetrics(sce, feature_controls=list(ERCC=is.spike))
+isSpike(sce) <- "ERCC"
 ```
 
 We remove rows that do not correspond to endogenous genes or spike-in transcripts.
