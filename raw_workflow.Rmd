@@ -82,7 +82,7 @@ In addition, scRNA-seq data can be used to study cell-to-cell heterogeneity, e.g
 This is simply not possible with bulk data, such that custom methods are required to perform these analyses. 
 
 This article describes a computational workflow for basic analysis of scRNA-seq data using software packages from the open-source Bioconductor project [@huber2015orchestrating].
-Starting from a count matrix, this workflow contains the steps required for quality control to remove problematic cells; normalization of cell-specific biases, with and without spike-ins; cell-cycle phase classification from gene expression data; data exploration to identify putative subpopulations; and finally, HVG and DEG identification to prioritize interesting genes.
+Starting from a count matrix, this workflow contains the steps required for quality control to remove problematic cells; normalization of cell-specific biases, with and without spike-ins; cell cycle phase classification from gene expression data; data exploration to identify putative subpopulations; and finally, HVG and DEG identification to prioritize interesting genes.
 The application of different steps in the workflow will be demonstrated on several public scRNA-seq data sets involving haematopoietic stem cells, brain-derived cells, T-helper cells and mouse embryonic stem cells, generated with a range of experimental protocols and platforms [@wilson2015combined;@zeisel2015brain;@buettner2015computational;@kolod2015singlecell].
 The aim is to provide a variety of modular usage examples that can be applied to construct custom analysis pipelines.
 
@@ -811,17 +811,16 @@ sce <- sce[!fData(sce)$is_feature_control_Mt,]
 gc()
 ```
 
-## Normalization and cell-cycle classification
+## Normalization of cell-specific biases
 
 Normalization of cell-specific biases is performed using the deconvolution method in the `computeSumFactors` function.
 Here, we cluster similar cells together and normalize the cells in each cluster using the deconvolution method.
-This improves the accuracy of normalization by reducing the number of DE genes between cells in the same cluster.
-Normalization between clusters is then performed to ensure that expression values from cells in different clusters are comparable.
+This improves normalization accuracy by reducing the number of DE genes between cells in the same cluster.
+Scaling is then performed to ensure that size factors of cells in different clusters are comparable.
 
 ```{r}
 clusters <- quickCluster(sce)
 sce <- computeSumFactors(sce, cluster=clusters)
-sce <- normalize(sce)
 ```
 
 ```{r echo=FALSE, results='hide'}
@@ -837,7 +836,21 @@ plot(sizeFactors(sce), sce$total_counts/1e3, log="xy",
     ylab="Library size (thousands)", xlab="Size factor")
 ```
 
-We also attempt to classify cells into cell cycle phases using the `cyclone` method.
+We also compute size factors specific to the spike-in set, as previously described.
+
+```{r}
+sizeFactors(sce, type="Spike") <- computeSpikeFactors(sce, type="Spike", sf.out=TRUE)
+```
+
+Finally, normalized log-expression values are computed for each endogenous gene or spike-in transcript using the appropriate size factors.
+
+```{r}
+sce <- normalize(sce)
+```
+
+## Cell cycle classification
+
+We attempt to classify cells into cell cycle phases using the `cyclone` method.
 However, examination of Figure ((phaseplotbrain)) indicates that many of the G1 and G2/M scores are ambiguous.
 This highlights the potential difficulties of training a classifier on one cell type (mouse embryonic stem cells -- see @scialdone2015computational for more details) and applying it on a substantially different cell type.
 Some neuron types are particularly problematic as they are postmitotic and do not belong in any phase of the cell cycle.
@@ -1183,6 +1196,14 @@ deconv.sf <- sizeFactors(sce)
 sce <- computeSpikeFactors(sce)
 ```
 
+Applying `normalize` will use the spike-in-based size factors to compute normalized log-expression values.
+We do not have to additionally set spike-in-specific size factors, as these are already being used for all genes and spike-in transcripts.
+(The exception is if there are multiple spike-in sets used in the experiment, that behave differently and need to be normalized separately.)
+
+```{r}
+sce <- normalize(sce)
+```
+
 Both non-DE methods (like deconvolution) and spike-in normalization will capture technical biases such as sequencing depth and capture efficiency.
 Indeed, Figure ((normplotspikehsc)) shows a rough positive correlation between the two sets of size factors, consistent with removal of technical biases by both methods.
 However, differences between the two sets are still present and are attributable to variability in total RNA content across the HSC population.
@@ -1199,7 +1220,7 @@ This may not always be appropriate if total RNA is associated with a biological 
 For example, @islam2011characterization describe a 5-fold difference in total RNA between mouse embyronic stem cells and fibroblasts.
 Spike-in normalization will preserve this difference and may provide more accurate quantification in downstream analyses.
 
-## Blocking on the cell-cycle phase
+## Blocking on the cell cycle phase
 
 Cell cycle phase is usually uninteresting in studies focusing on other aspects of biology.
 However, the effects of cell cycle on the expression profile can mask other effects and interfere with the interpretation of the results.
