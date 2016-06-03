@@ -694,11 +694,11 @@ hist(sce$total_features, xlab="Number of expressed genes", main="",
     breaks=20, col="grey80", ylab="Number of cells")
 ```
 
-We also examine the distribution of the proportions of total reads mapped to mitochondrial genes or spike-in transcripts (Figure ((controlplotbrain))).
+We also examine the distribution of the proportions of UMIs assigned to mitochondrial genes or spike-in transcripts (Figure ((controlplotbrain))).
 Note that the spike-in proportions here are more variable than in the HSC data set.
 This may reflect a greater variability in the total amount of endogenous RNA per cell when many cell types are present.
 
-```{r controlplotbrain, fig.width=12, fig.height=6, fig.cap="Histogram of the proportion of reads mapped to mitochondrial genes (left) or spike-in transcripts (right) across all cells in the brain data set."}
+```{r controlplotbrain, fig.width=12, fig.height=6, fig.cap="Histogram of the proportion of UMIs assigned to mitochondrial genes (left) or spike-in transcripts (right) across all cells in the brain data set."}
 par(mfrow=c(1,2))
 hist(sce$pct_counts_feature_controls_Mt, xlab="Mitochondrial proportion (%)", 
     ylab="Number of cells", breaks=20, main="", col="grey80")
@@ -996,7 +996,7 @@ The size factors are divided by the library sizes to obtain normalization factor
 y <- convertTo(sce)
 ```
 
-`r Biocpkg("edgeR")` uses negative binomial (NB) distributions to model the read counts for each sample.
+`r Biocpkg("edgeR")` uses negative binomial (NB) distributions to model the read/UMI counts for each sample.
 We estimate the NB dispersion parameter that quantifies the biological variability in expression across cells in the same cluster.
 Large dispersion estimates above 0.5 are often observed in scRNA-seq data due to technical noise, in contrast to bulk data where values of 0.05-0.2 are more typical.
 We then use the design matrix to fit a NB GLM to the counts for each gene [@mccarthy2012differential].
