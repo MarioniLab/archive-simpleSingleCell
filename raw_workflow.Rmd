@@ -132,7 +132,6 @@ For each cell, we calculate quality control metrics such as the total number of 
 These are stored in the `pData` of the `SCESet` for future reference.
 
 ```{r}
-asdasd
 sce <- calculateQCMetrics(sce, feature_controls=list(ERCC=is.spike, Mt=is.mito))
 head(colnames(pData(sce)))
 ```
@@ -244,7 +243,7 @@ Users interested in the more sophisticated approaches are referred to the `r Bio
 Low-abundance genes are problematic as zero or near-zero counts do not contain enough information for reliable statistical inference.
 In addition, the discreteness of the counts may interfere with downstream statistical procedures, e.g., by compromising the accuracy of asymptotic approximations.
 Here, low-abundance genes are defined as those with an average count below 1.
-This threshold is chosen as genes with lower averages are more likely to be dominated by zero counts (based roughly on a negative binomial distribution for the counts).
+This threshold is chosen as genes with lower averages are more likely to be dominated by zero counts (based roughly on a negative binomial model for technical noise in the counts).
 Removing such genes mitigates discreteness and reduces the amount of computational work without major loss of information.
 
 <!--
@@ -273,7 +272,7 @@ Such outliers are typically uninteresting as they can arise from amplification a
 An example of this filtering approach is shown below for _n_ set to 10.
 
 ```{r}
-alt.keep <- rowSums(is_exprs(sce)) >= 10
+alt.keep <- nexprs(sce, byrow=TRUE) >= 10
 sum(alt.keep)
 ```
 
@@ -779,7 +778,7 @@ gc()
 Low-abundance genes are also removed by applying a simple mean-based filter.
 We use a lower threshold for UMI counts compared to that used for read counts.
 This is because the number of transcript molecules will always be lower than the number of reads generated from such molecules.
-(The technical noise is also lower, which reduces the risk of being dominated by zeroes and allows retention of genes with lower means.)
+(The technical noise is also lower, which reduces the risk of zeroes dominating the expression profile and allows us to retain genes with lower means.)
 Even so, the number of retained genes is lower than that in the HSC data set, simply because the library sizes are much smaller for UMI counts.
 
 <!--
