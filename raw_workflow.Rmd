@@ -285,13 +285,11 @@ plotQC(sce, type = "exprs-freq-vs-mean") + fontsize
 
 In general, we prefer the mean-based filter as it tends to be less aggressive.
 A gene will be retained as long as it has sufficient expression in any subset of cells.
-The "at least _n_" filter depends heavily on the choice of _n_ -- in this case, a gene expressed in a subset of 9 cells would be lost.
+Genes expressed in fewer cells require higher levels of expression in those cells to be retained, but this is not undesirable as it avoids selecting uninformative genes (with low expression in few cells) that contribute little to downstream analyses, e.g., HVG detection or clustering.
+In contrast, the "at least _n_" filter depends heavily on the choice of _n_.
+With _n_ = 10, a gene expressed in a subset of 9 cells would be filtered out, regardless of the level of expression in those cells.
+This may result in the failure to detect rare subpopulations that are present at frequencies below _n_.
 While the mean-based filter will retain more outlier-driven genes, this can be handled by choosing methods that are robust to outliers in the downstream analyses.
-
-<!--
-The mean-based filter also means that, if a gene is only expressed in 'p' proportion of cells, then the expression in each cell must be '1/p' to be retained.
-This makes sense; the fewer cells a gene is expressed in, the more highly that gene must be expressed in order for us to believe that it's not just noise.
--->
 
 ## Normalization of cell-specific biases
 
@@ -1088,6 +1086,7 @@ for (clust in seq_len(nlevels(cluster))) {
 
 Potential marker genes for cluster 2 are ranked based on the maximum _p_-value across all comparisons.
 A gene that is DE between the chosen cluster and all others should have small _p_-values for all comparisons, and thus a small maximum _p_-value.
+This is equivalent to the outcome of an intersection-union test [@berger1996bioequivalence] requiring all comparisons to other clusters to be significant.
 In addition, we only focus on genes with the same sign of the log-fold change across all comparisons.
 This is necessary to identify specific markers that are unambiguously upregulated (or downregulated) in cluster 2 relative to the other clusters.
 
