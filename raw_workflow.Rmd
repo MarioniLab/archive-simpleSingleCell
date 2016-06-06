@@ -849,8 +849,10 @@ sce <- normalize(sce)
 
 We attempt to classify cells into cell cycle phases using the `cyclone` method.
 However, examination of Figure ((phaseplotbrain)) indicates that many of the G1 and G2/M scores are ambiguous.
-This highlights the potential difficulties of training a classifier on one cell type (mouse embryonic stem cells -- see @scialdone2015computational for more details) and applying it on a substantially different cell type.
-Some neuron types are particularly problematic as they are postmitotic and do not belong in any phase of the cell cycle.
+This highlights the risks of using a classifier on a data set that is substantially different to the training set.
+In particular, the classifier was trained on C1 SMARTer data [@scialdone2015computational] and accounts for the biases in that protocol. 
+The brain data set uses UMI counts, which has an entirely different set of biases, e.g., 3'-end coverage only, no length bias, no amplification noise.
+These new biases (and the absence of expected biases) will confound the classifier and interfere with accurate calling of cell cycle phase.
 
 ```{r, echo=FALSE, results='hide', message=FALSE}
 mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", package="scran"))
@@ -865,9 +867,15 @@ assignments <- cyclone(sce[keep,], mm.pairs, gene.names=ensembl[keep])
 plot(assignments$score$G1, assignments$score$G2M, xlab="G1 score", ylab="G2/M score", pch=16)
 ```
 
+Another possible contributor to poor performance is the difference in the cells used for training and those in the test data.
+If certain expression patterns are associated with the cell cycle in the training set (of mouse embryonic stem cells), these may be incorporated into the classifier.
+However, if those patterns are not associated with the cell cycle in the test data, their inclusion will add noise without providing any phase information.
+This will lead to a deterioration in the accuracy of the classifier.
+In general, this is unlikely to be a major issue as the cell cycle should be a conserved process across many lineages and conditions.
+Nonetheless, some neuron types may be problematic for the classifier as they are postmitotic and do not belong in any phase of the cell cycle.
+
 Given the lack of definitive classification, we will not perform any processing of the data set by cell cycle phase.
-However, this information is still useful for verifying downstream results.
-For example, if we were to identify putative subpopulations, and those subpopulations had systematically different phase scores, we might be wary of the possibility that the differences between subpopulations are being driven by cell cycle effects.
+Alternative approaches to handle cell cycle effects will be discussed in a later section.
 
 ## Data exploration to examine the effect of technical factors
 
@@ -1220,6 +1228,8 @@ Spike-in normalization will preserve this difference and may provide more accura
 
 ## Blocking on the cell cycle phase
 
+### Using the phase scores from `cyclone`
+
 Cell cycle phase is usually uninteresting in studies focusing on other aspects of biology.
 However, the effects of cell cycle on the expression profile can mask other effects and interfere with the interpretation of the results.
 This cannot be avoided by simply removing cell cycle marker genes, as the cell cycle can affect a substantial number of other transcripts [@buettner2015computational].
@@ -1251,8 +1261,9 @@ assignments <- cyclone(exprs(sce)[keep,], mm.pairs, gene.names=ensembl[keep])
 plot(assignments$score$G1, assignments$score$G2M, xlab="G1 score", ylab="G2/M score", pch=16)
 ```
 
-We can block directly on the phase scores in downstream analyses, which is more graduated than using a strict assignment of each cell to a specific phase.
-This will absorb any phase-related effects on expression such that they will not affect estimation of the effects of other experimental factors.
+We can block directly on the phase scores in downstream analyses.
+This is more graduated than using a strict assignment of each cell to a specific phase, as the magnitude of the score considers the uncertainty of the assignment.
+The phase covariates in the design matrix will absorb any phase-related effects on expression such that they will not affect estimation of the effects of other experimental factors.
 Note that users should ensure that the phase score is not confounded with other factors of interest.
 For example, model fitting is not possible if all cells in one experimental condition are in one phase, and all cells in another condition are in a different phase.
 
@@ -1294,6 +1305,47 @@ plotDiffusionMap(sce2, colour_by="Gata3") + fontsize
 saveRDS(file="th2_data.rds", sce)
 gc()
 ```
+
+### Using cycle-annotated genes to identify hidden variation
+
+An alternative approach uses genes that have annotated functions in cell cycling and division.
+We extract all genes associated with the relevant GO terms and use them to construct a PCA plot.
+Figure ((braincyclepca)) contains three clusters that may correspond to distinct phases of the cell cycle.
+This can be determined explicitly by identifying marker genes for each cluster as previously described, and checking whether each marker has known phase-specific expression with resources such as [Cyclebase](http://www.cyclebase.org) [@santos2015cyclebase].
+
+```{r, echo=FALSE, results='hide', message=FALSE}
+library(org.Mm.eg.db)
+fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
+```
+
+```{r braincyclepca, fig.width=10, fig.height=5, fig.cap="PCA plots of the brain data set, using only genes with annotated functions in cell cycling or division."}
+pca1 <- plotPCA(sce, feature_set=chosen.genes) + fontsize 
+multiplot(pca1, pca2, cols=2)
+```
+
+We can also identify hidden factors of variation across the annotated genes using `r Biocpkg("RUVSeq")`.
+This assumes that, if all cells were in the same phase of the cell cycle, there should be no DE across cells for genes associated with the cell cycle.
+Any systematic differences between cells are incorporated into the `W` matrix containing the factors of unwanted variation.
+We can include these factors as covariates in our design matrix to absorb cell cycle effects in the rest of the data set.
+
+```{r}
+sce <- readRDS("brain_data.rds")
+ccgenes <- select(org.Mm.eg.db, keys=c("GO:0022403", "GO:0051301"), keytype="GOALL", column="SYMBOL")
+chosen.genes <- which(rownames(sce) %in% ccgenes$SYMBOL)
+ruv.out <- RUVg(exprs(sce), isLog=TRUE, cIdx=chosen.genes, k=2)
+head(ruv.out$W)
+```
+
+In general, we prefer using the `cyclone`-based approach for phase identification and blocking.
+This is because the expression of cell cycle genes may be affected by other biological/experimental factors at the single-cell level.
+As a result, the inferred factors of variation may include interesting differences between cells, such that blocking on those factors would result in loss of detection power.
+`cyclone` calls the phase for each cell separately and is more robust to systematic (non-cell-cycle-related) differences between cells.
+
+<!--
+The obvious example would be if cells in the same phase had different amounts of expression for cell cycle genes, corresponding to some other factor (e.g., treatment).
+This would get picked up as a hidden factor of variation, leading to loss of power to detect that other factor.
+In contrast, cyclone wouldn't care as the relative amounts of expression within each cell would be the same for all cells, leading to correct calling of phase.
+-->
 
 ## Extracting annotation from Ensembl identifiers
 
