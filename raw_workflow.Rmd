@@ -1073,6 +1073,10 @@ fit <- glmFit(y, design)
 summary(y$tagwise.dispersion)
 ```
 
+```{r echo=FALSE, results='hide'}
+gc()
+```
+
 To identify marker genes for a particular cluster, we test each gene for DE between that cluster and each other cluster.
 This is done using the likelihood ratio test (LRT) for each comparison, as demonstrated below for cluster 2.
 The same process can be repeated for each cluster by changing `chosen.clust`, to identify markers specific to the corresponding subpopulation.
@@ -1309,7 +1313,7 @@ gc()
 ### Using cycle-annotated genes to identify hidden variation
 
 An alternative approach uses genes that have annotated functions in cell cycling and division.
-We extract all genes associated with the relevant GO terms and use them to construct a PCA plot.
+We extract all genes associated with the relevant GO terms and use them to construct a PCA plot for the brain data set.
 Figure ((braincyclepca)) contains three clusters that may correspond to distinct phases of the cell cycle.
 This can be determined explicitly by identifying marker genes for each cluster as previously described, and checking whether each marker has known phase-specific expression with resources such as [Cyclebase](http://www.cyclebase.org) [@santos2015cyclebase].
 
@@ -1319,19 +1323,19 @@ fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=
 ```
 
 ```{r braincyclepca, fig.width=10, fig.height=5, fig.cap="PCA plots of the brain data set, using only genes with annotated functions in cell cycling or division."}
-pca1 <- plotPCA(sce, feature_set=chosen.genes) + fontsize 
-multiplot(pca1, pca2, cols=2)
+ccgenes <- select(org.Mm.eg.db, keys=c("GO:0022403", "GO:0051301"), keytype="GOALL", column="SYMBOL")
+sce <- readRDS("brain_data.rds")
+chosen.genes <- which(rownames(sce) %in% ccgenes$SYMBOL)
+plotPCA(sce, feature_set=chosen.genes) + fontsize 
 ```
 
 We can also identify hidden factors of variation across the annotated genes using `r Biocpkg("RUVSeq")`.
 This assumes that, if all cells were in the same phase of the cell cycle, there should be no DE across cells for genes associated with the cell cycle.
 Any systematic differences between cells are incorporated into the `W` matrix containing the factors of unwanted variation.
-We can include these factors as covariates in our design matrix to absorb cell cycle effects in the rest of the data set.
+These factors can then be included as covariates in the design matrix to absorb cell cycle effects in the rest of the data set.
+We set `k=2` here to capture the variation corresponding to the two principal components in Figure ((braincyclepca)).
 
 ```{r}
-sce <- readRDS("brain_data.rds")
-ccgenes <- select(org.Mm.eg.db, keys=c("GO:0022403", "GO:0051301"), keytype="GOALL", column="SYMBOL")
-chosen.genes <- which(rownames(sce) %in% ccgenes$SYMBOL)
 ruv.out <- RUVg(exprs(sce), isLog=TRUE, cIdx=chosen.genes, k=2)
 head(ruv.out$W)
 ```
