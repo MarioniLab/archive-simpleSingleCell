@@ -1322,7 +1322,7 @@ library(org.Mm.eg.db)
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
 ```
 
-```{r braincyclepca, fig.width=10, fig.height=5, fig.cap="PCA plots of the brain data set, using only genes with annotated functions in cell cycling or division."}
+```{r braincyclepca, fig.width=10, fig.height=5, fig.cap="PCA plot of the brain data set, using only genes with annotated functions in cell cycling or division."}
 ccgenes <- select(org.Mm.eg.db, keys=c("GO:0022403", "GO:0051301"), keytype="GOALL", column="SYMBOL")
 sce <- readRDS("brain_data.rds")
 chosen.genes <- which(rownames(sce) %in% ccgenes$SYMBOL)
@@ -1336,6 +1336,7 @@ These factors can then be included as covariates in the design matrix to absorb 
 We set `k=2` here to capture the variation corresponding to the two principal components in Figure ((braincyclepca)).
 
 ```{r}
+library(RUVSeq)
 ruv.out <- RUVg(exprs(sce), isLog=TRUE, cIdx=chosen.genes, k=2)
 head(ruv.out$W)
 ```
