@@ -405,8 +405,7 @@ mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", package="sc
 library(org.Mm.eg.db)
 anno <- select(org.Mm.eg.db, keys=rownames(sce), keytype="SYMBOL", column="ENSEMBL")
 ensembl <- anno$ENSEMBL[match(rownames(sce), anno$SYMBOL)]
-keep <- !is.na(ensembl)
-assignments <- cyclone(sce[keep,], mm.pairs, gene.names=ensembl[keep])
+assignments <- cyclone(sce, mm.pairs, gene.names=ensembl)
 plot(assignments$score$G1, assignments$score$G2M, xlab="G1 score", ylab="G2/M score", pch=16)
 ```
 
@@ -509,7 +508,7 @@ Note that we only apply this function for the top set of HVGs -- doing so for al
 
 ```{r}
 set.seed(100)
-var.cor <- correlatePairs(sce[top.hvgs[1:200],])
+var.cor <- correlatePairs(sce, subset.row=top.hvgs[1:200])
 write.table(file="hsc_cor.tsv", var.cor, sep="\t", quote=FALSE, row.names=FALSE)
 head(var.cor)
 ```
@@ -862,8 +861,7 @@ library(org.Mm.eg.db)
 ```{r phaseplotbrain, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the brain data set, where each point represents a cell."}
 anno <- select(org.Mm.eg.db, keys=rownames(sce), keytype="SYMBOL", column="ENSEMBL")
 ensembl <- anno$ENSEMBL[match(rownames(sce), anno$SYMBOL)]
-keep <- !is.na(ensembl)
-assignments <- cyclone(sce[keep,], mm.pairs, gene.names=ensembl[keep])
+assignments <- cyclone(sce, mm.pairs, gene.names=ensembl)
 plot(assignments$score$G1, assignments$score$G2M, xlab="G1 score", ylab="G2/M score", pch=16)
 ```
 
@@ -990,7 +988,7 @@ These results are also saved to file for use in designing validation experiments
 
 ```{r}
 set.seed(100)
-var.cor <- correlatePairs(sce[top.hvgs[1:200],], design=design)
+var.cor <- correlatePairs(sce, design=design, subset.row=top.hvgs[1:200])
 write.table(file="brain_cor.tsv", var.cor, sep="\t", quote=FALSE, row.names=FALSE)
 head(var.cor)
 sig.cor <- var.cor$FDR <= 0.05
@@ -1260,8 +1258,7 @@ set.seed(100)
 ```{r phaseplotth2, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the T~H~2 data set, where each point represents a cell."}
 anno <- select(org.Mm.eg.db, keys=rownames(sce), keytype="SYMBOL", column="ENSEMBL")
 ensembl <- anno$ENSEMBL[match(rownames(sce), anno$SYMBOL)]
-keep <- !is.na(ensembl) # Remove genes without ENSEMBL IDs.
-assignments <- cyclone(exprs(sce)[keep,], mm.pairs, gene.names=ensembl[keep])
+assignments <- cyclone(sce, mm.pairs, gene.names=ensembl, assay="exprs")
 plot(assignments$score$G1, assignments$score$G2M, xlab="G1 score", ylab="G2/M score", pch=16)
 ```
 
