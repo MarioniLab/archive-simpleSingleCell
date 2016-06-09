@@ -385,10 +385,13 @@ out20 <- plotTSNE(sce, exprs_values="exprs", perplexity=20) + fontsize + ggtitle
 multiplot(out5, out10, out20, cols=3)
 ```
 
-For this data set, all methods suggest that there is no separation into distinct subpopulations.
-This might be expected for a homogenous population of cells of the same type.
-Of course, there are many dimensionality reduction techniques that we have not considered here but could also be used, e.g., multidimensional scaling, diffusion maps.
+There are many other dimensionality reduction techniques that we have not considered here but could also be used, e.g., multidimensional scaling, diffusion maps.
 These have their own advantages and disadvantages -- for example, diffusion maps (see `plotDiffusionMap`) place cells along a continuous trajectory and are suited for visualizing graduated processes like differentiation [@angerer2015destiny].
+The `selectorPlot` function from `r Biocpkg("scran")` can also be used to interactively select groups of cells in two-dimensional space.
+This facilitates data exploration as visually-identified subpopulations can be directly selected for further examination.
+
+For this data set, all tested methods suggest that the cells do not separate into multiple distinct subpopulations.
+This is not unexpected for a homogenous population of cells of the same type.
 
 ## Classification of cell cycle phase 
 
