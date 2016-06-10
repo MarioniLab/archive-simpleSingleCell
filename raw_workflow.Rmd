@@ -412,7 +412,9 @@ assignments <- cyclone(sce, mm.pairs, gene.names=ensembl)
 plot(assignments$score$G1, assignments$score$G2M, xlab="G1 score", ylab="G2/M score", pch=16)
 ```
 
-Cells are classified as being in G1 phase if the G1 score is above 0.5; in G2/M phase if the G2/M score is above 0.5; and in S phase, if neither is above 0.5.
+Cells are classified as being in G1 phase, if the G1 score is above 0.5 and greater than the G2/M score; 
+    in G2/M phase, if the G2/M score is above 0.5 and greater than the G1 score; 
+    and in S phase, if neither score is above 0.5.
 Here, the vast majority of cells are classified as being in G1 phase.
 We will focus on these cells in the downstream analysis.
 Cells in other phases are removed to avoid potential confounding effects from cell cycle-induced differences.
@@ -420,7 +422,7 @@ Alternatively, if a non-negligible number of cells are in other phases, we can u
 This protects against cell cycle effects without discarding information.
 
 ```{r}
-g1.only <- assignments$score$G1 > 0.5
+g1.only <- assignments$score$G1 > pmax(0.5, assignments$score$G2M)
 sce <- sce[,g1.only]
 ```
 
@@ -1294,12 +1296,15 @@ fit <- trendVar(sce, use.spikes=NA, trend="loess")
 dec <- decomposeVar(sce, fit)
 top.hvgs <- order(dec$bio, decreasing=TRUE)[1:500]
 sce$G1score <- assignments$score$G1
-out <- plotPCA(sce, select=top.hvgs, colour_by="G1score") + fontsize + ggtitle("Before removal")
+sce$G2Mscore <- assignments$score$G2M
+out <- plotPCA(sce, select=top.hvgs, colour_by="G1score", size_by="G2Mscore") + 
+    fontsize + ggtitle("Before removal")
 
 top.hvgs2 <- order(dec.block$bio, decreasing=TRUE)[1:500]
 corrected <- removeBatchEffect(exprs(sce), covariates=assignments$score[,c("G1", "G2M")])
 sce2 <- newSCESet(exprsData=corrected, phenoData=phenoData(sce))
-out2 <- plotPCA(sce2, select=top.hvgs2, colour_by="G1score") + fontsize + ggtitle("After removal")
+out2 <- plotPCA(sce2, select=top.hvgs2, colour_by="G1score", size_by="G2Mscore") + 
+    fontsize + ggtitle("After removal")
 multiplot(out, out2, cols=2)
 ```
 
