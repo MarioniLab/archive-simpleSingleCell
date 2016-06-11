@@ -422,8 +422,7 @@ Alternatively, if a non-negligible number of cells are in other phases, we can u
 This protects against cell cycle effects without discarding information.
 
 ```{r}
-g1.only <- assignments$score$G1 > pmax(0.5, assignments$score$G2M)
-sce <- sce[,g1.only]
+sce <- sce[,assignments$phases=="G1"]
 ```
 
 Pre-trained classifiers are available in `r Biocpkg("scran")` for human and mouse data. 
@@ -1254,7 +1253,7 @@ Rather, more sophisticated strategies are required, which are demonstrated below
 library(openxlsx)
 incoming <- read.xlsx("nbt.3102-S7.xlsx", sheet=1, rowNames=TRUE)
 incoming <- incoming[,!duplicated(colnames(incoming))] # Remove duplicated genes.
-sce <- newSCESet(exprsData=t(incoming))
+sce <- newSCESet(exprsData=t(incoming), logged=TRUE)
 ```
 
 We empirically identify the cell cycle phase using the pair-based classifier in `cyclone`.
