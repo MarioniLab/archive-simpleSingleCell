@@ -1233,10 +1233,10 @@ plot(sizeFactors(sce), deconv.sf, pch=16, log="xy", xlab="Size factor (spike-in)
     ylab="Size factor (deconvolution)")
 ```
 
-This is more clearly demonstrated with a data set involving different cell types -- namely, mouse embryonic stem cells (mESCs) and fibroblasts [islam2011characterization].
-If spike-in size factors were used, the expression values in fibroblasts would be scaled up while expression in mESCs would be scaled down (Figure ((normplotspikemef))).
+This is more clearly demonstrated with a data set involving different cell types -- namely, mouse embryonic stem cells (mESCs) and mouse embryonic fibroblasts (MEFs) [islam2011characterization].
+If spike-in size factors were used, the expression values in MEFs would be scaled up while expression in mESCs would be scaled down (Figure ((normplotspikemef))).
 However, the opposite would occur if deconvolution size factors were used.
-This is because fibroblasts contain more endogenous RNA which reduces the relative spike-in coverage (thereby decreasing the spike-in size factors) but increases the coverage of endogenous genes (thus increasing the deconvolution size factors).
+This is because MEFs contain more endogenous RNA which reduces the relative spike-in coverage (thereby decreasing the spike-in size factors) but increases the coverage of endogenous genes (thus increasing the deconvolution size factors).
 
 ```{r normplotspikemef, fig.cap="Size factors from spike-in normalization, plotted against the size factors from deconvolution for all cells in the mESC/fibroblast data set. Axes are shown on a log-scale, and cells are coloured according to their identity. Deconvolution size factors were computed with small pool sizes owing to the low number of cells of each type."}
 counts <- read.table("GSE29087_L139_expression_tab.txt.gz", colClasses=c(list("character", 
@@ -1257,9 +1257,9 @@ legend("bottomleft", col=colours, legend=names(colours), pch=16)
 Whether or not total RNA content is relevant depends on the biological hypothesis. 
 In the analyses described above, variability in total RNA across the population was treated as noise and removed by non-DE normalization.
 This may not always be appropriate if total RNA is associated with a biological difference of interest.
-For example, @islam2011characterization observe a 5-fold difference in total RNA between mESCs and fibroblasts.
-Similarly, the total amount of RNA in a cell changes across phases of the cell cycle [@buettner2015computational].
-Spike-in normalization will preserve these differences in downstream analyses.
+For example, @islam2011characterization observe a 5-fold difference in total RNA between mESCs and MEFs.
+Similarly, the total RNA in a cell changes across phases of the cell cycle [@buettner2015computational].
+Spike-in normalization will preserve these differences in total RNA content such that the corresponding biological groups can be easily resolved in downstream analyses.
 
 ## Blocking on the cell cycle phase
 
