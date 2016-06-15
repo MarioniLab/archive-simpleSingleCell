@@ -49,6 +49,7 @@ library(TxDb.Mmusculus.UCSC.mm10.ensGene)
 
 ```{r, eval=on.bioc, echo=FALSE, results='hide'}
 all.urls <- c("http://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE61533&format=file&file=GSE61533%5FHTSEQ%5Fcount%5Fresults%2Exls%2Egz", 
+"http://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE29087&format=file&file=GSE29087%5FL139%5Fexpression%5Ftab%2Etxt%2Egz",
 "http://linnarssonlab.org/blobs/cortex/expression_mRNA_17-Aug-2014.txt", 
 "http://linnarssonlab.org/blobs/cortex/expression_mito_17-Aug-2014.txt", 
 "http://linnarssonlab.org/blobs/cortex/expression_spikes_17-Aug-2014.txt",
@@ -56,8 +57,9 @@ all.urls <- c("http://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE61533&format=fil
 "http://www.nature.com/nbt/journal/v33/n2/extref/nbt.3102-S7.xlsx")
 all.basenames <- basename(all.urls)
 all.basenames[1] <- "GSE61533_HTSEQ_count_results.xls.gz"
+all.basenames[2] <- "GSE29087_L139_expression_tab.txt.gz"
 all.modes <- rep("w", length(all.urls))
-all.modes[c(1, 6)] <- "wb"
+all.modes[!grepl("(txt|csv)$", all.basenames)] <- "wb"
 for (x in seq_along(all.urls)) { 
     download.file(all.urls[x], all.basenames[x], mode=all.modes[x])
 }
