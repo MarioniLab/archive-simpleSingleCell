@@ -507,10 +507,16 @@ all.names <- matrix(rownames(sce)[examined], nrow=length(examined), ncol=ncol(sc
 boxplot(split(exprs(sce)[examined,], all.names), las=2, ylab="Normalized log-expression", col="grey80")
 ```
 
-There are many other ways of defining HVGs, e.g., by using the coefficient of variation [@kolod2015singlecell;@kim2015characterizing], with the dispersion parameter in the negative binomial distribution [@mccarthy2012differential], or as a proportion of total variability [@vallejos2015basics].
+There are many other strategies for defining HVGs, e.g., by using the coefficient of variation [@brennecke2013accounting;@kolod2015singlecell;@kim2015characterizing], with the dispersion parameter in the negative binomial distribution [@mccarthy2012differential], or as a proportion of total variability [@vallejos2015basics].
 We use the variance of the log-expression values because the log-transformation provides some protection against genes with strong expression in only one or two outlier cells.
 This ensures that the set of top HVGs is not dominated by genes with (mostly uninteresting) outlier expression patterns.
-However, the cost of this robustness is the need to fit a complex mean-variance relationship.
+However, for the same reason, detection power is reduced for HVGs driven by rare subpopulations.
+If these rare cells are of interest, alternative methods for HVG identification may be preferable, e.g., using the `DM` method in `r Biocpkg("scran")`.
+
+<!--
+The mean-variance trend in Figure ((hvgplothsc)) is also more complex and difficult to fit than that of other approaches.
+But we can do it, so it's a technical challenge rather than a philosophical one.
+-->
 
 ## Identifying correlated gene pairs with Spearman's rho
 
