@@ -999,6 +999,15 @@ To identify genes involved in defining subpopulations, the top 200 HVGs can be t
 Here, the number of significantly correlated pairs is much higher than in the HSC data set, indicating that strong substructure is present.
 These results are also saved to file for use in designing validation experiments.
 
+<!--
+We could also set a threshold on the absolute value of the correlation.
+This is useful when you have lots of cells, which gives you (too much) power to detect non-zero correlations.
+It is also valid without further work -- unlike log-fold changes in DE, the absolute correlation here directly determines the p-value.
+Thus, you can threshold on the correlation without affecting FDR control, because loss of elements with higher p-values just means the FDR is lower across the rest.
+However, I'm disinclined to recommend this explicitly, as you would lose power to detect subtle correlations driving minor subpopulations.
+This would defeat the purpose of having lots of cells to improve power to detect those subpopulations.
+-->
+
 ```{r}
 set.seed(100)
 var.cor <- correlatePairs(sce, design=design, subset.row=top.hvgs[1:200])
