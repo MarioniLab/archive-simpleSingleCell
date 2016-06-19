@@ -189,6 +189,10 @@ It shouldn't matter too much if it's the proportion against total counts, or pro
 This is because we're not measuring an increase in mitochondrial/spike-in counts, but rather, a depletion of endogenous RNA.
 If endogenous RNA decreases in low-quality cells, the mitochondrial/spike-in proportions against the total count should both increase.
 We don't have to worry about effects of e.g. an increase in mitochondrial counts affecting the proportion of spike-in counts.
+
+Also, we don't use the logit transform for the proportions, even though on the raw scale we could theoretically end up with a above-unity threshold.
+This is because the logit transform compresses changes within the middle of the [0,1] range.
+This reduces the resolution for where the threshold would usually be.
 -->
 
 ```{r controlplothsc, fig.width=12, fig.height=6, fig.cap="Histogram of the proportion of reads mapped to mitochondrial genes (left) or spike-in transcripts (right) across all cells in the HSC data set."}
