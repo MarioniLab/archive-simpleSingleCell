@@ -494,6 +494,17 @@ This can be used to prioritize interesting genes for further investigation.
 In general, we consider a gene to be a HVG if it has a biological component of at least 1.
 For log~2~-counts, this means that gene expression will vary, for biological reasons, by at least 2-fold around the mean.
 
+<!--
+Alternatively we could select based on p-value, via `testVar` with `min=1` which uses the ratio of the variance to the null value.
+Because it uses ratios, it tends to select high-abundance genes with small techical components and large ratios but small absolute variances.
+These are more likely to be real HVGs (i.e., above technical variability) but, at the same time, less likely to be interesting (as the absolute variance is small).
+Ranking based on the biological component is used here, as it avoids loss of power for genes with high biological and technical components.
+Such genes are more likely to be nulls but also more likely to be strongly variable -- the uncertainty of the sample variance is higher, so you can't tell.
+I prefer the latter strategy as HVG detection doesn't need to be formal.
+In and of themselves, HVGs are not of interest -- rather, they prioritise genes for more interesting analyses, e.g., clustering, correlation and gene set analyses.
+If HVG detection is considered as a screen, it is better to focus on potentially interesting (but possibly false) genes rather than true and uninteresting ones.
+-->
+
 ```{r}
 top.hvgs <- order(var.out2$bio, decreasing=TRUE)
 write.table(file="hsc_hvg.tsv", var.out2[top.hvgs,], sep="\t", quote=FALSE, col.names=NA)
