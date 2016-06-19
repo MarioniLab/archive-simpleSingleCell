@@ -143,6 +143,7 @@ This is necessary as spike-ins require special treatment in some downstream step
 We can do this easily by indicating the name of the spike-in set to `isSpike`.
 
 ```{r}
+library(scran)
 isSpike(sce) <- "ERCC"
 ```
 
@@ -168,13 +169,13 @@ Picking a threshold for these metrics is not straightforward as their absolute v
 For example, sequencing to greater depth will lead to more reads, regardless of the quality of the cells.
 To obtain an adaptive threshold, we assume that most of the data set consists of high-quality cells.
 We remove cells with log-library sizes that are more than 3 median absolute deviations (MADs) below the median log-library size.
-The wide range of library sizes requires a log-transformation, as the MAD would be too large on the raw scale.
-We also remove cells where the number of expressed genes is 3 MADs below the median.
-This eliminates low-quality cells corresponding to small outliers.
+(A log-transformation improves resolution at small values, especially when the MAD is comparable to or greater than the median.)
+We also remove cells where the log-transformed number of expressed genes is 3 MADs below the median.
+Both of these procedures eliminate low-quality cells corresponding to small outliers.
 
 ```{r}
-libsize.drop <- isOutlier(sce$total_counts, n=3, type="lower", log=TRUE)
-feature.drop <- isOutlier(sce$total_features, n=3, type="lower")
+libsize.drop <- isOutlier(sce$total_counts, nmads=3, type="lower", log=TRUE)
+feature.drop <- isOutlier(sce$total_features, nmads=3, type="lower", log=TRUE)
 ```
 
 Another measure of quality is the proportion of reads mapped to genes in the mitochondrial genome.
@@ -205,8 +206,8 @@ If we assume that most cells in the data set are of high quality, then the thres
 We use the MAD-based definition of outliers to remove putative low-quality cells from the data set.
 
 ```{r}
-mito.drop <- isOutlier(sce$pct_counts_feature_controls_Mt, n=3, type="higher")
-spike.drop <- isOutlier(sce$pct_counts_feature_controls_ERCC, n=3, type="higher")
+mito.drop <- isOutlier(sce$pct_counts_feature_controls_Mt, nmads=3, type="higher")
+spike.drop <- isOutlier(sce$pct_counts_feature_controls_ERCC, nmads=3, type="higher")
 ```
 
 Subsetting by column will retain only the high-quality cells that pass each filter described above.
@@ -772,10 +773,10 @@ hist(sce$pct_counts_feature_controls_Spike, xlab="ERCC proportion (%)",
 We remove small outliers in Figure ((libplotbrain)) and large outliers in Figure ((controlplotbrain)), using a MAD-based threshold as previously described.
 
 ```{r}
-libsize.drop <- isOutlier(sce$total_counts, n=3, type="lower", log=TRUE)
-feature.drop <- isOutlier(sce$total_features, n=3, type="lower")
-mito.drop <- isOutlier(sce$pct_counts_feature_controls_Mt, n=3, type="higher")
-spike.drop <- isOutlier(sce$pct_counts_feature_controls_Spike, n=3, type="higher")
+libsize.drop <- isOutlier(sce$total_counts, nmads=3, type="lower", log=TRUE)
+feature.drop <- isOutlier(sce$total_features, nmads=3, type="lower", log=TRUE)
+mito.drop <- isOutlier(sce$pct_counts_feature_controls_Mt, nmads=3, type="higher")
+spike.drop <- isOutlier(sce$pct_counts_feature_controls_Spike, nmads=3, type="higher")
 ```
 
 Removal of low-quality cells can then be performed by combining all of the metrics.
