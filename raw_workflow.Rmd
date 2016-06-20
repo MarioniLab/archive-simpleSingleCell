@@ -173,6 +173,12 @@ We remove cells with log-library sizes that are more than 3 median absolute devi
 We also remove cells where the log-transformed number of expressed genes is 3 MADs below the median.
 Both of these procedures eliminate low-quality cells corresponding to small outliers.
 
+<!--
+By improving resolution, I refer to compression of high values and expansion of the range of low values.
+The former reduces the MAD relative to the median, such that "3 MADs away" is a sensible statistic.
+The latter makes it easier to distinguish between outliers and the edge of the distribution of acceptable values.
+-->
+
 ```{r}
 libsize.drop <- isOutlier(sce$total_counts, nmads=3, type="lower", log=TRUE)
 feature.drop <- isOutlier(sce$total_features, nmads=3, type="lower", log=TRUE)
