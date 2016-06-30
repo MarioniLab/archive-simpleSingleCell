@@ -1183,6 +1183,12 @@ This is less stringent than identifying markers for a specific cluster, which ma
 Here, we report the log-fold changes for each cluster against the average of all other clusters for each gene.
 This facilitates interpretation of the results as the relevant cluster(s) expressing each gene can be quickly determined.
 
+<!--
+An alternative might be to compute the significance of each cluster to the average of all other clusters.
+This is also less stringent than the marker definitions above, as it allows for a gene to be expressed in another cluster.
+However, it's also a bit unpredictable as a gene may or may not be detected depending on the level of expression in other (potentially unrelated) populations.
+-->
+
 ```{r}
 # Automatic construction of the contrast matrix.
 nclusters <- nlevels(cluster)
