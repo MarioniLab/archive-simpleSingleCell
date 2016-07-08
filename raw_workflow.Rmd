@@ -1263,7 +1263,7 @@ sce <- computeSpikeFactors(sce)
 ```
 
 Applying `normalize` will use the spike-in-based size factors to compute normalized log-expression values.
-We do not have to additionally set spike-in-specific size factors, as these are already being used for all genes and spike-in transcripts.
+Unlike in the previous analyses, we do not have to additionally set spike-in-specific size factors, as these are already being used for all genes and spike-in transcripts.
 (The exception is if there are multiple spike-in sets used in the experiment, that behave differently and need to be normalized separately.)
 
 ```{r}
@@ -1280,7 +1280,7 @@ plot(sizeFactors(sce), deconv.sf, pch=16, log="xy", xlab="Size factor (spike-in)
     ylab="Size factor (deconvolution)")
 ```
 
-This is more clearly demonstrated with a data set involving different cell types -- namely, mouse embryonic stem cells (mESCs) and mouse embryonic fibroblasts (MEFs) [islam2011characterization].
+This is more clearly demonstrated with a data set involving different cell types -- namely, mouse embryonic stem cells (mESCs) and mouse embryonic fibroblasts (MEFs) [@islam2011characterization].
 If spike-in size factors were used, the expression values in MEFs would be scaled up while expression in mESCs would be scaled down (Figure ((normplotspikemef))).
 However, the opposite would occur if deconvolution size factors were used.
 This is because MEFs contain more endogenous RNA which reduces the relative spike-in coverage (thereby decreasing the spike-in size factors) but increases the coverage of endogenous genes (thus increasing the deconvolution size factors).
