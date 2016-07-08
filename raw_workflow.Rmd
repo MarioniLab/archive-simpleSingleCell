@@ -1271,7 +1271,7 @@ sce <- normalize(sce)
 ```
 
 Both non-DE methods (like deconvolution) and spike-in normalization will capture technical biases such as sequencing depth and capture efficiency.
-Indeed, Figure ((normplotspikehsc)) shows a rough positive correlation between the two sets of size factors, consistent with removal of technical biases by both methods.
+Figure ((normplotspikehsc)) shows a weak positive correlation between the two sets of size factors, consistent with removal of technical biases by both methods.
 However, differences between the two sets are still present and are attributable to variability in total RNA content across the HSC population.
 Spike-in normalization will preserve differences in RNA content, whereas non-DE normalization will eliminate them.
 
@@ -1360,7 +1360,7 @@ Before removal, cells in the G1 and non-G1 phases tend to be concentrated in dif
 Afterwards, more intermingling is observed between the phases which suggests that the cell cycle effect has been mitigated.
 
 ```{r pcaplotth2, fig.width=12, fig.height=6, fig.cap="PCA plots before (left) and after (right) removal of the cell cycle effect in the T~H~2 data set. Each point represents a cell, coloured according to its G1 score. Only the top 500 HVGs were used to make each PCA plot."}
-fit <- trendVar(sce, use.spikes=NA, trend="loess")
+fit <- trendVar(sce, use.spikes=NA, trend="loess") # Finding HVGs without blocking on phase score.
 dec <- decomposeVar(sce, fit)
 top.hvgs <- order(dec$bio, decreasing=TRUE)[1:500]
 sce$G1score <- assignments$score$G1
@@ -1368,7 +1368,7 @@ sce$G2Mscore <- assignments$score$G2M
 out <- plotPCA(sce, select=top.hvgs, colour_by="G1score", size_by="G2Mscore") + 
     fontsize + ggtitle("Before removal")
 
-top.hvgs2 <- order(dec.block$bio, decreasing=TRUE)[1:500]
+top.hvgs2 <- order(dec.block$bio, decreasing=TRUE)[1:500] # Using HVGs after blocking.
 corrected <- removeBatchEffect(exprs(sce), covariates=assignments$score[,c("G1", "G2M")])
 sce2 <- newSCESet(exprsData=corrected, phenoData=phenoData(sce))
 out2 <- plotPCA(sce2, select=top.hvgs2, colour_by="G1score", size_by="G2Mscore") + 
@@ -1444,7 +1444,6 @@ The `select` call extracts the specified data from the annotation object, and th
 ```{r}
 incoming <- read.table("counttable_es.csv", header=TRUE, row.names=1)
 my.ids <- rownames(incoming)
-library(org.Mm.eg.db)
 anno <- select(org.Mm.eg.db, keys=my.ids, keytype="ENSEMBL", column="SYMBOL")
 anno <- anno[match(my.ids, anno$ENSEMBL),]
 head(anno)
