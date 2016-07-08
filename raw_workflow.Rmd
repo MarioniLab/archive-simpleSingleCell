@@ -1,13 +1,15 @@
 ---
-title: "A step-by-step workflow for basic analyses of single-cell RNA-seq data"
+title: "A step-by-step workflow for low-level analyses of single-cell RNA-seq data"
 author: 
     - name: Aaron T. L. Lun
       affiliation: Cancer Research UK Cambridge Institute, Li Ka Shing Centre, Robinson Way, Cambridge CB2 0RE, United Kingdom
+    - name: Davis J. McCarthy
+      affiliation: EMBL European Bioinformatics Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SD, United Kingdom
     - name: John C. Marioni
       affiliation: Cancer Research UK Cambridge Institute, Li Ka Shing Centre, Robinson Way, Cambridge CB2 0RE, United Kingdom; EMBL European Bioinformatics Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SD, United Kingdom; Wellcome Trust Sanger Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SA, United Kingdom
-date: 6 May 2016
+date: 8 July 2016
 vignette: >
-    %\VignetteIndexEntry{A worfklow for basic analyses of single-cell RNA-seq data}
+    %\VignetteIndexEntry{A worfklow for low-level analyses of single-cell RNA-seq data}
     %\VignetteEngine{knitr::rmarkdown}
 output: 
     BiocStyle::html_document:
@@ -1517,6 +1519,8 @@ unlink("GSE61533_HTSEQ_count_results.xls")
 # Author contributions
 
 A.T.L.L. developed and tested the workflow on all data sets.
+A.T.L.L. and D.J.M. implemented improvements to the software packages required by the workflow.
+J.C.M. provided direction to the software and workflow development.
 All authors wrote and approved the final manuscript.
 
 # Competing interests
@@ -1526,11 +1530,11 @@ No competing interests were disclosed.
 # Grant information
 
 A.T.L.L. and J.C.M. were supported by core funding from Cancer Research UK (award no. A17197).
-J.C.M. was also supported by core funding from EMBL.
+D.J.M and J.C.M. were also supported by core funding from EMBL.
 
 # Acknowledgements
 
-We would like to thank Davis McCarthy, for assistance with coding for `scater`; Antonio Scialdone, for helpful discussions regarding spike-ins and HVGs; and Michael Epstein, for trialling the workflow on other data sets.
+We would like to thank Antonio Scialdone for helpful discussions, and Michael Epstein for testing the workflow on other data sets.
 
 # References
 
