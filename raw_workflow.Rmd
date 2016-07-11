@@ -78,7 +78,7 @@ Count data can be analyzed to identify new cell subpopulations via dimensionalit
 This provides biological insights at a single-cell resolution that cannot be achieved with conventional bulk RNA sequencing of cell populations.
 
 Strategies for scRNA-seq data analysis differ markedly from those for bulk RNA-seq.
-One technical reason is that scRNA-seq data is much noisier than bulk data [@brennecke2013accounting;@marinov2014singlecell].
+One technical reason is that scRNA-seq data are much noisier than bulk data [@brennecke2013accounting;@marinov2014singlecell].
 Reliable capture (i.e., conversion) of transcripts into cDNA for sequencing is difficult with the low quantity of RNA in a single cell.
 This increases the frequency of drop-out events where none of the transcripts for a gene are captured.
 Dedicated steps are required to deal with this noise, especially during quality control.
@@ -344,22 +344,23 @@ However, the same amount of spike-in RNA is added to each cell, regardless of th
 This means that the counts for spike-in transcripts are not subject to the effects of RNA content.
 Attempting to normalize the spike-in counts with the gene-based size factors will lead to over-normalization and incorrect quantification.
 
-To avoid this, we compute a separate set of size factors for each set of spike-ins.
+To avoid this, we compute a separate set of size factors for the spike-in set.
 For each cell, the spike-in-specific size factor is defined as the total count across all transcripts in the spike-in set.
 This assumes that all spike-in transcripts are not differentially expressed -- which is a reasonable assumption, as the same spike-ins should have been added to each cell.
 (See below for a more detailed discussion on spike-in normalization.)
-These size factors are stored in the `SCESet` object and will be used instead of the gene-based factors in downstream analyses.
+These size factors are stored in a separate field of the `SCESet` object by setting `general.use=FALSE` in `computeSpikeFactors`.
+This ensures that they will only be used with the spike-in transcripts but not the endogenous genes.
 
 ```{r}
-sizeFactors(sce, type="ERCC") <- computeSpikeFactors(sce, type="ERCC", sf.out=TRUE)
+sce <- computeSpikeFactors(sce, type="ERCC", general.use=FALSE)
 ```
 
 ### Applying the size factors to normalize gene expression
 
-Normalized log-expression values can be computed for use in downstream analyses.
+The count data are used to compute normalized log-expression values for use in downstream analyses.
 Each value is defined as the log-ratio of each count to the size factor for the corresponding cell, after adding a small prior count to avoid undefined values at zero counts.
 Division by the size factor ensures that any cell-specific biases are removed.
-In addition, spike-in transcripts will be normalized separately from the endogenous genes if specific size factors are present in `sce`.
+If spike-in-specific size factors are present in `sce`, they will be automatically applied to normalize the spike-in transcripts separately from the endogenous genes. 
 
 ```{r}
 sce <- normalize(sce)
@@ -878,7 +879,7 @@ plot(sizeFactors(sce), sce$total_counts/1e3, log="xy",
 We also compute size factors specific to the spike-in set, as previously described.
 
 ```{r}
-sizeFactors(sce, type="Spike") <- computeSpikeFactors(sce, type="Spike", sf.out=TRUE)
+sce <- computeSpikeFactors(sce, type="Spike", general.use=FALSE)
 ```
 
 Finally, normalized log-expression values are computed for each endogenous gene or spike-in transcript using the appropriate size factors.
@@ -1255,15 +1256,17 @@ The use of spike-in normalization can be demonstrated on the HSC data set.
 We load in the `SCESet` object that we saved earlier, which contains the count data for filtered genes in high-quality HSCs.
 We then apply the `computeSpikeFactors` method to estimate size factors for all cells.
 This method computes the total count over all spike-in transcripts in each cell, and calculates size factors to equalize the total spike-in count across cells. 
+Here, we set `general.use=TRUE` as we intend to apply the spike-in factors to all counts.
 
 ```{r}
 sce <- readRDS("hsc_data.rds")
 deconv.sf <- sizeFactors(sce)
-sce <- computeSpikeFactors(sce)
+sce <- computeSpikeFactors(sce, general.use=TRUE)
 ```
 
 Applying `normalize` will use the spike-in-based size factors to compute normalized log-expression values.
-Unlike in the previous analyses, we do not have to additionally set spike-in-specific size factors, as these are already being used for all genes and spike-in transcripts.
+Unlike in the previous analyses, we do not have to set separate size factors for the spike-in transcripts.
+This is because the relevant factors are already being used for all genes and spike-in transcripts when `general.use=TRUE`.
 (The exception is if there are multiple spike-in sets used in the experiment, that behave differently and need to be normalized separately.)
 
 ```{r}
