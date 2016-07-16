@@ -7,7 +7,7 @@ author:
       affiliation: EMBL European Bioinformatics Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SD, United Kingdom
     - name: John C. Marioni
       affiliation: Cancer Research UK Cambridge Institute, Li Ka Shing Centre, Robinson Way, Cambridge CB2 0RE, United Kingdom; EMBL European Bioinformatics Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SD, United Kingdom; Wellcome Trust Sanger Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SA, United Kingdom
-date: 8 July 2016
+date: 15 July 2016
 vignette: >
     %\VignetteIndexEntry{A worfklow for low-level analyses of single-cell RNA-seq data}
     %\VignetteEngine{knitr::rmarkdown}
@@ -541,6 +541,15 @@ If these rare cells are of interest, alternative methods for HVG identification 
 <!--
 The mean-variance trend in Figure ((hvgplothsc)) is also more complex and difficult to fit than that of other approaches.
 But we can do it, so it's a technical challenge rather than a philosophical one.
+-->
+
+<!--
+We can interpret HVGs as genes where each cell has an (unknown) true expression that varies across cells, e.g., due to subpopulations or across a continuum.
+This can also be extended across time, e.g., due to transcriptional bursting or circadian rhythms.
+In other words, HVGs are equivalent to DE genes for unknown subsets of cells.
+Validating whether the variability is functionally relevant becomes straightforward, as we can just KO or overexpress the gene to validate the corresponding DE.
+One can also see this as reducing the variance by coercing everyone to be lowly or highly-expressing.
+While it won't preserve the population mean, this is largely irrelevant if HVGs are DEGs anyway.
 -->
 
 ## Identifying correlated gene pairs with Spearman's rho
