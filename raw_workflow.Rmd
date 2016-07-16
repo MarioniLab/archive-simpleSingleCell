@@ -547,9 +547,11 @@ But we can do it, so it's a technical challenge rather than a philosophical one.
 We can interpret HVGs as genes where each cell has an (unknown) true expression that varies across cells, e.g., due to subpopulations or across a continuum.
 This can also be extended across time, e.g., due to transcriptional bursting or circadian rhythms.
 In other words, HVGs are equivalent to DE genes for unknown subsets of cells.
-Validating whether the variability is functionally relevant becomes straightforward, as we can just KO or overexpress the gene to validate the corresponding DE.
-One can also see this as reducing the variance by coercing everyone to be lowly or highly-expressing.
-While it won't preserve the population mean, this is largely irrelevant if HVGs are DEGs anyway.
+Validating whether the variability is functionally relevant becomes straightforward, as we can just KO or overexpress the gene.
+This is equivalent to the strategy that would be used to validate the underlying DE, if the subsets were known.
+One can also see this as seeing what happens after reducing the variance by coercing everyone to be lowly or highly-expressing.
+While it won't preserve the population mean, this is largely irrelevant if HVGs are to equivalent to DEGs anyway.
+(Such a task -- reducing variability while preserving the mean -- would be monumentally difficult.)
 -->
 
 ## Identifying correlated gene pairs with Spearman's rho
