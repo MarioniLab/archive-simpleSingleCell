@@ -604,6 +604,14 @@ In this manner, the existence of subpopulations with distinct expression pattern
 Negatively correlated pairs may be particularly useful as they provide more power to discriminate between subpopulations.
 In the simplest example, a subpopulation would be positive for one marker and negative for the other while the reverse would be true for a different subpopulation, thus allowing the two subpopulations to be easily distinguished.
 
+<!-- 
+The idea is to use the correlated gene pairs without having to rely on clustering.
+This is closer to the raw data and avoids the errors and ambiguities introduced by clustering.
+Of course, it is also a bit less interpretable, as the identities of the cells in the subpopulations are not explicitly set.
+It is also limited to the top set of HVGs, whereas DE between clusters can be checked between all genes.
+(Although the rest of the genes are unlikely to be strong DE, otherwise they would have been HVGs.)
+-->
+
 ## Using correlated HVGs for further data exploration
 
 For further analyses, we focus on the significantly correlated HVGs for which any substructure should be most pronounced.
