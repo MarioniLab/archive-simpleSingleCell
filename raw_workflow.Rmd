@@ -533,10 +533,15 @@ boxplot(split(exprs(sce)[examined,], all.names), las=2, ylab="Normalized log-exp
 ```
 
 There are many other strategies for defining HVGs, e.g., by using the coefficient of variation [@brennecke2013accounting;@kolod2015singlecell;@kim2015characterizing], with the dispersion parameter in the negative binomial distribution [@mccarthy2012differential], or as a proportion of total variability [@vallejos2015basics].
-We use the variance of the log-expression values because the log-transformation provides some protection against genes with strong expression in only one or two outlier cells.
+Some of these methods are available in `r Biocpkg("scran")` -- for example, see `DM` or `technicalCV2` for calculations based on the coefficient of variation.
+Here, we use the variance of the log-expression values because the log-transformation protects against genes with strong expression in only one or two cells.
 This ensures that the set of top HVGs is not dominated by genes with (mostly uninteresting) outlier expression patterns.
-However, for the same reason, detection power is reduced for HVGs driven by rare subpopulations.
-If these rare cells are of interest, alternative methods for HVG identification may be preferable, e.g., using the `DM` or `technicalCV2` methods in `r Biocpkg("scran")`.
+
+<!--
+For the same reason, detection power is reduced for HVGs driven by rare subpopulations.
+The only way to maximize power for rare subpopulations would be to use something like the Gini index (Jiang et al., 2016).
+This risks throwing up a lot of noise, though, as outliers will now be very highly ranked -- this is also true of the CV2-based methods.
+-->
 
 <!--
 The mean-variance trend in Figure ((hvgplothsc)) is also more complex and difficult to fit than that of other approaches.
@@ -563,7 +568,7 @@ Note that we only apply this function for the top set of HVGs -- doing so for al
 
 ```{r}
 set.seed(100)
-var.cor <- correlatePairs(sce, subset.row=top.hvgs[1:200])
+var.cor <- correlatePairs(sce, subset.row=top.hvgs[1:500])
 write.table(file="hsc_cor.tsv", var.cor, sep="\t", quote=FALSE, row.names=FALSE)
 head(var.cor)
 ```
@@ -1061,7 +1066,7 @@ This would defeat the purpose of having lots of cells to improve power to detect
 
 ```{r}
 set.seed(100)
-var.cor <- correlatePairs(sce, design=design, subset.row=top.hvgs[1:200])
+var.cor <- correlatePairs(sce, design=design, subset.row=top.hvgs[1:500])
 write.table(file="brain_cor.tsv", var.cor, sep="\t", quote=FALSE, row.names=FALSE)
 head(var.cor)
 sig.cor <- var.cor$FDR <= 0.05
