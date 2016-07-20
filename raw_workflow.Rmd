@@ -536,7 +536,7 @@ There are many other strategies for defining HVGs, e.g., by using the coefficien
 We use the variance of the log-expression values because the log-transformation provides some protection against genes with strong expression in only one or two outlier cells.
 This ensures that the set of top HVGs is not dominated by genes with (mostly uninteresting) outlier expression patterns.
 However, for the same reason, detection power is reduced for HVGs driven by rare subpopulations.
-If these rare cells are of interest, alternative methods for HVG identification may be preferable, e.g., using the `DM` method in `r Biocpkg("scran")`.
+If these rare cells are of interest, alternative methods for HVG identification may be preferable, e.g., using the `DM` or `technicalCV2` methods in `r Biocpkg("scran")`.
 
 <!--
 The mean-variance trend in Figure ((hvgplothsc)) is also more complex and difficult to fit than that of other approaches.
