@@ -661,9 +661,9 @@ heatmap.2(heat.vals[chosen,], col=bluered, symbreak=TRUE, trace='none', cexRow=0
 
 Modest substructure in Figure ((heatmaphsc)) is consistent with the low number of correlated HVGs.
 Nonetheless, a close look suggests that a _H2-Aa_/_Cd74_-expressing subpopulation exists alongside a _Fos_/_Jun_-negative subpopulation.
-_H2-Aa_ codes for a component of the class II major histocompatibility complex and may be indicative of B-cell contamination [@heng2008immunological].
+_H2-Aa_ codes for a component of the class II major histocompatibility complex, possibly corresponding to the development of antigen presentation activity.
 _Fos_ and _Jun_ may also be relevant as they are involved in cell proliferation [@angel1991role].
-In addition, these visual subpopulations roughly correspond to the computationally identified clusters from the tree cut.
+These visual subpopulations roughly correspond to the computationally identified clusters from the tree cut.
 Further analyses can then be performed on those empirical clusters -- for example, we could perform a DE analysis to identify marker genes for each corresponding subpopulation.
 
 That being said, users should treat clustering results with some caution.
@@ -1001,7 +1001,7 @@ There is some imbalance in the spread of colours, but it's not overwhelming (i.e
 -->
 
 In summary, the major differences between cells are associated with the tissue of origin.
-This is likely to be a relevant biological effect rather than a technical one, e.g., different subpopulations in different tissues.
+This is likely to be a relevant biological effect rather than a technical one, e.g., different cell types in different tissues.
 As such, we will not block on tissue in our downstream analyses.
 We instead consider the sex of the mice to be an uninteresting technical effect, and we block on it to ensure that there are no sex-driven differences between cells.
 Strictly speaking, this is unnecessary as there are no differences between sexes in Figure ((pcaplotbrain)).
