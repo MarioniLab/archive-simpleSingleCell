@@ -1199,14 +1199,14 @@ head(marker.set, 10)
 We save the list of candidate marker genes for further examination.
 We also examine their expression profiles to verify that the DE signature is robust.
 Figure ((heatmapmarkerbrain)) indicates that most of the top markers have strong and consistent up- or downregulation in cells of cluster 1 compared to some or all of the other clusters.
-Unknown cells can be assigned to the corresponding subpopulation based on strong expression of upregulated markers and the absence of expression of downregulated markers.
+Thus, cells from the subpopulation of interest can be identified as those that express the upregulated markers and do not express the downregulated markers.
 
 ```{r heatmapmarkerbrain, fig.cap="Heatmap of mean-centred normalized log-expression values for the top set of markers for cluster 1 in the brain data set. Column colours represent the cluster to which each cell is assigned."}
 write.table(marker.set, file="brain_marker_1.tsv", sep="\t", quote=FALSE, col.names=NA)
 top.markers <- marker.set$Gene[marker.set$Top <= 10]
 norm.exprs <- exprs(sce)[top.markers,,drop=FALSE]
 heat.vals <- norm.exprs - rowMeans(norm.exprs)
-heatmap.2(heat.vals, col=bluered, symbreak=TRUE, trace='none', cexRow=0.8,
+heatmap.2(heat.vals, col=bluered, symbreak=TRUE, trace='none', cexRow=0.6,
     ColSideColors=clust.col[my.clusters], Colv=as.dendrogram(my.tree), dendrogram='none')
 legend("bottomleft", col=clust.col, legend=sort(unique(my.clusters)), pch=16)
 ```
