@@ -673,6 +673,12 @@ Moreover, different algorithms can yield substantially different clusters by foc
 Some genes may support clustering based on cell type, whereas others may support clustering based on metabolic state, immune activation status, cell cycle, and so on.
 In short, experimental validation of the clustering results is critical to ensure that the putative subpopulations actually exist.
 
+<!--
+Standard bootstrapping requires IID genes in order to generate bootstrap replicates of the original data.
+This is not the case, which makes it difficult to interpret the bootstrap probabilities on an absolute scale.
+Doing it correctly would require block resampling to account for correlations -- hence the difficulty.
+-->
+
 Finally, dimensionality reduction can be applied using only the set of correlated HVGs to highlight any substructure that might be present.
 This is shown in Figure ((pcareduxhsc)) for both PCA and _t_-SNE plots, though in this case, focusing on HVGs does not provide any additional separation into distinct subpopulations.
 A more informative strategy is to colour cells in the plot based on the expression of a gene of interest.
@@ -948,7 +954,7 @@ Thus, the former is unlikely to distort the conclusions regarding the latter.
 
 For large experiments, data exploration has two functions -- to identify interesting biology, and also to check the effect of various technical factors.
 PCA plots constructed from the expression data suggest that distinct subpopulations are present (Figure ((pcaplotbrain))).
-Some of the substructure may be due to differences in the tissue from which the cells were extracted, e.g., cells from the cortex and hippocampus dominate different parts of the plot.
+Some of the substructure is due to differences in the tissue from which the cells were extracted, e.g., cells from the cortex and hippocampus dominate different parts of the plot.
 In contrast, cells taken from mice of different sexes mix throughout the plot, indicating that sex has little effect on the overall differences across the data set.
 
 ```{r, echo=FALSE, results='hide', message=FALSE}
@@ -994,14 +1000,15 @@ It should at least be the mouse, as the prefix is nested in tissue/sex.
 There is some imbalance in the spread of colours, but it's not overwhelming (i.e., you don't get distinct blobs containing only one colour) so I'll let it pass.
 -->
 
-In summary, the major difference between cells seems to be associated with the tissue of origin.
-Whether or not this is interesting depends on the biological hypothesis being studied.
-For the purposes of this workflow, we will treat the tissue of origin as an uninteresting confounding effect.
-This is because we are mainly interested in the cell subpopulations within each tissue.
-As such, we will block on tissue in all of our downstream analyses.
+In summary, the major differences between cells are associated with the tissue of origin.
+This is likely to be a relevant biological effect rather than a technical one, e.g., different subpopulations in different tissues.
+As such, we will not block on tissue in our downstream analyses.
+We instead consider the sex of the mice to be an uninteresting technical effect, and we block on it to ensure that there are no sex-driven differences between cells.
+Strictly speaking, this is unnecessary as there are no differences between sexes in Figure ((pcaplotbrain)).
+However, it provides a useful demonstration of how to perform the downstream analyses in other data sets where batch effects might be present.
 
 ```{r}
-design <- model.matrix(~sce$tissue)
+design <- model.matrix(~sce$sex)
 ```
 
 ## Identifying correlated HVGs
@@ -1075,8 +1082,8 @@ sum(sig.cor)
 
 Correlated HVGs can also be used to construct a heatmap that can be inspected for subpopulations.
 Here, we use the normalized log-expression values for the top HVGs that have significant correlations at a FDR of 5%.
-We also apply the `removeBatchEffect` function from the `r Biocpkg("limma")` package [@ritchie2015limma] to remove the tissue effect.
-This ensures that any differences due to the tissue of origin will not dominate the visualization of the expression profiles.
+We also apply the `removeBatchEffect` function from the `r Biocpkg("limma")` package [@ritchie2015limma] to remove the sex effect.
+This ensures that any differences due to sex will not dominate the visualization of the expression profiles.
 (Note that, if an analysis method can accept a design matrix, then blocking on nuisance factors in the design matrix is preferable to manipulating the expression values with `removeBatchEffect`.
 This is because the latter does not account for the loss of residual degrees of freedom, nor the uncertainty of estimation of the blocking factor terms.)
 
@@ -1084,7 +1091,7 @@ This is because the latter does not account for the loss of residual degrees of 
 chosen <- unique(c(var.cor$gene1[sig.cor], var.cor$gene2[sig.cor]))
 norm.exprs <- exprs(sce)[chosen,,drop=FALSE]
 library(limma)
-norm.exprs <- removeBatchEffect(norm.exprs, batch=sce$tissue)
+norm.exprs <- removeBatchEffect(norm.exprs, batch=sce$sex)
 ```
 
 The heatmap in Figure ((heatmapbrain)) shows systematic differences between groups of cells with distinct patterns of expression.
