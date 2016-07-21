@@ -1127,8 +1127,8 @@ Use Acrobat reader or zathura for linux (selecting gene names and looking a copi
 
 ## Detecting marker genes between subpopulations
 
-Once putative subpopulations are identified by clustering, we can identify some candidate marker genes that distinguish between those subpopulations.
-This is done by testing for DE between pairs of subpopulations and selecting those genes that are consistently upregulated in one subpopulation compared to the others.
+Once putative subpopulations are identified by clustering, we can identify marker genes for specific subpopulations of interest.
+This is done by identifying genes that are consistently DE in one subpopulation compared to the others.
 DE testing can be done using a number of packages, but for this workflow, we will use the `r Biocpkg("edgeR")` package [@robinson2010edgeR].
 First, we set up a design matrix specifying which cells belong in which cluster.
 Each `cluster*` coefficient represents the average log-expression of all cells in the corresponding cluster.
@@ -1164,9 +1164,9 @@ summary(y$tagwise.dispersion)
 gc()
 ```
 
-We identify marker genes for a chosen subpopulation as those that are upregulated in the corresponding cluster.
-This is done by first testing each gene for DE between the chosen cluster and every other cluster.
-We demonstrate this for cluster 1, though the same process can be applied to every other cluster by changing `chosen.clust`.
+We assume that one of the clusters corresponds to our subpopulation of interest.
+Each gene is tested for DE between the chosen cluster and every other cluster in the data set.
+We demonstrate this below for cluster 1, though the same process can be applied to any other cluster by changing `chosen.clust`.
 
 ```{r}
 result.logFC <- result.PValue <- list()
@@ -1183,18 +1183,12 @@ for (clust in seq_len(nlevels(cluster))) {
 }
 ```
 
-Potential marker genes are identified by taking the top set of upregulated genes from each pairwise comparison between clusters.
+Potential marker genes are identified by taking the top set of DE genes from each pairwise comparison between clusters.
 We arrange the results into a single output table that allows a marker set to be easily defined for a user-specified size for the top set.
 For example, to construct a marker set from the top 10 genes of each comparison, one would filter `marker.set` to retain rows with `Top` less than or equal to 10.
 
 ```{r}
-collected.ranks <- list()
-for (comp in names(result.logFC)) { 
-    upregulated <- result.logFC[[comp]] > 0
-    all.ranks <- rep(Inf, length(upregulated))
-    all.ranks[upregulated] <- rank(result.PValue[[comp]][upregulated], ties="first")
-    collected.ranks[[comp]] <- all.ranks
-}
+collected.ranks <- lapply(result.PValue, rank, ties="first")
 min.rank <- do.call(pmin, collected.ranks)
 marker.set <- data.frame(Top=min.rank, Gene=rownames(y), 
     logFC=do.call(cbind, result.logFC), stringsAsFactors=FALSE)
@@ -1204,7 +1198,8 @@ head(marker.set, 10)
 
 We save the list of candidate marker genes for further examination.
 We also examine their expression profiles to verify that the DE signature is robust.
-Figure ((heatmapmarkerbrain)) indicates that most of the top markers have strong and consistent upregulation in cells of cluster 1 compared to some or all of the other clusters.
+Figure ((heatmapmarkerbrain)) indicates that most of the top markers have strong and consistent up- or downregulation in cells of cluster 1 compared to some or all of the other clusters.
+Unknown cells can be assigned to the corresponding subpopulation based on strong expression of upregulated markers and the absence of expression of downregulated markers.
 
 ```{r heatmapmarkerbrain, fig.cap="Heatmap of mean-centred normalized log-expression values for the top set of markers for cluster 1 in the brain data set. Column colours represent the cluster to which each cell is assigned."}
 write.table(marker.set, file="brain_marker_1.tsv", sep="\t", quote=FALSE, col.names=NA)
@@ -1216,11 +1211,11 @@ heatmap.2(heat.vals, col=bluered, symbreak=TRUE, trace='none', cexRow=0.8,
 legend("bottomleft", col=clust.col, legend=sort(unique(my.clusters)), pch=16)
 ```
 
-Note that many of the markers in Figure ((heatmapmarkerbrain)) are not uniquely expressed in the chosen cluster.
-Testing for unique expression tends to be too stringent as it overlooks important genes that are expressed in two or more clusters.
+Note that many of the markers in Figure ((heatmapmarkerbrain)) are not uniquely up- or downregulated in the chosen cluster.
+Testing for unique DE tends to be too stringent as it overlooks important genes that are expressed in two or more clusters.
 For example, in a mixed population of CD4^+^-only, CD8^+^-only, double-positive and double-negative T-cells, neither _Cd4_ or _Cd8_ would be detected as subpopulation-specific markers because each gene is expressed in two subpopulations.
 With our approach, both of these genes will be picked up as candidate markers as they will be DE between at least one pair of subpopulations.
-A combination of markers can then be chosen to characterize a subpopulation, which is more flexible than trying to find uniquely expressed genes.
+A combination of markers can then be chosen to characterize a subpopulation, which is more flexible than trying to find uniquely DE genes.
 
 It must be stressed that the _p_-values reported here cannot be interpreted as measures of significance.
 This is because the clusters have been empirically identified from the data.
