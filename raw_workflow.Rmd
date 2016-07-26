@@ -376,7 +376,7 @@ This seems better than square-rooting it, which only works for the Poisson.
 
 ## Data exploration with dimensionality reduction techniques
 
-Dimensionality reduction is often useful to examine major features of the data before more quantitative analyses.
+Dimensionality reduction is often useful to examine major features of the data prior to more quantitative analyses.
 Of particular interest is whether the HSCs partition into distinct subpopulations.
 This can be visualized by constructing a PCA plot from the normalized log-expression values (Figure ((pcaplothsc))).
 Cells with similar expression profiles should be located close together in the plot, while dissimilar cells should be far apart.
@@ -393,7 +393,7 @@ Like `plotPCA`, the `plotTSNE` function will use the genes with the largest vari
 However, unlike PCA, _t_-SNE is a stochastic method -- users should run the algorithm several times to ensure that the results are representative, and then set a seed to ensure that the chosen results are reproducible.
 It is also advisable to test different settings of the "perplexity" parameter as this will affect the distribution of points in the low-dimensional space (Figure ((tsneplothsc))).
 
-```{r tsneplothsc, fig.cap="_t_-SNE plot constructed from normalized log-expression values using a range of perplexity values. In each plot, each point represents a cell in the HSC data set. Bars represent the coordinates of the cells on each axis.", fig.width=12, fig.height=6}
+```{r tsneplothsc, fig.cap="_t_-SNE plots constructed from normalized log-expression values using a range of perplexity values. In each plot, each point represents a cell in the HSC data set. Bars represent the coordinates of the cells on each axis.", fig.width=12, fig.height=6}
 set.seed(100)
 out5 <- plotTSNE(sce, exprs_values="exprs", perplexity=5) + fontsize + ggtitle("Perplexity = 5")
 out10 <- plotTSNE(sce, exprs_values="exprs", perplexity=10) + fontsize + ggtitle("Perplexity = 10")
@@ -407,7 +407,7 @@ The `selectorPlot` function from `r Biocpkg("scran")` can also be used to intera
 This facilitates data exploration as visually-identified subpopulations can be directly selected for further examination.
 
 For this data set, all tested methods suggest that the cells do not separate into multiple distinct subpopulations.
-This is not unexpected for a homogenous population of cells of the same type.
+This is consistent with the presence of a homogenous population of cells of the same type.
 
 ## Classification of cell cycle phase 
 
@@ -443,8 +443,8 @@ sce <- sce[,assignments$phases=="G1"]
 
 Pre-trained classifiers are available in `r Biocpkg("scran")` for human and mouse data. 
 The mouse classifier used here was trained on embryonic stem cells but can still be generally applied -- the pair-based method is a non-parametric procedure that should be robust to technical differences between data sets, and the transcriptional program associated with cell cycling should be mostly conserved across cell types.
-However, it will (inevitably) be less accurate for cell types that are substantially different from those used in the training set.
-Users can also construct a custom classifier from their own training data using the `sandbag` function.
+However, it will be less accurate for cell types that are substantially different from those used in the training set.
+In such cases, users can construct a custom classifier from their own training data using the `sandbag` function.
 This may be necessary for other model organisms where pre-trained classifiers are not available.
 
 ## Identifying HVGs from the normalized log-expression 
@@ -939,16 +939,18 @@ assignments <- cyclone(sce, mm.pairs, gene.names=ensembl)
 plot(assignments$score$G1, assignments$score$G2M, xlab="G1 score", ylab="G2/M score", pch=16)
 ```
 
+<!--
 Another possible contributor to poor performance is the difference in the cells used for training and those in the test data.
 If certain expression patterns are associated with the cell cycle in the training set (of mouse embryonic stem cells), these may be incorporated into the classifier.
 However, if those patterns are not associated with the cell cycle in the test data, their inclusion will add noise without providing any phase information.
 This will lead to a deterioration in the accuracy of the classifier.
 In general, this is unlikely to be a major issue as the cell cycle should be a conserved process across many lineages and conditions.
-Nonetheless, some neuron types may be problematic for the classifier as they are postmitotic and do not belong in any phase of the cell cycle.
+-->
 
 Given the lack of definitive classification, we will not perform any processing of the data set by cell cycle phase.
 This is unlikely to be problematic for this analysis, as the cell cycle effect will be relatively subtle compared to the obvious differences between subpopulations (see below).
 Thus, the former is unlikely to distort the conclusions regarding the latter.
+Indeed, classification may be irrelevant for many neuronal cell types which are postmitotic and do not belong in any phase of the cell cycle.
 
 ## Data exploration to examine the effect of technical factors
 
