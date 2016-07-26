@@ -456,47 +456,36 @@ This requires estimation of the variance in expression for each gene, followed b
 HVGs are then identified as those genes with the highest biological components.
 This avoids prioritizing genes that are highly variable due to technical factors such as sampling noise during RNA capture and library preparation.
 
-Ideally, the technical component would be estimated by fitting a mean-variance trend to the spike-in transcripts.
+Ideally, the technical component would be estimated by fitting a mean-variance trend to the spike-in transcripts using the `trendVar` function.
 Recall that the same set of spike-ins was added in the same quantity to each cell.
 This means that the spike-in transcripts should exhibit no biological variability, such that any variance in the counts should be technical in origin.
-Fitting is performed by the `trendVar` function, using a loess curve with a low span as the trend is highly non-linear.
-(Some adjustment of the parameters may be required to obtain a satisfactory fit.)
-
-```{r}
-var.fit <- trendVar(sce, trend="loess", span=0.3)
-```
-
 Given the mean abundance of a gene, the fitted value of the trend can be used as an estimate of the technical component for that gene.
-The biological component of the variance can then be calculated by subtracting the technical component from the total variance of each gene in the `decomposeVar` function.
+The biological component of the variance can then be calculated by subtracting the technical component from the total variance of each gene with the `decomposeVar` function.
+
+In practice, this strategy is compromised by the small number of spike-in transcripts, the uneven distribution of their abundances and (for low numbers of cells) the imprecision of their variance estimates.
+This makes it difficult to accurately fit a complex mean-dependent trend to the spike-in variances.
+An alternative approach is to fit the trend to the variance estimates of the endogenous genes, using the `use.spikes=FALSE` setting as shown below.
+This assumes that the majority of genes are constantly expressed, such that the technical component dominates the total variance for those genes.
+The fitted value of the trend can then be used as an estimate of the technical component.
+Obviously, this is the only approach that can be used if no spike-ins were added in the experiment.
 
 ```{r}
+var.fit <- trendVar(sce, trend="loess", use.spikes=FALSE, span=0.2)
 var.out <- decomposeVar(sce, var.fit)
 ```
 
-In practice, this strategy is compromised by the small number of spike-in transcripts and the uneven distribution of their abundances.
-This makes it difficult to accurately fit a complex trend to the spike-in variances.
-An alternative approach is to fit the mean-variance trend to the endogenous genes.
-This assumes that the majority of genes are constantly expressed, such that the technical component dominates the total variance of expression for those genes.
-The fitted value of the trend can then be used as an estimate of the technical component.
-This is the only option in data sets where no spike-ins were added or not enough spike-in RNA was added to cover the range of means for the endogenous genes.
-
-```{r}
-var.fit2 <- trendVar(sce, trend="loess", use.spikes=FALSE, span=0.2)
-var.out2 <- decomposeVar(sce, var.fit2)
-```
-
 We assess the suitability of the trend fitted to the endogenous variances by examining whether it is consistent with the spike-in variances (Figure ((hvgplothsc))). 
-The endogenous trend passes through most of the spike-in variances, indicating that our assumption (that most genes have low levels of biological variability) is valid.
-In contrast, the spike-in trend is irregular and systematically understates the variance estimates at intermediate abundances.
-This is because the spike-ins themselves are too few in number and their variance estimates are too imprecise for reliable trend fitting.
+The trend passes through or close to most of the spike-in variances, indicating that our assumption (that most genes have low levels of biological variability) is valid.
+This exploits the large number of endogenous genes to obtain a stable trend, with the spike-in transcripts used as diagnostic features rather than in the trend fitting itself. 
+Note that if our assumption did _not_ hold, we would instead fit the trend directly to the spike-in variances with the default `use.spikes=TRUE`.
+This sacrifices stability to reduce systematic errors in the estimate of the biological component for each gene.
 
-```{r hvgplothsc, fig.cap="Variance of normalized log-expression values for each gene in the HSC data set, plotted against the mean log-expression. The red line represents the mean-dependent trend in the technical variance of the spike-in transcripts (also highlighted as red points). The blue line represents the trend fitted to the variances of the endogenous genes."}
+```{r hvgplothsc, fig.cap="Variance of normalized log-expression values for each gene in the HSC data set, plotted against the mean log-expression. The blue line represents the mean-dependent trend fitted to the variances of the endogenous genes. Variance estimates for spike-in transcripts are highlighted in red."}
 plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression", 
     ylab="Variance of log-expression")
 points(var.fit$mean, var.fit$var, col="red", pch=16)
 o <- order(var.out$mean)
-lines(var.out$mean[o], var.out$tech[o], col="red", lwd=2)
-lines(var.out2$mean[o], var.out2$tech[o], col="dodgerblue", lwd=2)
+lines(var.out$mean[o], var.out$tech[o], col="dodgerblue", lwd=2)
 ```
 
 <!--
@@ -509,7 +498,7 @@ Not sure how much effort it's worth to extract HVG information from this part of
 The top HVGs are identified by ranking genes on their biological components.
 This can be used to prioritize interesting genes for further investigation.
 In general, we consider a gene to be a HVG if it has a biological component of at least 1.
-For expression values on the log~2~ scale, this means that gene expression will vary by at least 2-fold around the mean due to biological effects.
+For transformed expression values on the log~2~ scale, this means that gene expression will vary by at least 2-fold around the mean due to biological effects.
 
 <!--
 Alternatively we could select based on p-value, via `testVar` with `min=1` which uses the ratio of the variance to the null value.
@@ -523,9 +512,9 @@ If HVG detection is considered as a screen, it is better to focus on potentially
 -->
 
 ```{r}
-top.hvgs <- order(var.out2$bio, decreasing=TRUE)
-write.table(file="hsc_hvg.tsv", var.out2[top.hvgs,], sep="\t", quote=FALSE, col.names=NA)
-head(var.out2[top.hvgs,])
+top.hvgs <- order(var.out$bio, decreasing=TRUE)
+write.table(file="hsc_hvg.tsv", var.out[top.hvgs,], sep="\t", quote=FALSE, col.names=NA)
+head(var.out[top.hvgs,])
 ```
 
 We recommend checking the distribution of expression values for the top HVGs to ensure that the variance estimate is not being dominated by one or two outlier cells (Figure ((hvgboxplothsc))).
@@ -1020,7 +1009,8 @@ design <- model.matrix(~sce$sex)
 ## Identifying correlated HVGs
 
 We identify HVGs that may be involved in driving population heterogeneity.
-This is done by fitting a trend to the technical variances for the spike-in transcripts as previously described.
+This is done by fitting a trend to the technical variances for the spike-in transcripts.
+(Here, the approach is necessarily different from that used in the HSC data set -- see below for more details.)
 We then compute the biological component of the variance for each endogenous gene by subtracting the fitted value of the trend from the total variance.
 
 ```{r}
@@ -1033,7 +1023,7 @@ gc()
 ```
 
 Figure ((hvgplotbrain)) suggests that the trend is fitted accurately to the technical variances.
-Errors in fitting seem to be negligible relative to the size of the total variances for the endogenous genes.
+Errors in fitting are negligble due to the precision of the variance estimates in a large data set containing thousands of cells.
 The technical variances are also much smaller than those in the HSC data set.
 This is due to the use of UMIs which reduces the noise caused by variable PCR amplification.
 Furthermore, the spike-in trend is consistently lower than the variances of the endogenous genes.
