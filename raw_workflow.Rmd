@@ -442,10 +442,12 @@ sce <- sce[,assignments$phases=="G1"]
 ```
 
 Pre-trained classifiers are available in `r Biocpkg("scran")` for human and mouse data. 
-The mouse classifier used here was trained on embryonic stem cells but can still be generally applied -- the pair-based method is a non-parametric procedure that should be robust to technical differences between data sets, and the transcriptional program associated with cell cycling should be mostly conserved across cell types.
-However, it will be less accurate for cell types that are substantially different from those used in the training set.
+While the mouse classifier used here was trained on data from embryonic stem cells, it can still be generally applied to other data sets.
+This is because the transcriptional program associated with cell cycling should be mostly conserved across cell types.
+In addition, the pair-based method is a non-parametric procedure that is robust to technical differences between data sets.
+However, it will be less accurate for data that are substantially different from those used in the training set.
 In such cases, users can construct a custom classifier from their own training data using the `sandbag` function.
-This may be necessary for other model organisms where pre-trained classifiers are not available.
+This will be necessary for other model organisms where pre-trained classifiers are not available.
 
 ## Identifying HVGs from the normalized log-expression 
 
@@ -471,10 +473,12 @@ The biological component of the variance can then be calculated by subtracting t
 var.out <- decomposeVar(sce, var.fit)
 ```
 
-In practice, this strategy is complicated by the difficulty of accurately fitting a complex trend to a low number of unevenly distributed points.
+In practice, this strategy is compromised by the small number of spike-in transcripts and the uneven distribution of their abundances.
+This makes it difficult to accurately fit a complex trend to the spike-in variances.
 An alternative approach is to fit the mean-variance trend to the endogenous genes.
 This assumes that the majority of genes are constantly expressed, such that the technical component dominates the total variance of expression for those genes.
 The fitted value of the trend can then be used as an estimate of the technical component.
+This is the only option in data sets where no spike-ins were added or not enough spike-in RNA was added to cover the range of means for the endogenous genes.
 
 ```{r}
 var.fit2 <- trendVar(sce, trend="loess", use.spikes=FALSE, span=0.2)
@@ -482,9 +486,9 @@ var.out2 <- decomposeVar(sce, var.fit2)
 ```
 
 We assess the suitability of the trend fitted to the endogenous variances by examining whether it is consistent with the spike-in variances (Figure ((hvgplothsc))). 
-The former passes through the bulk of the latter in the plot below, indicating that our assumption (that most genes have low levels of biological variability) is valid.
-In contrast, the spike-in trend fits poorly as it lies below the variance estimates at mean intervals with few spike-in transcripts.
-The use of an endogenous trend is the only option in data sets where no spike-ins were added or in situations where not enough spike-in RNA was added to cover the range of means for the endogenous genes.
+The endogenous trend passes through most of the spike-in variances, indicating that our assumption (that most genes have low levels of biological variability) is valid.
+In contrast, the spike-in trend is irregular and systematically understates the variance estimates at intermediate abundances.
+This is because the spike-ins themselves are too few in number and their variance estimates are too imprecise for reliable trend fitting.
 
 ```{r hvgplothsc, fig.cap="Variance of normalized log-expression values for each gene in the HSC data set, plotted against the mean log-expression. The red line represents the mean-dependent trend in the technical variance of the spike-in transcripts (also highlighted as red points). The blue line represents the trend fitted to the variances of the endogenous genes."}
 plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression", 
@@ -505,7 +509,7 @@ Not sure how much effort it's worth to extract HVG information from this part of
 The top HVGs are identified by ranking genes on their biological components.
 This can be used to prioritize interesting genes for further investigation.
 In general, we consider a gene to be a HVG if it has a biological component of at least 1.
-For log~2~-counts, this means that gene expression will vary, for biological reasons, by at least 2-fold around the mean.
+For expression values on the log~2~ scale, this means that gene expression will vary by at least 2-fold around the mean due to biological effects.
 
 <!--
 Alternatively we could select based on p-value, via `testVar` with `min=1` which uses the ratio of the variance to the null value.
@@ -1224,7 +1228,7 @@ This is because the clusters have been empirically identified from the data.
 `r Biocpkg("edgeR")` does not account for the uncertainty and stochasticity in clustering, which means that the _p_-values are much lower than they should be. 
 As such, these _p_-values should only be used for ranking candidate markers for follow-up studies.
 However, this is not a concern in other analyses where the groups are pre-defined.
-For such analyses, the FDR-adjusted _p_-value can be directly used to define significant genes for each DE comparison, though some care may be required to deal with plate effects [@hicks2015widespread; @tung2016batch; @lun2016overcoming].
+For such analyses, the FDR-adjusted _p_-value can be directly used to define significant genes for each DE comparison, though some care may be required to deal with plate effects [@hicks2015widespread; @tung2016batch].
 
 ## Additional comments
 
@@ -1536,6 +1540,7 @@ No competing interests were disclosed.
 # Grant information
 
 A.T.L.L. and J.C.M. were supported by core funding from Cancer Research UK (award no. A17197).
+D.J.M. was supported by a CJ Martin Early Career Research Fellowship from the NHMRC.
 D.J.M and J.C.M. were also supported by core funding from EMBL.
 
 # Acknowledgements
