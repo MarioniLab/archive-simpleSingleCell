@@ -81,7 +81,7 @@ Strategies for scRNA-seq data analysis differ markedly from those for bulk RNA-s
 One technical reason is that scRNA-seq data are much noisier than bulk data [@brennecke2013accounting;@marinov2014singlecell].
 Reliable capture (i.e., conversion) of transcripts into cDNA for sequencing is difficult with the low quantity of RNA in a single cell.
 This increases the frequency of drop-out events where none of the transcripts for a gene are captured.
-Dedicated steps are required to deal with this noise, especially during quality control.
+Dedicated steps are required to deal with this noise during analysis, especially during quality control.
 In addition, scRNA-seq data can be used to study cell-to-cell heterogeneity, e.g., to identify new cell subtypes, to characterize differentiation processes, to assign cells into their cell cycle phases, or to identify HVGs driving variability across the population [@vallejos2015basics;@fan2016characterizing;@trapnell2014dynamics].
 This is simply not possible with bulk data, such that custom methods are required to perform these analyses. 
 
@@ -483,9 +483,10 @@ This sacrifices stability to reduce systematic errors in the estimate of the bio
 ```{r hvgplothsc, fig.cap="Variance of normalized log-expression values for each gene in the HSC data set, plotted against the mean log-expression. The blue line represents the mean-dependent trend fitted to the variances of the endogenous genes. Variance estimates for spike-in transcripts are highlighted in red."}
 plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression", 
     ylab="Variance of log-expression")
-points(var.fit$mean, var.fit$var, col="red", pch=16)
 o <- order(var.out$mean)
 lines(var.out$mean[o], var.out$tech[o], col="dodgerblue", lwd=2)
+spike.fit <- trendVar(sce, use.spikes=TRUE) # Just to compute spike-in variances.
+points(spike.fit$mean, spike.fit$var, col="red", pch=16)
 ```
 
 <!--
