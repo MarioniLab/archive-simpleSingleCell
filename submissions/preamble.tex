@@ -99,15 +99,14 @@
 
 \begin{abstract}
 
-Chromatin immunoprecipitation with massively parallel sequencing (ChIP-seq) is widely used to identify the genomic binding sites for protein of interest.
-Most conventional approaches to ChIP-seq data analysis involve the detection of the absolute presence (or absence) of a binding site.
-However, an alternative strategy is to identify changes in the binding intensity between two biological conditions, i.e., differential binding (DB).
-This may yield more relevant results than conventional analyses, as changes in binding can be associated with the biological difference being investigated.
-The aim of this article is to facilitate the implementation of DB analyses, by comprehensively describing a computational workflow for the detection of DB regions from ChIP-seq data.
-The workflow is based primarily on R software packages from the open-source Bioconductor project and covers all steps of the analysis pipeline, from alignment of read sequences to interpretation and visualization of putative DB regions. 
-In particular, detection of DB regions will be conducted using the counts for sliding windows from the csaw package, with statistical modelling performed using methods in the edgeR package. 
-Analyses will be demonstrated on real histone mark and transcription factor data sets.
-This will provide readers with practical usage examples that can be applied in their own studies.
+Single-cell RNA sequencing (scRNA-seq) is widely used to profile the transcriptome of individual cells.
+This provides biological resolution that cannot be matched by bulk RNA sequencing, at the cost of increased technical noise and data complexity.
+The differences between scRNA-seq and bulk RNA-seq data mean that the analysis of the former cannot be performed by recycling bioinformatics pipelines for the latter.
+Rather, dedicated single-cell methods are required at various steps to exploit the cellular resolution while accounting for technical noise.
+This article describes a computational workflow for low-level analyses of scRNA-seq data, based primarily on software packages from the open-source Bioconductor project.
+It covers basic steps including quality control, data exploration and normalization, as well as more complex procedures such as cell cycle phase assignment, identification of highly variable and correlated genes, clustering into subpopulations and marker gene detection.
+Analyses were demonstrated on gene-level count data from several publicly available data sets involving haematopoietic stem cells, brain-derived cells, T-helper cells and mouse embryonic stem cells.
+This will provide a range of usage scenarios from which readers can construct their own analyses.
 
 \end{abstract}
 \listoftodos[F1000Research review comments] % Ignore until review stage
