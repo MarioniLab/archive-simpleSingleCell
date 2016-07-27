@@ -7,7 +7,7 @@ author:
       affiliation: EMBL European Bioinformatics Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SD, United Kingdom
     - name: John C. Marioni
       affiliation: Cancer Research UK Cambridge Institute, Li Ka Shing Centre, Robinson Way, Cambridge CB2 0RE, United Kingdom; EMBL European Bioinformatics Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SD, United Kingdom; Wellcome Trust Sanger Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SA, United Kingdom
-date: 15 July 2016
+date: 27 July 2016
 vignette: >
     %\VignetteIndexEntry{A worfklow for low-level analyses of single-cell RNA-seq data}
     %\VignetteEngine{knitr::rmarkdown}
@@ -1530,7 +1530,7 @@ No competing interests were disclosed.
 # Grant information
 
 A.T.L.L. and J.C.M. were supported by core funding from Cancer Research UK (award no. A17197).
-D.J.M. was supported by a CJ Martin Early Career Research Fellowship from the NHMRC.
+D.J.M. was supported by a CJ Martin Fellowship from the National Health and Medical Research Council of Australia.
 D.J.M and J.C.M. were also supported by core funding from EMBL.
 
 # Acknowledgements
