@@ -90,7 +90,7 @@ Starting from a count matrix, this workflow contains the steps required for qual
 The application of different steps in the workflow will be demonstrated on several public scRNA-seq data sets involving haematopoietic stem cells, brain-derived cells, T-helper cells and mouse embryonic stem cells, generated with a range of experimental protocols and platforms [@wilson2015combined;@zeisel2015brain;@buettner2015computational;@kolod2015singlecell].
 The aim is to provide a variety of modular usage examples that can be applied to construct custom analysis pipelines.
 
-# A simple analysis on haematopoietic stem cells
+# A simple analysis of haematopoietic stem cells
 
 ## Overview
 
@@ -106,6 +106,7 @@ These steps have been described in some detail elsewhere [@love2015rnaseq], and 
 The only additional consideration is that the spike-in information must be included in the pipeline.
 Typically, spike-in sequences can be included as additional FASTA files during genome index building prior to alignment, while genomic intervals for both spike-in transcripts and endogenous genes can be concatenated into a single GTF file prior to counting.
 For users favouring a R-based approach to read alignment and counting, we suggest using the methods in the `r Biocpkg("Rsubread")` package [@liao2013subread;@liao2014featurecounts].
+Alternatively, rapid quantification of expression with alignment-free methods such as _kallisto_ [@bray2016near] or _Salmon_ [@patro2015accurate] can be performed using the functions `runKallisto` and `runSalmon` in the `r Biocpkg("scater")` package.
 
 ## Count loading
 
@@ -277,12 +278,12 @@ hist(log10(ave.counts), breaks=100, main="", col="grey80",
 abline(v=log10(1), col="blue", lwd=2, lty=2)
 ```
 
-We can also have a look at the identities of the top set of retained high-abundance genes.
+We can also have a look at the identities of the top set of retained high-abundance genes (Figure ((topgenehsc))).
 This should generally be dominated by constitutively expressed transcripts, such as those for ribosomal or mitochondrial proteins, actin and histones.
 If other features are present, e.g., pseudogenes or predicted transcripts, this may be indicative of some upstream processing error.
 
-```{r}
-sort(ave.counts, decreasing=TRUE)[1:50]
+```{r topgenehsc, fig.height=9, fig.width=6, fig.cap="Percentage of total counts assigned to the top 50 most highly-abundant features in the HSC data set. For each feature, each bar represents the percentage assigned to that feature for a single cell, while the circle represents the average across all cells. Bars are coloured by the total number of expressed features in each cell, while circles are coloured according to whether the feature is labelled as a control feature."}
+plotQC(sce, type = "highest-expression", n=50) + fontsize
 ```
 
 An alternative approach to gene filtering is to select genes that have non-zero counts in at least _n_ cells. 
@@ -708,7 +709,9 @@ saveRDS(file="hsc_data.rds", sce)
 ```
 
 A variety of methods are available to perform more complex analyses on the processed expression data.
-For example, cells can be ordered by pseudotime (e.g., for progress along a differentiation pathway) with `r Biocpkg("monocle")` [@trapnell2014dynamics]; cell-state hierarchies can be characterized with the `r Biocpkg("sincell")` package [@julia2015sincell]; and oscillatory behaviour can be identified using `r Biocpkg("Oscope")` [@leng2015oscope].
+For example, cells can be ordered by pseudotime (e.g., for progress along a differentiation pathway) with `r Biocpkg("monocle")` [@trapnell2014dynamics] or `r Biocpkg("TSCAN")` [@ji2016tscan]; 
+cell-state hierarchies can be characterized with the `r Biocpkg("sincell")` package [@julia2015sincell];
+and oscillatory behaviour can be identified using `r Biocpkg("Oscope")` [@leng2015oscope].
 HVGs can be used in gene set enrichment analyses to identify biological pathways and processes with heterogeneous activity, using packages designed for bulk data like `r Biocpkg("topGO")` or with dedicated single-cell methods like `r Biocpkg("scde")` [@fan2016characterizing].
 Full descriptions of these analyses are outside the scope of this workflow, so interested users are advised to consult the relevant documentation.
 
@@ -722,7 +725,7 @@ rm(sce, all.counts)
 gc()
 ```
 
-# A more complex analysis on brain cell types
+# A more complex analysis of brain cell types
 
 ## Overview
 
@@ -1495,6 +1498,7 @@ sum(is.spike)
 ```
 
 All of this information can be consolidated into a `SCESet` object for further manipulation.
+Alternatively, annotation from BioMart resources can be directly added to the object using the `getBMFeatureAnnos` function from `r Biocpkg("scater")`.
 
 ```{r}
 anno <- anno[,-1,drop=FALSE]
@@ -1521,7 +1525,7 @@ gc()
 # Conclusions
 
 This workflow provides a step-by-step guide for performing basic analyses of single-cell RNA-seq data.
-It provides instructions for a number of low-level steps such as quality control, normalization, cell cycle phase assignment, data exploration, HVG and DEG detection, and clustering.
+It provides instructions for a number of low-level steps such as quality control, normalization, cell cycle phase assignment, data exploration, HVG and markger gene detection, and clustering.
 This is done with a number of different data sets to provide a range of usage examples.
 In addition, the processed data can be easily used for higher-level analyses with other Bioconductor packages.
 We anticipate that this workflow will assist readers in assembling analyses of their own scRNA-seq data.
