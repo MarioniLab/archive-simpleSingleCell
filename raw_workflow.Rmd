@@ -258,7 +258,7 @@ Users interested in the more sophisticated approaches are referred to the `r Bio
 Low-abundance genes are problematic as zero or near-zero counts do not contain enough information for reliable statistical inference.
 In addition, the discreteness of the counts may interfere with downstream statistical procedures, e.g., by compromising the accuracy of asymptotic approximations.
 Here, low-abundance genes are defined as those with an average count below a filter threshold of 1.
-These genes are likely to be dominated by drop-out events [@brennecke2013technical] which reduces their usefulness for downstream analyses.
+These genes are likely to be dominated by drop-out events [@brennecke2013technical] which reduces their usefulness in later analyses.
 Removal of these genes mitigates discreteness and reduces the amount of computational work without major loss of information.
 
 ```{r}
@@ -1238,7 +1238,7 @@ For example, in a mixed population of CD4^+^-only, CD8^+^-only, double-positive 
 With our approach, both of these genes will be picked up as candidate markers as they will be DE between at least one pair of subpopulations.
 A combination of markers can then be chosen to characterize a subpopulation, which is more flexible than trying to find uniquely DE genes.
 
-It must be stressed that the _p_-values reported here cannot be interpreted as measures of significance.
+It must be stressed that the _p_-values computed here cannot be interpreted as measures of significance.
 This is because the clusters have been empirically identified from the data.
 `r Biocpkg("edgeR")` does not account for the uncertainty and stochasticity in clustering, which means that the _p_-values are much lower than they should be. 
 As such, these _p_-values should only be used for ranking candidate markers for follow-up studies.
