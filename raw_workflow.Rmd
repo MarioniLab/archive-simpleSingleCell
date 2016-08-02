@@ -258,7 +258,7 @@ Users interested in the more sophisticated approaches are referred to the `r Bio
 Low-abundance genes are problematic as zero or near-zero counts do not contain enough information for reliable statistical inference.
 In addition, the discreteness of the counts may interfere with downstream statistical procedures, e.g., by compromising the accuracy of asymptotic approximations.
 Here, low-abundance genes are defined as those with an average count below a filter threshold of 1.
-These genes are likely to be dominated by drop-out events [@brennecke2013technical] which reduces their usefulness in later analyses.
+These genes are likely to be dominated by drop-out events [@brennecke2013accounting] which reduces their usefulness in later analyses.
 Removal of these genes mitigates discreteness and reduces the amount of computational work without major loss of information.
 
 ```{r}
