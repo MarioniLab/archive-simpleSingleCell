@@ -415,7 +415,7 @@ multiplot(out5, out10, out20, cols=3)
 ```
 
 There are many other dimensionality reduction techniques that we have not considered here but could also be used, e.g., multidimensional scaling, diffusion maps.
-These have their own advantages and disadvantages -- for example, diffusion maps (see `plotDiffusionMap`) place cells along a continuous trajectory and are suited for visualizing graduated processes like differentiation [@angerer2015destiny].
+These have their own advantages and disadvantages -- for example, diffusion maps (see `plotDiffusionMap`) place cells along a continuous trajectory and are suited for visualizing graduated processes like differentiation [@angerer2016destiny].
 The `selectorPlot` function from `r Biocpkg("scran")` can also be used to interactively select groups of cells in two-dimensional space.
 This facilitates data exploration as visually-identified subpopulations can be directly selected for further examination.
 
@@ -692,9 +692,10 @@ A more informative strategy is to colour cells in the plot based on the expressi
 This improves visualization by highlighting changes in expression across the cell population.
 
 ```{r pcareduxhsc, fig.width=10, fig.height=6, fig.cap="PCA (left) and _t_-SNE plots (right) using only the expression values for significantly correlated HVGs in the HSC data set. Cells are coloured according to the level of _H2-Aa_ expression."}
-out.pca <- plotPCA(sce, exprs_values="exprs", feature_set=chosen, colour_by="H2-Aa") + fontsize
-set.seed(100)
-out.tsne <- plotTSNE(sce, exprs_values="exprs", feature_set=chosen, colour_by="H2-Aa") + fontsize
+out.pca <- plotPCA(sce, exprs_values="exprs", feature_set=chosen, 
+    colour_by="H2-Aa") + fontsize
+out.tsne <- plotTSNE(sce, exprs_values="exprs", feature_set=chosen, 
+    colour_by="H2-Aa", rand_seed=100) + fontsize
 multiplot(out.pca, out.tsne, cols=2)
 ```
 
@@ -995,10 +996,8 @@ Similar results are observed with _t_-SNE plots (Figure ((tsneplotbrain))).
 Again, users should set the seed to a constant value to ensure that the results are reproducible.
 
 ```{r tsneplotbrain, fig.width=12, fig.height=6, fig.cap="_t_-SNE plots constructed from the normalized log-expression values of cells in the brain data set. Left: cells are coloured according to the tissue of origin (cortex or hippocampus). Right: cells are coloured according to the sex of the mouse -- male (-1), female (1) or unassigned (0)."}
-set.seed(100)
-tsne1 <- plotTSNE(sce, exprs_values="exprs", colour_by="tissue") + fontsize
-set.seed(100)
-tsne2 <- plotTSNE(sce, exprs_values="exprs", colour_by="sex") + fontsize
+tsne1 <- plotTSNE(sce, exprs_values="exprs", colour_by="tissue", rand_seed=100) + fontsize
+tsne2 <- plotTSNE(sce, exprs_values="exprs", colour_by="sex", rand_seed=100) + fontsize
 multiplot(tsne1, tsne2, cols=2)
 ```
 
