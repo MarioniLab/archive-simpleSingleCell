@@ -1122,6 +1122,20 @@ library(limma)
 norm.exprs <- removeBatchEffect(norm.exprs, batch=sce$sex)
 ```
 
+<!--
+Comparing residuals between blocking factor levels can run into problems if population structure varies between levels.
+Imagine a case where we have two batches, NO batch effect and different proportions of the same cell types in each batch.
+Computing residuals can result in spurious differences within each cell type for genes that are DE between cell types.
+This is because the batch-specific average will be different due to the different composition of each batch.
+It's actually worse than a completely confounding effect, as at least total confounding would just result in loss of differences and a false negative.
+
+This seems to only affect situations where residuals need to compared across levels.
+For variance calculations, residual effects are evaluated in terms of their total size, so this is less of an issue.
+In fact, the whole point is to pick up highly variable genes that aren't captured well by the model, so this is a good thing.
+For correlations with one-way layouts, comparisons are done within each level so it should be fine.
+There are problems for additive designs, but we knew that already.
+-->
+
 The heatmap in Figure ((heatmapbrain)) shows systematic differences between groups of cells with distinct patterns of expression.
 This is consistent with the presence of well-defined subpopulations.
 Clusters corresponding to these subpopulations are defined by applying a dynamic tree cut [@langfelder2008defining] to the dendrogram.
