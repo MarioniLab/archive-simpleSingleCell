@@ -7,7 +7,7 @@ author:
       affiliation: EMBL European Bioinformatics Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SD, United Kingdom
     - name: John C. Marioni
       affiliation: Cancer Research UK Cambridge Institute, Li Ka Shing Centre, Robinson Way, Cambridge CB2 0RE, United Kingdom; EMBL European Bioinformatics Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SD, United Kingdom; Wellcome Trust Sanger Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SA, United Kingdom
-date: 1 August 2016
+date: 5 August 2016
 vignette: >
     %\VignetteIndexEntry{A worfklow for low-level analyses of single-cell RNA-seq data}
     %\VignetteEngine{knitr::rmarkdown}
@@ -810,7 +810,7 @@ gc()
 ## Quality control on the cells 
 
 The original authors of the study have already removed low-quality cells prior to data publication.
-Nonetheless, we can compute some metrics to check that whether the remaining cells are satisfactory.
+Nonetheless, we compute some quality control metrics to check whether the remaining cells are satisfactory.
 
 ```{r}
 sce <- calculateQCMetrics(sce, feature_controls=list(Spike=is.spike, Mt=is.mito)) 
@@ -848,8 +848,8 @@ mito.drop <- isOutlier(sce$pct_counts_feature_controls_Mt, nmads=3, type="higher
 spike.drop <- isOutlier(sce$pct_counts_feature_controls_Spike, nmads=3, type="higher")
 ```
 
-Removal of low-quality cells can then be performed by combining all of the metrics.
-The majority of cells are retained, which suggests that the original quality control procedures were generally adequate.
+Removal of low-quality cells is then performed by combining the filters for all of the metrics.
+The vast majority of cells are retained which suggests that the original quality control procedures were generally adequate.
 
 ```{r}
 sce <- sce[,!(libsize.drop | feature.drop | spike.drop | mito.drop)]
@@ -867,7 +867,7 @@ Low-abundance genes are removed by applying a simple mean-based filter.
 We use a lower threshold for UMI counts compared to that used for read counts.
 This is because the number of transcript molecules will always be lower than the number of reads generated from such molecules.
 Technical variability is also lower due to the elimination of amplification biases when UMIs are used [@islam2014quantitative].
-This allows genes to be retained at lower abundances as the biological signal is no longer dominated by noise.
+This allows genes to be retained at lower abundances as the biological signal is no longer dominated by technical noise.
 Despite the reduced threshold, the number of retained genes is lower than that in the HSC data set, simply because the library sizes are much smaller with UMI counts.
 
 ```{r}
@@ -953,7 +953,7 @@ However, examination of Figure ((phaseplotbrain)) indicates that many of the G1 
 This highlights the risks of using a classifier on a data set that is substantially different to the training set.
 In particular, the classifier was trained on C1 SMARTer data [@scialdone2015computational] and accounts for the biases in that protocol. 
 The brain data set uses UMI counts, which has an entirely different set of biases, e.g., 3'-end coverage only, no length bias, no amplification noise.
-These new biases (and the absence of expected biases) will confound the classifier and interfere with accurate calling of cell cycle phase.
+These new biases and the absence of expected biases will confound the classifier and interfere with accurate calling of cell cycle phase.
 
 ```{r, echo=FALSE, results='hide', message=FALSE}
 mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", package="scran"))
@@ -1032,7 +1032,7 @@ In summary, the major differences between cells are associated with the tissue o
 This is likely to be a relevant biological effect rather than a technical one, e.g., different cell types in different tissues.
 As such, we will not block on tissue in our downstream analyses.
 We instead consider the sex of the mice to be an uninteresting technical effect, and we block on it to ensure that there are no sex-driven differences between cells.
-Strictly speaking, this is unnecessary as there are no differences between sexes in Figure ((pcaplotbrain)).
+Strictly speaking, this is probably unnecessary as there are no differences between sexes in Figure ((pcaplotbrain)).
 However, it provides a useful demonstration of how to perform the downstream analyses in other data sets where batch effects might be present.
 
 ```{r}
@@ -1087,7 +1087,7 @@ all.names <- matrix(rownames(sce)[examined], nrow=length(examined), ncol=ncol(sc
 boxplot(split(exprs(sce)[examined,], all.names), las=2, ylab="Normalized log-expression", col="grey80")
 ```
 
-To identify genes involved in defining subpopulations, the top 200 HVGs can be tested for significant pairwise correlations.
+To identify genes involved in defining subpopulations, the top set of HVGs is tested for significant pairwise correlations.
 Here, the number of significantly correlated pairs is much higher than in the HSC data set, indicating that strong substructure is present.
 These results are also saved to file for use in designing validation experiments.
 
@@ -1109,8 +1109,7 @@ sig.cor <- var.cor$FDR <= 0.05
 sum(sig.cor)
 ```
 
-Correlated HVGs can also be used to construct a heatmap that can be inspected for subpopulations.
-Here, we use the normalized log-expression values for the top HVGs that have significant correlations at a FDR of 5%.
+The log-expression values for correlated HVGs are used to construct a heatmap that can be inspected for subpopulations.
 We also apply the `removeBatchEffect` function from the `r Biocpkg("limma")` package [@ritchie2015limma] to remove the sex effect.
 This ensures that any differences due to sex will not dominate the visualization of the expression profiles.
 (Note that, if an analysis method can accept a design matrix, then blocking on nuisance factors in the design matrix is preferable to manipulating the expression values with `removeBatchEffect`.
@@ -1135,9 +1134,11 @@ For variance calculations, residual effects are evaluated in terms of their tota
 In fact, the whole point is to pick up highly variable genes that aren't captured well by the model, so this is a good thing.
 For correlations with one-way layouts, comparisons are done within each level so it should be fine.
 There are problems for additive designs, but we knew that already.
+
+With all that being said, correction is probably the lesser of two evils if you have a strong batch effect that compromises the visualization.
 -->
 
-The heatmap in Figure ((heatmapbrain)) shows systematic differences between groups of cells with distinct patterns of expression.
+Figure ((heatmapbrain)) shows systematic differences between groups of cells with distinct patterns of expression.
 This is consistent with the presence of well-defined subpopulations.
 Clusters corresponding to these subpopulations are defined by applying a dynamic tree cut [@langfelder2008defining] to the dendrogram.
 This exploits the shape of the branches in the dendrogram to refine the cluster definitions, and is more appropriate than `cutree` for complex dendrograms.
@@ -1183,12 +1184,10 @@ colnames(de.design)
 ```
 
 We set up a `DGEList` object for entry into the `r Biocpkg("edgeR")` analysis.
-Spike-in transcripts are removed as they are not relevant for marker identification.
-The size factors are divided by the library sizes to obtain normalization factors for all cells.
-(The normalization factor is simply an alternative formulation of the size factor, and quantifies the bias that is not caused by differences in library size between samples.)
+This new object contains all relevant information from the original `SCESet` object, including the counts and (library size-adjusted) size factors.
 
 ```{r}
-y <- convertTo(sce)
+y <- convertTo(sce, type="edgeR")
 ```
 
 `r Biocpkg("edgeR")` uses negative binomial (NB) distributions to model the read/UMI counts for each sample.
@@ -1243,7 +1242,7 @@ We also examine their expression profiles to verify that the DE signature is rob
 Figure ((heatmapmarkerbrain)) indicates that most of the top markers have strong and consistent up- or downregulation in cells of cluster 1 compared to some or all of the other clusters.
 Thus, cells from the subpopulation of interest can be identified as those that express the upregulated markers and do not express the downregulated markers.
 
-```{r heatmapmarkerbrain, fig.cap="Heatmap of mean-centred normalized log-expression values for the top set of markers for cluster 1 in the brain data set. Column colours represent the cluster to which each cell is assigned."}
+```{r heatmapmarkerbrain, fig.cap="Heatmap of mean-centred normalized log-expression values for the top set of markers for cluster 1 in the brain data set. Column colours represent the cluster to which each cell is assigned, as indicated by the legend."}
 write.table(marker.set, file="brain_marker_1.tsv", sep="\t", quote=FALSE, col.names=NA)
 top.markers <- marker.set$Gene[marker.set$Top <= 10]
 norm.exprs <- exprs(sce)[top.markers,,drop=FALSE]
@@ -1255,7 +1254,7 @@ legend("bottomleft", col=clust.col, legend=sort(unique(my.clusters)), pch=16)
 
 Note that many of the markers in Figure ((heatmapmarkerbrain)) are not uniquely up- or downregulated in the chosen cluster.
 Testing for unique DE tends to be too stringent as it overlooks important genes that are expressed in two or more clusters.
-For example, in a mixed population of CD4^+^-only, CD8^+^-only, double-positive and double-negative T-cells, neither _Cd4_ or _Cd8_ would be detected as subpopulation-specific markers because each gene is expressed in two subpopulations.
+For example, in a mixed population of CD4^+^-only, CD8^+^-only, double-positive and double-negative T cells, neither _Cd4_ or _Cd8_ would be detected as subpopulation-specific markers because each gene is expressed in two subpopulations.
 With our approach, both of these genes will be picked up as candidate markers as they will be DE between at least one pair of subpopulations.
 A combination of markers can then be chosen to characterize a subpopulation, which is more flexible than trying to find uniquely DE genes.
 
@@ -1291,12 +1290,12 @@ Differences in the coverage of the spike-in transcripts can only be due to cell-
 Scaling normalization is then applied to equalize spike-in coverage across cells.
 
 The choice between these two normalization strategies depends on the biology of the cells and the features of interest.
-If there is no reliable house-keeping set, and if the majority of genes are expected to be DE, then spike-in normalization may be the only option for removing technical biases.
+If the majority of genes are expected to be DE and there is no reliable house-keeping set, then spike-in normalization may be the only option for removing technical biases.
 Spike-in normalization should also be used if differences in the total RNA content of individual cells are of interest.
 This is because the same amount of spike-in RNA is added to each cell, such that the relative quantity of endogenous RNA can be easily quantified in each cell.
 For non-DE normalization, any change in total RNA content will affect all genes in the non-DE subset, such that it will be treated as bias and removed.
 
-The use of spike-in normalization can be demonstrated on the HSC data set.
+We demonstrate the use of spike-in normalization on the HSC data set.
 We load in the `SCESet` object that we saved earlier, which contains the count data for filtered genes in high-quality HSCs.
 We then apply the `computeSpikeFactors` method to estimate size factors for all cells.
 This method computes the total count over all spike-in transcripts in each cell, and calculates size factors to equalize the total spike-in count across cells. 
@@ -1311,7 +1310,7 @@ sce <- computeSpikeFactors(sce, general.use=TRUE)
 Applying `normalize` will use the spike-in-based size factors to compute normalized log-expression values.
 Unlike in the previous analyses, we do not have to set separate size factors for the spike-in transcripts.
 This is because the relevant factors are already being used for all genes and spike-in transcripts when `general.use=TRUE`.
-(The exception is if there are multiple spike-in sets used in the experiment, that behave differently and need to be normalized separately.)
+(The exception is if the experiment uses multiple spike-in sets that behave differently and need to be normalized separately.)
 
 ```{r}
 sce <- normalize(sce)
@@ -1399,8 +1398,8 @@ fit.block <- trendVar(sce, use.spikes=NA, trend="loess", design=design)
 dec.block <- decomposeVar(sce, fit.block)
 ```
 
-For analyses that do not use design matrices, we can remove the cell cycle effect directly from the expression values using `removeBatchEffect`.
-The result of this procedure can be visualized with some PCA plots in Figure ((pcaplotth2)).
+For analyses that do not use design matrices, we remove the cell cycle effect directly from the expression values using `removeBatchEffect`.
+The result of this procedure is visualized with some PCA plots in Figure ((pcaplotth2)).
 Before removal, cells in the G1 and non-G1 phases tend to be concentrated in different parts of the plot.
 Afterwards, more intermingling is observed between the phases which suggests that the cell cycle effect has been mitigated.
 
@@ -1422,7 +1421,7 @@ multiplot(out, out2, cols=2)
 ```
 
 As an aside, this data set contains cells at various stages of differentiation [@mahata2014singlecell].
-This is an ideal use case for diffusion maps, which perform dimensionality reduction along a continuous process.
+This is an ideal use case for diffusion maps which perform dimensionality reduction along a continuous process.
 In Figure ((diffusionth2)), cells are arranged along a trajectory in the low-dimensional space.
 The first diffusion component is likely to correspond to T~H~2 differentiation, given that a key regulator _Gata3_ [@zhu2006gata3] changes in expression from left to right.
 
@@ -1483,7 +1482,7 @@ In contrast, cyclone wouldn't care as the relative amounts of expression within 
 
 Feature-counting tools typically report genes in terms of standard identifiers like Ensembl or Entrez.
 These identifiers are used as they are unambiguous and highly stable.
-However, they are difficult to interpret compared to gene symbols, which are more often used in the literature.
+However, they are difficult to interpret compared to the gene symbols which are more commonly used in the literature.
 We can easily convert from one to the other using annotation packages like `r Biocpkg("org.Mm.eg.db")`.
 This is demonstrated below for Ensembl identifiers in a mESC data set [@kolod2015singlecell] obtained from http://www.ebi.ac.uk/teichmann-srv/espresso.
 The `select` call extracts the specified data from the annotation object, and the `match` call ensures that the first gene symbol is used if multiple symbols correspond to a single Ensembl identifier.
