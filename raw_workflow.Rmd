@@ -125,8 +125,9 @@ sce <- newSCESet(countData=all.counts)
 dim(sce)
 ```
 
-We annotate those rows corresponding to ERCC spike-ins and mitochondrial genes.
-This information can be easily extracted from the row names, though in general, identifying mitochondrial genes from standard identifiers like Ensembl requires extra annotation.
+We identify the rows corresponding to ERCC spike-ins and mitochondrial genes.
+For this data set, this information can be easily extracted from the row names.
+In general, though, identifying mitochondrial genes from standard identifiers like Ensembl requires extra annotation (see below).
 
 ```{r}
 is.spike <- grepl("^ERCC", rownames(sce))
@@ -142,8 +143,8 @@ head(colnames(pData(sce)))
 ```
 
 We need to explicitly indicate that the ERCC set is, in fact, a spike-in set.
-This is necessary as spike-ins require special treatment in some downstream steps (e.g., normalization, see below).
-We can do this easily by indicating the name of the spike-in set to `isSpike`.
+This is necessary as spike-ins require special treatment in some downstream steps such as variance estimation and normalization.
+We do this by supplying the name of the spike-in set to `isSpike`.
 
 ```{r}
 library(scran)
@@ -189,7 +190,7 @@ feature.drop <- isOutlier(sce$total_features, nmads=3, type="lower", log=TRUE)
 
 Another measure of quality is the proportion of reads mapped to genes in the mitochondrial genome.
 High proportions are indicative of poor-quality cells [@islam2014quantitative;@ilicic2016classification], possibly because of increased apoptosis and/or loss of cytoplasmic RNA from lysed cells.
-A similar case can be made for the proportion of reads mapped to spike-in transcripts.
+Similar reasoning is applied to the proportion of reads mapped to spike-in transcripts.
 The quantity of spike-in RNA added to each cell should be constant, which means that the proportion should increase upon loss of endogenous RNA in low-quality cells.
 The distributions of mitochondrial and spike-in proportions across all cells are shown in Figure ((controlplothsc)).
 
@@ -224,7 +225,7 @@ spike.drop <- isOutlier(sce$pct_counts_feature_controls_ERCC, nmads=3, type="hig
 ```
 
 Subsetting by column will retain only the high-quality cells that pass each filter described above.
-We can examine the number of cells removed by each filter, and the total number remaining in the data set.
+We examine the number of cells removed by each filter as well as the total number of retained cells.
 Removal of a substantial proportion of cells (> 10%) may be indicative of an overall issue with data quality.
 It may also reflect genuine biology in extreme cases (e.g., low numbers of expressed genes in erythrocytes) for which the filters described here are not appropriate.
 
@@ -239,7 +240,7 @@ data.frame(ByLibSize=sum(libsize.drop), ByFeature=sum(feature.drop),
     ByMito=sum(mito.drop), BySpike=sum(spike.drop), Remaining=ncol(sce))
 ```
 
-An alternative approach to quality control is to perform a principal components analysis (PCA) based on the quality metrics for each cell, e.g., the total number of reads, the total number of features, the proportion of mitochondrial or spike-in reads.
+An alternative approach to quality control is to perform a principal components analysis (PCA) based on the quality metrics for each cell, e.g., the total number of reads, the total number of features and the proportion of mitochondrial or spike-in reads.
 Outliers on a PCA plot may be indicative of low-quality cells that have aberrant technical properties compared to the (presumed) majority of high-quality cells.
 In Figure ((pcaqualplothsc)), no obvious outliers are present which is consistent with the removal of suspect cells in the preceding quality control steps.
 
@@ -259,7 +260,7 @@ Users interested in the more sophisticated approaches are referred to the `r Bio
 Low-abundance genes are problematic as zero or near-zero counts do not contain enough information for reliable statistical inference.
 In addition, the discreteness of the counts may interfere with downstream statistical procedures, e.g., by compromising the accuracy of asymptotic approximations.
 Here, low-abundance genes are defined as those with an average count below a filter threshold of 1.
-These genes are likely to be dominated by drop-out events [@brennecke2013accounting] which reduces their usefulness in later analyses.
+These genes are likely to be dominated by drop-out events [@brennecke2013accounting] which limits their usefulness in later analyses.
 Removal of these genes mitigates discreteness and reduces the amount of computational work without major loss of information.
 
 ```{r}
@@ -268,8 +269,8 @@ keep <- ave.counts >= 1
 sum(keep)
 ```
 
-To check whether the chosen threshold is suitable, we can examine the distribution of log-means across all genes (Figure ((abhisthsc))).
-The peak represents the bulk of moderately expressed genes, while the rectangular component corresponds to lowly expressed genes.
+To check whether the chosen threshold is suitable, we examine the distribution of log-means across all genes (Figure ((abhisthsc))).
+The peak represents the bulk of moderately expressed genes while the rectangular component corresponds to lowly expressed genes.
 The filter threshold should cut the distribution at some point along the rectangular component to remove the majority of low-abundance genes.
 
 ```{r abhisthsc, fig.cap="Histogram of log-average counts for all genes in the HSC data set. The filter threshold is represented by the blue line."}
@@ -278,7 +279,7 @@ hist(log10(ave.counts), breaks=100, main="", col="grey80",
 abline(v=log10(1), col="blue", lwd=2, lty=2)
 ```
 
-We can also have a look at the identities of the top set of retained high-abundance genes (Figure ((topgenehsc))).
+We also look at the identities of the most highly expressed genes (Figure ((topgenehsc))).
 This should generally be dominated by constitutively expressed transcripts, such as those for ribosomal or mitochondrial proteins, actin and histones.
 If other features are present, e.g., pseudogenes or predicted transcripts, this may be indicative of some upstream processing error.
 
@@ -298,7 +299,7 @@ alt.keep <- numcells >= 10
 sum(alt.keep)
 ```
 
-The relationship between the number of expressing cells and the mean can be examined more closely in Figure ((geneplothsc)).
+The relationship between the number of expressing cells and the mean is shown in Figure ((geneplothsc)).
 The two statistics tend to be well-correlated so filtering on either should give roughly similar results.
 
 ```{r geneplothsc, fig.cap="Number of expressing cells against the log-mean expression for each gene in the HSC data set. Spike-in transcripts are highlighted in red."}
@@ -363,7 +364,7 @@ Attempting to normalize the spike-in counts with the gene-based size factors wil
 
 To avoid this, we compute a separate set of size factors for the spike-in set.
 For each cell, the spike-in-specific size factor is defined as the total count across all transcripts in the spike-in set.
-This assumes that all spike-in transcripts are not differentially expressed -- which is a reasonable assumption, as the same spike-ins should have been added to each cell.
+This assumes that all spike-in transcripts are not differentially expressed -- which is a reasonable assumption, as the same amount and composition of spike-in RNA should have been added to each cell.
 (See below for a more detailed discussion on spike-in normalization.)
 These size factors are stored in a separate field of the `SCESet` object by setting `general.use=FALSE` in `computeSpikeFactors`.
 This ensures that they will only be used with the spike-in transcripts but not the endogenous genes.
@@ -395,7 +396,7 @@ This seems better than square-rooting it, which only works for the Poisson.
 
 Dimensionality reduction is often useful to examine major features of the data prior to more quantitative analyses.
 Of particular interest is whether the HSCs partition into distinct subpopulations.
-This can be visualized by constructing a PCA plot from the normalized log-expression values (Figure ((pcaplothsc))).
+This is visualized by constructing a PCA plot from the normalized log-expression values (Figure ((pcaplothsc))).
 Cells with similar expression profiles should be located close together in the plot, while dissimilar cells should be far apart.
 By default, the `plotPCA` function will only use the top 500 genes with the largest variances.
 This focuses on the genes that are driving heterogeneity in the population and should provide greater visual resolution of any systematic differences between groups of cells.
@@ -406,7 +407,7 @@ plotPCA(sce, exprs_values="exprs") + fontsize
 
 Another popular approach to dimensionality reduction is the _t_-stochastic neighbour embedding (_t_-SNE) method [@van2008visualizing].
 _t_-SNE tends to work better than PCA for separating cells in large data sets with many subpopulations, at the cost of more computational effort and complexity.
-Like `plotPCA`, the `plotTSNE` function will use the genes with the largest variances to focus on heterogeneity in the population.
+Like `plotPCA`, the `plotTSNE` function will use the genes with the largest variances to highlight any heterogeneity in the population.
 However, unlike PCA, _t_-SNE is a stochastic method -- users should run the algorithm several times to ensure that the results are representative, and then set a seed to ensure that the chosen results are reproducible.
 It is also advisable to test different settings of the "perplexity" parameter as this will affect the distribution of points in the low-dimensional space (Figure ((tsneplothsc))).
 
@@ -434,7 +435,7 @@ Pairs with changes in the sign across cell cycle phases were chosen as markers.
 Cells in a test data set can then be classified into the appropriate phase, based on whether the observed sign for each marker pair is consistent with one phase or another.
 This approach is implemented in the `cyclone` function using a pre-trained set of marker pairs for mouse data.
 The result of phase assignment for each cell in the HSC data set is shown in Figure ((phaseplothsc)).
-(Some additional work is necessary to match the gene symbols in the data to the Ensembl annotation in the set of pairs.)
+(Some additional work is necessary to match the gene symbols in the data to the Ensembl annotation in the pre-trained marker set.)
 
 ```{r phaseplothsc, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the HSC data set, where each point represents a cell."}
 mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", package="scran"))
@@ -483,7 +484,7 @@ In practice, this strategy is compromised by the small number of spike-in transc
 This makes it difficult to accurately fit a complex mean-dependent trend to the spike-in variances.
 An alternative approach is to fit the trend to the variance estimates of the endogenous genes, using the `use.spikes=FALSE` setting as shown below.
 This assumes that the majority of genes are constantly expressed, such that the technical component dominates the total variance for those genes.
-The fitted value of the trend can then be used as an estimate of the technical component.
+The fitted value of the trend is then used as an estimate of the technical component.
 Obviously, this is the only approach that can be used if no spike-ins were added in the experiment.
 
 ```{r}
@@ -514,7 +515,7 @@ Not sure how much effort it's worth to extract HVG information from this part of
 -->
 
 The top HVGs are identified by ranking genes on their biological components.
-This can be used to prioritize interesting genes for further investigation.
+These genes are interesting as they drive differences between cells, and should be prioritized for further investigation.
 In general, we consider a gene to be a HVG if it has a biological component of at least 1.
 For transformed expression values on the log~2~ scale, this means that gene expression will vary by at least 2-fold around the mean due to biological effects.
 
@@ -586,7 +587,7 @@ head(var.cor)
 
 The significance of each correlation is determined using a permutation test.
 For each pair of genes, the null hypothesis is that the expression profiles of two genes are independent.
-Shuffling the profiles and recalculating the correlation will yield a null distribution that can be used to obtain a _p_-value for each observed correlation value [@phipson2010permutation].
+Shuffling the profiles and recalculating the correlation will yield a null distribution that is used to obtain a _p_-value for each observed correlation value [@phipson2010permutation].
 Correction for multiple testing across many gene pairs is performed by controlling the false discovery rate (FDR) at 5%.
 
 ```{r}
@@ -594,9 +595,9 @@ sig.cor <- var.cor$FDR <= 0.05
 summary(sig.cor)
 ```
 
-Larger sets of correlated genes can be assembled by treating genes as nodes in a graph and each pair of genes with significantly large correlations as an edge.
-In this manner, an undirected graph can be constructed using methods in the `r Biocpkg("RBGL")` package.
-Highly connected subgraphs can then be identified and defined as gene sets.
+Larger sets of correlated genes are assembled by treating genes as nodes in a graph and each pair of genes with significantly large correlations as an edge.
+In particular, an undirected graph is constructed using methods in the `r Biocpkg("RBGL")` package.
+Highly connected subgraphs are then identified and defined as gene sets.
 This provides a convenient summary of the pairwise correlations between genes.
 
 ```{r, message=FALSE}
@@ -616,7 +617,7 @@ This suggests that any substructure in the data will be modest, which may not be
 
 The correlation results can also be used directly in follow-up experiments to verify if any substructure is present.
 This is done by using sets of correlated HVGs as markers in procedures such as fluorescence-activated cell sorting, immunohistochemistry or RNA flourescence _in situ_ hybridization.
-In this manner, the existence of subpopulations with distinct expression patterns for the chosen HVGs can be experimentally validated.
+In this manner, the existence of subpopulations with distinct expression patterns for the chosen genes can be experimentally validated.
 Negatively correlated pairs may be particularly useful as they provide more power to discriminate between subpopulations.
 In the simplest example, a subpopulation would be positive for one marker and negative for the other while the reverse would be true for a different subpopulation, thus allowing the two subpopulations to be easily distinguished.
 
@@ -631,7 +632,7 @@ It is also limited to the top set of HVGs, whereas DE between clusters can be ch
 ## Using correlated HVGs for further data exploration
 
 For further analyses, we focus on the significantly correlated HVGs for which any substructure should be most pronounced.
-This may allow us to identify subpopulations that would have otherwise been masked by random noise in the expression profiles.
+This allows us to identify subpopulations that would have otherwise been masked by random noise in the expression profiles.
 (Even greater resolution can be achieved by looking at one or more subsets of correlated HVGs, identified above as the highly connected subgraphs. 
 This focuses on specific aspects of biology that might have been otherwise masked by stronger effects in the data, e.g., metabolic state being masked by cell type.
 However, this requires some pre-existing knowledge to determine which genes are relevant and which subsets should be used.)
@@ -650,15 +651,15 @@ my.dist <- dist(t(norm.exprs))
 my.tree <- hclust(my.dist, method="ward.D2")
 ```
 
-In addition, a tree cut can be used to explicitly define subpopulations of cells from the dendrogram.
-Note that some tuning of the cut height `h` is required to obtain satisfactory results for each data set.
+In addition, a tree cut is used to explicitly define subpopulations of cells from the dendrogram.
+Note that some tuning of the cut height `h` is often required to obtain satisfactory results for each data set.
 
 ```{r}
 my.clusters <- unname(cutree(my.tree, h=50))
 my.clusters
 ```
 
-We can visualize the constructed dendrogram with a heatmap (Figure ((heatmaphsc))).
+We visualize the cell clustering and dendrogram with a heatmap in Figure ((heatmaphsc)).
 All expression values are mean-centred for each gene to highlight the relative expression between cells.
 We recommend storing the heatmap at a sufficiently high resolution so that the relevant genes can be easily identified for further examination.
 
@@ -674,15 +675,15 @@ Modest substructure in Figure ((heatmaphsc)) is consistent with the low number o
 Nonetheless, a close look suggests that a _H2-Aa_/_Cd74_-expressing subpopulation exists alongside a _Fos_/_Jun_-negative subpopulation.
 _H2-Aa_ codes for a component of the class II major histocompatibility complex, possibly corresponding to the development of antigen presentation activity.
 _Fos_ and _Jun_ may also be relevant as they are involved in cell proliferation [@angel1991role].
-These visual subpopulations are computationally defined by performing a tree cut to identify explicit clusters.
-Further analyses can then be performed on those empirical clusters -- for example, we could perform a DE analysis to identify marker genes for each corresponding subpopulation.
+These visual subpopulations correspond to the computationally identified clusters on which further analyses can be performed.
+For example, we could perform a DE analysis to identify marker genes for each corresponding subpopulation.
 
 That being said, users should treat clustering results with some caution.
 It is difficult to maintain statistical rigour during clustering to protect against the formation of spurious clusters.
-As such, determining whether a cluster is "real" or not usually depends on subjective judgement, unless the clusters are very clearly defined (i.e., strong separation on a PCA plot, widespread differences in the expression profiles).
+As such, determining whether a cluster is "real" or not can be somewhat subjective unless the clusters are very clearly defined (i.e., strong separation on a PCA plot, widespread differences in the expression profiles).
 Moreover, different algorithms can yield substantially different clusters by focusing on different aspects of the data.
 Some genes may support clustering based on cell type, whereas others may support clustering based on metabolic state, immune activation status, cell cycle, and so on.
-In short, experimental validation of the clustering results is critical to ensure that the putative subpopulations actually exist.
+Experimental validation of the clustering results is critical to ensure that the putative subpopulations actually exist.
 
 <!--
 Standard bootstrapping requires IID genes in order to generate bootstrap replicates of the original data.
