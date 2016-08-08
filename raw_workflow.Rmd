@@ -1329,11 +1329,10 @@ plot(sizeFactors(sce), deconv.sf, pch=16, log="xy", xlab="Size factor (spike-in)
 ```
 
 This is more clearly demonstrated with a data set involving different cell types -- namely, mouse embryonic stem cells (mESCs) and mouse embryonic fibroblasts (MEFs) [@islam2011characterization].
-If spike-in size factors were used, the expression values in MEFs would be scaled up while expression in mESCs would be scaled down (Figure ((normplotspikemef))).
-However, the opposite would occur if deconvolution size factors were used.
-This is because MEFs contain more endogenous RNA which reduces the relative spike-in coverage (thereby decreasing the spike-in size factors) but increases the coverage of endogenous genes (thus increasing the deconvolution size factors).
+We load in the counts and specify the rows corresponding to spike-in transcripts.
+The negative control wells do not contain any cells and are useful for quality control but need to be removed prior to downstream analysis.
 
-```{r normplotspikemef, fig.cap="Size factors from spike-in normalization, plotted against the size factors from deconvolution for all cells in the mESC/fibroblast data set. Axes are shown on a log-scale, and cells are coloured according to their identity. Deconvolution size factors were computed with small pool sizes owing to the low number of cells of each type."}
+```{r}
 counts <- read.table("GSE29087_L139_expression_tab.txt.gz", colClasses=c(list("character", 
     NULL, NULL, NULL, NULL, NULL, NULL), rep("integer", 96)), skip=6, sep='\t', row.names=1)
 sce <- newSCESet(countData=counts)
@@ -1341,10 +1340,17 @@ sce$grouping <- rep(c("mESC", "MEF", "Neg"), c(48, 44, 4))
 sce <- sce[,sce$grouping!="Neg"] # Removing negative control wells.
 sce <- calculateQCMetrics(sce, feature_controls=list(spike=grep("SPIKE", rownames(counts))))
 isSpike(sce) <- "spike"
+```
 
+We then compute size factors using either spike-in normalization or the deconvolution method.
+If the spike-in size factors were applied to the counts, the expression values in MEFs would be scaled up while expression in mESCs would be scaled down (Figure ((normplotspikemef))).
+However, the opposite would occur if deconvolution size factors were used.
+This is because MEFs contain more endogenous RNA which reduces the relative spike-in coverage (thereby decreasing the spike-in size factors) but increases the coverage of endogenous genes (thus increasing the deconvolution size factors).
+
+```{r normplotspikemef, fig.cap="Size factors from spike-in normalization, plotted against the size factors from deconvolution for all cells in the mESC/fibroblast data set. Axes are shown on a log-scale, and cells are coloured according to their identity. Deconvolution size factors were computed with small pool sizes owing to the low number of cells of each type."}
 colours <- c(mESC="red", MEF="grey")
 plot(col=colours[sce$grouping], pch=16, log="xy", computeSpikeFactors(sce, sf.out=TRUE), 
-    computeSumFactors(sce, sf.out=TRUE, cluster=sce$grouping, sizes=c(5, 10, 20, 25)), 
+    computeSumFactors(sce, sf.out=TRUE, cluster=sce$grouping, sizes=c(10, 20, 30, 40)), 
     xlab="Size factor (spike-in)", ylab="Size factor (deconvolution)")
 legend("bottomleft", col=colours, legend=names(colours), pch=16)
 ```
@@ -1527,8 +1533,8 @@ sce <- calculateQCMetrics(sce, feature_controls=list(ERCC=is.spike))
 isSpike(sce) <- "ERCC"
 ```
 
-We remove rows that do not correspond to endogenous genes or spike-in transcripts.
-This includes rows containing mapping statistics, e.g., the number of unaligned or unassigned reads.
+We filter out rows that do not correspond to endogenous genes or spike-in transcripts.
+This will remove rows containing mapping statistics such as the number of unaligned or unassigned reads, which would be misleading if treated as gene expression values.
 The object is then ready for downstream analyses as previously described. 
 
 ```{r}
