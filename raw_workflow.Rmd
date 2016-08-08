@@ -200,6 +200,12 @@ This is because we're not measuring an increase in mitochondrial/spike-in counts
 If endogenous RNA decreases in low-quality cells, the mitochondrial/spike-in proportions against the total count should both increase.
 We don't have to worry about effects of e.g. an increase in mitochondrial counts affecting the proportion of spike-in counts.
 
+The absolute value of the spike-in proportion can also be used for QC.
+You would want about 5-10% of the reads going to the spike-ins.
+If this is not the case, it suggests that you need to alter the dilution.
+You can also compare the observed proportions to the expected values, which can be calculated if RNA quantification was done on the cells beforehand.
+Neither of these approaches provide a threshold for filtering, but they do tell you if the experiment went well or not.
+
 Also, we don't use the logit transform for the proportions, even though on the raw scale we could theoretically end up with a above-unity threshold.
 This is because the logit transform compresses changes within the middle of the [0,1] range.
 This reduces the resolution for where the threshold would usually be.
