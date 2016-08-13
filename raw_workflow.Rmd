@@ -71,10 +71,10 @@ for (x in seq_along(all.urls)) {
 
 Single-cell RNA sequencing (scRNA-seq) is widely used to measure the genome-wide expression profile of individual cells.
 From each cell, mRNA is isolated and reverse transcribed to cDNA for high-throughput sequencing [@stegle2015computational].
-This can be done using microfluidics platforms like the Fluidigm C1 [@pollen2014lowcoverage], or with protocols based on microtiter plates like Smart-seq2 [@picelli2014fulllength].
+This can be done using microfluidics platforms like the Fluidigm C1 [@pollen2014lowcoverage], protocols based on microtiter plates like Smart-seq2 [@picelli2014fulllength], or droplet-based technologies like inDrop [@klein2015droplet,macosko2015highly].
 The number of reads mapped to each gene is then used to quantify its expression in each cell.
 Alternatively, unique molecular identifiers (UMIs) can be used to directly measure the number of transcript molecules for each gene [@islam2014quantitative].
-Count data is analyzed to detect highly variable genes (HVGs) driving heterogeneity across cells in a population, to find correlations between genes and cellular phenotypes, or to identify new subpopulations via dimensionality reduction and clustering. 
+Count data is analyzed to detect highly variable genes (HVGs) that drive heterogeneity across cells in a population, to find correlations between genes and cellular phenotypes, or to identify new subpopulations via dimensionality reduction and clustering. 
 This provides biological insights at a single-cell resolution that cannot be achieved with conventional bulk RNA sequencing of cell populations.
 
 Strategies for scRNA-seq data analysis differ markedly from those for bulk RNA-seq.
@@ -83,7 +83,7 @@ Reliable capture (i.e., conversion) of transcripts into cDNA for sequencing is d
 This increases the frequency of drop-out events where none of the transcripts for a gene are captured.
 Dedicated steps are required to deal with this noise during analysis, especially during quality control.
 In addition, scRNA-seq data can be used to study cell-to-cell heterogeneity, e.g., to identify new cell subtypes, to characterize differentiation processes, to assign cells into their cell cycle phases, or to identify HVGs driving variability across the population [@vallejos2015basics;@fan2016characterizing;@trapnell2014dynamics].
-This is simply not possible with bulk data, such that custom methods are required to perform these analyses. 
+This is simply not possible with bulk data, meaning that custom methods are required to perform these analyses. 
 
 This article describes a computational workflow for basic analysis of scRNA-seq data using software packages from the open-source Bioconductor project [@huber2015orchestrating].
 Starting from a count matrix, this workflow contains the steps required for quality control to remove problematic cells; normalization of cell-specific biases, with and without spike-ins; cell cycle phase classification from gene expression data; data exploration to identify putative subpopulations; and finally, HVG and marker gene identification to prioritize interesting genes.
@@ -101,7 +101,7 @@ High-throughput sequencing was performed and the expression of each gene was qua
 Similarly, the quantity of each spike-in transcript was measured by counting reads mapped to the spike-in reference sequence.
 Counts for all genes/transcripts in each cell were obtained from the NCBI Gene Expression Omnibus (GEO) as a supplementary file under the accession number GSE61533.
 
-For simplicity, we forgo a description of the read processing steps required to generate the count matrix, i.e., read alignment and counting into features.
+For simplicity, we forego a description of the read processing steps required to generate the count matrix, i.e., read alignment and counting into features.
 These steps have been described in some detail elsewhere [@love2015rnaseq], and are largely the same for bulk and single-cell data.
 The only additional consideration is that the spike-in information must be included in the pipeline.
 Typically, spike-in sequences can be included as additional FASTA files during genome index building prior to alignment, while genomic intervals for both spike-in transcripts and endogenous genes can be concatenated into a single GTF file prior to counting.
@@ -111,7 +111,7 @@ Alternatively, rapid quantification of expression with alignment-free methods su
 ## Count loading
 
 The first task is to load the count matrix into memory.
-In this case, some work is required to decompress and retreive the data from the Excel format.
+In this case, some work is required to decompress and retrieve the data from the Excel format.
 Each row of the matrix represents an endogenous gene or a spike-in transcript, and each column represents a single HSC.
 For convenience, the counts for spike-in transcripts and endogenous genes are stored in a `SCESet` object from the `r Biocpkg("scater")` package.
 
@@ -153,10 +153,10 @@ isSpike(sce) <- "ERCC"
 
 ## Quality control on the cells 
 
-Low-quality cells need to removed to ensure that technical effects do not distort downstream analysis results.
+Low-quality cells need to be removed to ensure that technical effects do not distort downstream analysis results.
 Two common measures of cell quality are the library size and the number of expressed features in each library.
 The library size is defined as the total sum of counts across all features, i.e., genes and spike-in transcripts.
-Cells with small library sizes are considered to be of low quality as the RNA has not been efficiently captured (i.e., converted into cDNA and amplified) during library preparation.
+Cells with relatively small library sizes are considered to be of low quality as the RNA has not been efficiently captured (i.e., converted into cDNA and amplified) during library preparation.
 The number of expressed features in each cell is defined as the number of features with non-zero counts for that cell.
 Any cell with very few expressed genes is likely to be of poor quality as the diverse transcript population has not been successfully captured.
 The distributions of both of these metrics are shown in Figure ((libplothsc)).
@@ -175,7 +175,6 @@ To obtain an adaptive threshold, we assume that most of the data set consists of
 We remove cells with log-library sizes that are more than 3 median absolute deviations (MADs) below the median log-library size.
 (A log-transformation improves resolution at small values, especially when the MAD is comparable to or greater than the median.)
 We also remove cells where the log-transformed number of expressed genes is 3 MADs below the median.
-Both of these procedures eliminate low-quality cells corresponding to small outliers.
 
 <!--
 By improving resolution, I refer to compression of high values and expansion of the range of low values.
@@ -221,7 +220,7 @@ hist(sce$pct_counts_feature_controls_ERCC, xlab="ERCC proportion (%)",
 
 Again, the ideal threshold for these proportions depends on the cell type and the experimental protocol.
 Cells with more mitochondria or more mitochondrial activity may naturally have larger mitochondrial proportions.
-Similarly, cells with more endogenous RNA or in protocols using less spike-in RNA will have lower spike-in proportions.
+Similarly, cells with more endogenous RNA or that are assayed in protocols using less spike-in RNA will have lower spike-in proportions.
 If we assume that most cells in the data set are of high quality, then the threshold can be set to remove any large outliers from the distribution of proportions.
 We use the MAD-based definition of outliers to remove putative low-quality cells from the data set.
 
@@ -233,7 +232,7 @@ spike.drop <- isOutlier(sce$pct_counts_feature_controls_ERCC, nmads=3, type="hig
 Subsetting by column will retain only the high-quality cells that pass each filter described above.
 We examine the number of cells removed by each filter as well as the total number of retained cells.
 Removal of a substantial proportion of cells (> 10%) may be indicative of an overall issue with data quality.
-It may also reflect genuine biology in extreme cases (e.g., low numbers of expressed genes in erythrocytes) for which the filters described here are not appropriate.
+It may also reflect genuine biology in extreme cases (e.g., low numbers of expressed genes in erythrocytes) for which the filters described here are inappropriate.
 
 <!-- 
 There's an additional implicit assumption that these technical metrics are homogeneous across cells.
@@ -263,8 +262,8 @@ Users interested in the more sophisticated approaches are referred to the `r Bio
 
 ## Filtering out low-abundance genes
 
-Low-abundance genes are problematic as zero or near-zero counts do not contain enough information for reliable statistical inference.
-In addition, the discreteness of the counts may interfere with downstream statistical procedures, e.g., by compromising the accuracy of asymptotic approximations.
+Low-abundance genes are problematic as zero or near-zero counts do not contain enough information for reliable statistical inference [@bourgon2010independent].
+In addition, the discreteness of the counts may interfere with downstream statistical procedures, e.g., by compromising the accuracy of continuous approximations.
 Here, low-abundance genes are defined as those with an average count below a filter threshold of 1.
 These genes are likely to be dominated by drop-out events [@brennecke2013accounting] which limits their usefulness in later analyses.
 Removal of these genes mitigates discreteness and reduces the amount of computational work without major loss of information.
@@ -353,7 +352,7 @@ summary(sizeFactors(sce))
 In this case, the size factors are tightly correlated with the library sizes for all cells (Figure ((normplothsc))).
 This suggests that the systematic differences between cells are primarily driven by differences in capture efficiency or sequencing depth.
 Any DE between cells would yield a non-linear trend between the total count and size factor, and/or increased scatter around the trend.
-This does not occur here as strong DE is unlikely to exist between cells of the same type.
+This does not occur here as strong DE is unlikely to exist within a homogeneous population of cells.
 
 ```{r normplothsc, fig.cap="Size factors from deconvolution, plotted against library sizes for all cells in the HSC data set. Axes are shown on a log-scale."}
 plot(sizeFactors(sce), sce$total_counts/1e6, log="xy",
@@ -382,7 +381,7 @@ sce <- computeSpikeFactors(sce, type="ERCC", general.use=FALSE)
 ### Applying the size factors to normalize gene expression
 
 The count data are used to compute normalized log-expression values for use in downstream analyses.
-Each value is defined as the log-ratio of each count to the size factor for the corresponding cell, after adding a small prior count to avoid undefined values at zero counts.
+Each value is defined as the log-ratio of each count to the size factor for the corresponding cell, after adding a prior count of 1 to avoid undefined values at zero counts.
 Division by the size factor ensures that any cell-specific biases are removed.
 If spike-in-specific size factors are present in `sce`, they will be automatically applied to normalize the spike-in transcripts separately from the endogenous genes. 
 
@@ -401,37 +400,45 @@ This seems better than square-rooting it, which only works for the Poisson.
 ## Data exploration with dimensionality reduction techniques
 
 Dimensionality reduction is often useful to examine major features of the data prior to more quantitative analyses.
-Of particular interest is whether the HSCs partition into distinct subpopulations.
-This is visualized by constructing a PCA plot from the normalized log-expression values (Figure ((pcaplothsc))).
+This allows us to identify confounding technical effects that need to be incorporated into downstream models.
+For this data set, the simple experimental design means that there are no plate or batch effects to examine.
+Instead, we focus on the total number of expressed features (i.e., the "cellular detection rate") to determine if it needs to modelled [@finak2015mast].
+
+One approach to visualization is to construct a PCA plot from the normalized log-expression values (Figure ((pcaplothsc))).
 Cells with similar expression profiles should be located close together in the plot, while dissimilar cells should be far apart.
-By default, the `plotPCA` function will only use the top 500 genes with the largest variances.
+By default, the `plotPCA` function will only use the top 500 genes with the largest variances in the log-expression values.
 This focuses on the genes that are driving heterogeneity in the population and should provide greater visual resolution of any systematic differences between groups of cells.
 
-```{r pcaplothsc, fig.cap="PCA plot constructed from normalized log-expression values, where each point represents a cell in the HSC data set. First and second components are shown, along with the percentage of variance explained. Bars represent the coordinates of the cells on each axis."}
-plotPCA(sce, exprs_values="exprs") + fontsize
+```{r pcaplothsc, fig.cap="PCA plot constructed from normalized log-expression values, where each point represents a cell in the HSC data set. First and second components are shown, along with the percentage of variance explained. Bars represent the coordinates of the cells on each axis. Each cell is coloured according to its total number of expressed features."}
+plotPCA(sce, exprs_values="exprs", colour_by="total_features") + fontsize
 ```
 
-Another popular approach to dimensionality reduction is the _t_-stochastic neighbour embedding (_t_-SNE) method [@van2008visualizing].
-_t_-SNE tends to work better than PCA for separating cells in large data sets with many subpopulations, at the cost of more computational effort and complexity.
-Like `plotPCA`, the `plotTSNE` function will use the genes with the largest variances to highlight any heterogeneity in the population.
+Another widely used approach is the _t_-stochastic neighbour embedding (_t_-SNE) method [@van2008visualizing].
+_t_-SNE tends to work better than PCA for separating cells in more diverse populations, at the cost of more computational effort and complexity.
+Like `plotPCA`, the `plotTSNE` function will use the genes with the largest variances to highlight any heterogeneity.
 However, unlike PCA, _t_-SNE is a stochastic method -- users should run the algorithm several times to ensure that the results are representative, and then set a seed to ensure that the chosen results are reproducible.
 It is also advisable to test different settings of the "perplexity" parameter as this will affect the distribution of points in the low-dimensional space (Figure ((tsneplothsc))).
 
-```{r tsneplothsc, fig.cap="_t_-SNE plots constructed from normalized log-expression values using a range of perplexity values. In each plot, each point represents a cell in the HSC data set. Bars represent the coordinates of the cells on each axis.", fig.width=12, fig.height=6}
+```{r tsneplothsc, fig.cap="_t_-SNE plots constructed from normalized log-expression values using a range of perplexity values. In each plot, each point represents a cell in the HSC data set. Bars represent the coordinates of the cells on each axis. Each cell is coloured according to its total number of expressed features.", fig.width=12, fig.height=6}
 set.seed(100)
-out5 <- plotTSNE(sce, exprs_values="exprs", perplexity=5) + fontsize + ggtitle("Perplexity = 5")
-out10 <- plotTSNE(sce, exprs_values="exprs", perplexity=10) + fontsize + ggtitle("Perplexity = 10")
-out20 <- plotTSNE(sce, exprs_values="exprs", perplexity=20) + fontsize + ggtitle("Perplexity = 20")
+out5 <- plotTSNE(sce, exprs_values="exprs", perplexity=5, colour_by="total_features") + 
+    fontsize + ggtitle("Perplexity = 5")
+out10 <- plotTSNE(sce, exprs_values="exprs", perplexity=10, colour_by="total_features") + 
+    fontsize + ggtitle("Perplexity = 10")
+out20 <- plotTSNE(sce, exprs_values="exprs", perplexity=20, colour_by="total_features") + 
+    fontsize + ggtitle("Perplexity = 20")
 multiplot(out5, out10, out20, cols=3)
 ```
 
-There are many other dimensionality reduction techniques that we have not considered here but could also be used, e.g., multidimensional scaling, diffusion maps.
+There are many other dimensionality reduction techniques that we do not consider here but could also be used, e.g., multidimensional scaling, diffusion maps.
 These have their own advantages and disadvantages -- for example, diffusion maps (see `plotDiffusionMap`) place cells along a continuous trajectory and are suited for visualizing graduated processes like differentiation [@angerer2016destiny].
 The `selectorPlot` function from `r Biocpkg("scran")` can also be used to interactively select groups of cells in two-dimensional space.
-This facilitates data exploration as visually-identified subpopulations can be directly selected for further examination.
+This facilitates data exploration as visually identified subpopulations can be directly selected for further examination.
 
-For this data set, all tested methods suggest that the cells do not separate into multiple distinct subpopulations.
-This is consistent with the presence of a homogenous population of cells of the same type.
+For this data set, the results suggest that we do not need to consider the cellular detection rate in our downstream analyses.
+This metric does not associate with any obvious substructure in Figure ((tsneplothsc)), and while it correlates well with the first principal component in Figure ((pcaplothsc)), this only explains a small percentage of the total variance.
+On a separate note, none of the tested methods are able to separate the into multiple distinct subpopulations.
+This is consistent with the presence of a homogeneous population of cells of the same type.
 
 ## Classification of cell cycle phase 
 
@@ -467,7 +474,7 @@ sce <- sce[,assignments$phases=="G1"]
 
 Pre-trained classifiers are available in `r Biocpkg("scran")` for human and mouse data. 
 While the mouse classifier used here was trained on data from embryonic stem cells, it can still be generally applied to other data sets.
-This is because the transcriptional program associated with cell cycling should be mostly conserved across cell types.
+This is because the transcriptional program associated with the cell cycle should be mostly conserved across cell types.
 In addition, the pair-based method is a non-parametric procedure that is robust to technical differences between data sets.
 However, it will be less accurate for data that are substantially different from those used in the training set.
 In such cases, users can construct a custom classifier from their own training data using the `sandbag` function.
@@ -489,7 +496,7 @@ The biological component of the variance can then be calculated by subtracting t
 In practice, this strategy is compromised by the small number of spike-in transcripts, the uneven distribution of their abundances and (for low numbers of cells) the imprecision of their variance estimates.
 This makes it difficult to accurately fit a complex mean-dependent trend to the spike-in variances.
 An alternative approach is to fit the trend to the variance estimates of the endogenous genes, using the `use.spikes=FALSE` setting as shown below.
-This assumes that the majority of genes are constantly expressed, such that the technical component dominates the total variance for those genes.
+This assumes that the majority of genes are not variably expressed, such that the technical component dominates the total variance for those genes.
 The fitted value of the trend is then used as an estimate of the technical component.
 Obviously, this is the only approach that can be used if no spike-ins were added in the experiment.
 
@@ -621,7 +628,36 @@ If many pairs were significant, this would indicate that the subpopulations were
 For this particular data set, a relatively low number of HVGs exhibit significant correlations.
 This suggests that any substructure in the data will be modest, which may not be unexpected given that rigorous selection was performed to obtain a homogeneous population of HSCs [@wilson2015combined].
 
-The correlation results can also be used directly in follow-up experiments to verify if any substructure is present.
+We examine the expression of the significantly correlated HVGs with a heatmap (Figure ((heatmaphsc))). 
+All expression values are mean-centred for each gene to highlight the relative expression between cells.
+Weak substructure in the heatmap is consistent with the low number of correlated HVGs.
+Nonetheless, a close look suggests that a _H2-Aa_ and _Cd74_-expressing subpopulation exists alongside a _Fos_ and _Jun_-negative subpopulation.
+_H2-Aa_ codes for a component of the class II major histocompatibility complex, possibly corresponding to the development of antigen presentation activity.
+_Fos_ and _Jun_ may also be relevant as they are involved in cell proliferation [@angel1991role].
+
+```{r heatmaphsc, message=FALSE, fig.width=7, fig.height=7, fig.cap="Heatmap of mean-centred normalized log-expression values for correlated HVGs in the HSC data set. Dendrograms are formed by hierarchical clustering on the Euclidean distances between genes (row) or cells (column)."}
+chosen <- unique(c(var.cor$gene1[sig.cor], var.cor$gene2[sig.cor]))
+norm.exprs <- exprs(sce)[chosen,,drop=FALSE]
+heat.vals <- norm.exprs - rowMeans(norm.exprs)
+heat.out <- heatmap.2(heat.vals, col=bluered, symbreak=TRUE, trace='none', cexRow=0.8)
+```
+
+In theory, putative subpopulations can be computationally defined by cutting the dendrogram in `heat.out$colDendrogram` with `cutree` to form clusters.
+We do not attempt this here as the number of genes is too low for reliable clustering.
+In fact, users should generally treat clustering results with some caution.
+It is difficult to maintain statistical rigour to protect against the formation of spurious clusters.
+As such, determining whether a cluster is "real" or not can be somewhat subjective unless the clusters are very clearly defined (i.e., strong separation on a PCA plot, widespread differences in the expression profiles).
+Moreover, different algorithms can yield substantially different clusters by focusing on different aspects of the data.
+Some genes may support clustering based on cell type, whereas others may support clustering based on metabolic state, immune activation status, cell cycle, and so on.
+Experimental validation of the clustering results is critical to ensure that the putative subpopulations actually exist.
+
+<!--
+Standard bootstrapping requires IID genes in order to generate bootstrap replicates of the original data.
+This is not the case, which makes it difficult to interpret the bootstrap probabilities on an absolute scale.
+Doing it correctly would require block resampling to account for correlations -- hence the difficulty.
+-->
+
+To this end, the correlation results can be used directly in follow-up experiments to verify if any substructure is present.
 This is done by using sets of correlated HVGs as markers in procedures such as fluorescence-activated cell sorting, immunohistochemistry or RNA flourescence _in situ_ hybridization.
 In this manner, the existence of subpopulations with distinct expression patterns for the chosen genes can be experimentally validated.
 Negatively correlated pairs may be particularly useful as they provide more power to discriminate between subpopulations.
@@ -635,6 +671,7 @@ It is also limited to the top set of HVGs, whereas DE between clusters can be ch
 (Although the rest of the genes are unlikely to be strong DE, otherwise they would have been HVGs.)
 -->
 
+<!--
 ## Using correlated HVGs for further data exploration
 
 For further analyses, we focus on the significantly correlated HVGs for which any substructure should be most pronounced.
@@ -643,16 +680,16 @@ This allows us to identify subpopulations that would have otherwise been masked 
 This focuses on specific aspects of biology that might have been otherwise masked by stronger effects in the data, e.g., metabolic state being masked by cell type.
 However, this requires some pre-existing knowledge to determine which genes are relevant and which subsets should be used.)
 
-```{r}
+```{r, eval=FALSE}
 chosen <- unique(c(var.cor$gene1[sig.cor], var.cor$gene2[sig.cor]))
 norm.exprs <- exprs(sce)[chosen,,drop=FALSE]
 ```
 
 We construct a simple dendrogram to group together cells with similar expression patterns across the chosen genes.
-Here, we cluster on Euclidean distances to provide greater sensitivity to differences in expression for low numbers of genes.
+Here, we cluster based on Euclidean distances to provide greater sensitivity to differences in expression for low numbers of genes.
 Ward's clustering criterion is used to minimize the total variance within each cluster.
 
-```{r}
+```{r, eval=FALSE}
 my.dist <- dist(t(norm.exprs))
 my.tree <- hclust(my.dist, method="ward.D2")
 ```
@@ -660,7 +697,7 @@ my.tree <- hclust(my.dist, method="ward.D2")
 In addition, a tree cut is used to explicitly define subpopulations of cells from the dendrogram.
 Note that some tuning of the cut height `h` is often required to obtain satisfactory results for each data set.
 
-```{r}
+```{r, eval=FALSE}
 my.clusters <- unname(cutree(my.tree, h=50))
 my.clusters
 ```
@@ -669,12 +706,11 @@ We visualize the cell clustering and dendrogram with a heatmap in Figure ((heatm
 All expression values are mean-centred for each gene to highlight the relative expression between cells.
 We recommend storing the heatmap at a sufficiently high resolution so that the relevant genes can be easily identified for further examination.
 
-```{r heatmaphsc, message=FALSE, fig.width=7, fig.height=7, fig.cap="Heatmap of mean-centred normalized log-expression values for correlated HVGs in the HSC data set. Dendrograms are formed by hierarchical clustering on the Euclidean distances between genes (row) or cells (column). Column colours represent the cluster to which each cell is assigned after a tree cut."}
+```{r heatmaphsc, eval=FALSE, message=FALSE, fig.width=7, fig.height=7, fig.cap="Heatmap of mean-centred normalized log-expression values for correlated HVGs in the HSC data set. Dendrograms are formed by hierarchical clustering on the Euclidean distances between genes (row) or cells (column). Column colours represent the cluster to which each cell is assigned after a tree cut."}
 library(gplots)
 heat.vals <- norm.exprs - rowMeans(norm.exprs)
 clust.col <- rainbow(max(my.clusters))
-heatmap.2(heat.vals[chosen,], col=bluered, symbreak=TRUE, trace='none', cexRow=0.8,
-    ColSideColors=clust.col[my.clusters], Colv=as.dendrogram(my.tree))
+heatmap.2(heat.vals, col=bluered, symbreak=TRUE, trace='none', cexRow=0.8)
 ```
 
 Modest substructure in Figure ((heatmaphsc)) is consistent with the low number of correlated HVGs.
@@ -697,18 +733,20 @@ This is not the case, which makes it difficult to interpret the bootstrap probab
 Doing it correctly would require block resampling to account for correlations -- hence the difficulty.
 -->
 
+<!--
 Finally, dimensionality reduction can be applied using only the set of correlated HVGs to highlight any substructure that might be present.
 This is shown in Figure ((pcareduxhsc)) for both PCA and _t_-SNE plots, though in this case, focusing on HVGs does not provide any additional separation into distinct subpopulations.
 A more informative strategy is to colour cells in the plot based on the expression of a gene of interest.
 This improves visualization by highlighting changes in expression across the cell population.
 
-```{r pcareduxhsc, fig.width=10, fig.height=6, fig.cap="PCA (left) and _t_-SNE plots (right) using only the expression values for significantly correlated HVGs in the HSC data set. Cells are coloured according to the level of _H2-Aa_ expression."}
+```{r pcareduxhsc, eval=FALSE, fig.width=10, fig.height=6, fig.cap="PCA (left) and _t_-SNE plots (right) using only the expression values for significantly correlated HVGs in the HSC data set. Cells are coloured according to the level of _H2-Aa_ expression."}
 out.pca <- plotPCA(sce, exprs_values="exprs", feature_set=chosen, 
     colour_by="H2-Aa") + fontsize
 out.tsne <- plotTSNE(sce, exprs_values="exprs", feature_set=chosen, 
     colour_by="H2-Aa", rand_seed=100) + fontsize
 multiplot(out.pca, out.tsne, cols=2)
 ```
+-->
 
 ## Additional comments
 
@@ -721,7 +759,7 @@ saveRDS(file="hsc_data.rds", sce)
 ```
 
 A variety of methods are available to perform more complex analyses on the processed expression data.
-For example, cells can be ordered by pseudotime (e.g., for progress along a differentiation pathway) with `r Biocpkg("monocle")` [@trapnell2014dynamics] or `r Biocpkg("TSCAN")` [@ji2016tscan]; 
+For example, cells can be ordered in pseudotime (e.g., for progress along a differentiation pathway) with `r Biocpkg("monocle")` [@trapnell2014dynamics] or `r Biocpkg("TSCAN")` [@ji2016tscan]; 
 cell-state hierarchies can be characterized with the `r Biocpkg("sincell")` package [@julia2015sincell];
 and oscillatory behaviour can be identified using `r Biocpkg("Oscope")` [@leng2015oscope].
 HVGs can be used in gene set enrichment analyses to identify biological pathways and processes with heterogeneous activity, using packages designed for bulk data like `r Biocpkg("topGO")` or with dedicated single-cell methods like `r Biocpkg("scde")` [@fan2016characterizing].
