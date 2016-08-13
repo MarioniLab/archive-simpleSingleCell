@@ -1154,8 +1154,10 @@ sig.cor <- var.cor$FDR <= 0.05
 sum(sig.cor)
 ```
 
-The log-expression values for correlated HVGs are used to construct a heatmap that can be inspected for subpopulations.
-We also apply the `removeBatchEffect` function from the `r Biocpkg("limma")` package [@ritchie2015limma] to remove the sex effect.
+## Clustering cells into putative subpopulations
+
+The log-expression values for correlated HVGs are used to cluster cells into putative subpopulations.
+We first apply the `removeBatchEffect` function from the `r Biocpkg("limma")` package [@ritchie2015limma] to remove the sex effect.
 This ensures that any differences due to sex will not dominate the visualization of the expression profiles.
 (Note that, if an analysis method can accept a design matrix, blocking on nuisance factors in the design matrix is preferable to manipulating the expression values with `removeBatchEffect`.
 This is because the latter does not account for the loss of residual degrees of freedom, nor the uncertainty of estimation of the blocking factor terms.)
@@ -1185,17 +1187,29 @@ It shouldn't matter for technical effects that are largely orthogonal to populat
 Problems would only occur when you try to regress out uninteresting biological effects that might have some composition differences.
 -->
 
-Figure ((heatmapbrain)) shows systematic differences between groups of cells with distinct patterns of expression.
-This is consistent with the presence of well-defined subpopulations.
-Clusters corresponding to these subpopulations are defined by applying a dynamic tree cut [@langfelder2008defining] to the dendrogram.
+We perform hierarchical clustering on the Euclidean distances between cells, using Ward's criterion to minimize the total variance within each cluster.
+This yields a dendrogram that groups together cells with similar expression patterns across the chosen genes.
+An alternative approach is to cluster on a matrix of distances derived from correlations (e.g., as in `quickCluster`).
+This is more robust to noise and normalization errors, but is also less sensitive to subtle changes in the expression profiles. 
+
+```{r}
+my.dist <- dist(t(norm.exprs))
+my.tree <- hclust(my.dist, method="ward.D2")
+```
+
+Clusters are explicitly defined by applying a dynamic tree cut [@langfelder2008defining] to the dendrogram.
 This exploits the shape of the branches in the dendrogram to refine the cluster definitions, and is more appropriate than `cutree` for complex dendrograms.
 Greater control of the empirical clusters can be obtained by manually specifying `cutHeight` in `cutreeDynamic`.
 
-```{r heatmapbrain, message=FALSE, fig.width=7, fig.height=10, fig.cap="Heatmap of mean-centred normalized log-expression values for correlated HVGs in the brain data set. Dendrograms are formed by hierarchical clustering on the Euclidean distances between genes (row) or cells (column). Column colours represent the cluster to which each cell is assigned after a dynamic tree cut."}
-my.dist <- dist(t(norm.exprs))
-my.tree <- hclust(my.dist, method="ward.D2")
+```{r}
 library(dynamicTreeCut)
 my.clusters <- unname(cutreeDynamic(my.tree, distM=as.matrix(my.dist), verbose=0))
+```
+
+Figure ((heatmapbrain)) shows systematic differences between clusters of cells with distinct patterns of expression.
+This is consistent with the presence of well-defined subpopulations.
+
+```{r heatmapbrain, message=FALSE, fig.width=7, fig.height=10, fig.cap="Heatmap of mean-centred normalized log-expression values for correlated HVGs in the brain data set. Dendrograms are formed by hierarchical clustering on the Euclidean distances between genes (row) or cells (column). Column colours represent the cluster to which each cell is assigned after a dynamic tree cut."}
 heat.vals <- norm.exprs - rowMeans(norm.exprs)
 clust.col <- rainbow(max(my.clusters))
 heatmap.2(heat.vals, col=bluered, symbreak=TRUE, trace='none', cexRow=0.3,
