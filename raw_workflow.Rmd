@@ -90,7 +90,7 @@ Starting from a count matrix, this workflow contains the steps required for qual
 The application of different steps in the workflow will be demonstrated on several public scRNA-seq data sets involving haematopoietic stem cells, brain-derived cells, T-helper cells and mouse embryonic stem cells, generated with a range of experimental protocols and platforms [@wilson2015combined;@zeisel2015brain;@buettner2015computational;@kolod2015singlecell].
 The aim is to provide a variety of modular usage examples that can be applied to construct custom analysis pipelines.
 
-# A simple analysis of haematopoietic stem cells
+# Analysis of haematopoietic stem cells
 
 ## Overview
 
@@ -436,7 +436,7 @@ The `selectorPlot` function from `r Biocpkg("scran")` can also be used to intera
 This facilitates data exploration as visually identified subpopulations can be directly selected for further examination.
 
 For this data set, the results suggest that we do not need to consider the cellular detection rate in our downstream analyses.
-This metric does not associate with any obvious substructure in Figure ((tsneplothsc)), and while it correlates well with the first principal component in Figure ((pcaplothsc)), this only contributes a small percentage of the total variance.
+This metric does not associate with any obvious substructure in Figure ((tsneplothsc)), and while it correlates well with the first principal component in Figure ((pcaplothsc)), this accounts for only a small percentage of the total variance.
 On a separate note, none of the tested methods are able to separate the into multiple distinct subpopulations.
 This is consistent with the presence of a homogeneous population of cells of the same type.
 
@@ -775,11 +775,11 @@ rm(sce, all.counts)
 gc()
 ```
 
-# A more complex analysis of brain cell types
+# Analysis of cell types in the brain
 
 ## Overview
 
-We proceed to a more complex data set from a study of cell types in the mouse brain [@zeisel2015brain].
+We proceed to a more heterogeneous data set from a study of cell types in the mouse brain [@zeisel2015brain].
 This contains approximately 3000 cells of varying types such as oligodendrocytes, microglia and neurons.
 Individual cells were isolated using the Fluidigm C1 microfluidics system and library preparation was performed on each cell using a UMI-based protocol.
 After sequencing, expression was quantified by counting the number of UMIs mapped to each gene.
@@ -837,7 +837,7 @@ sce <- newSCESet(countData=all.counts, phenoData=metadata)
 dim(sce)
 ```
 
-We also add annotation identifying which rows correspond to each class of features.
+We also add annotation identifying rows that correspond to each class of features.
 
 ```{r}
 nrows <- c(nrow(endo.data$counts), nrow(mito.data$counts), nrow(spike.data$counts))
@@ -893,7 +893,7 @@ spike.drop <- isOutlier(sce$pct_counts_feature_controls_Spike, nmads=3, type="hi
 ```
 
 Removal of low-quality cells is then performed by combining the filters for all of the metrics.
-The vast majority of cells are retained which suggests that the original quality control procedures were generally adequate.
+The vast majority of cells are retained, which suggests that the original quality control procedures were generally adequate.
 
 ```{r}
 sce <- sce[,!(libsize.drop | feature.drop | spike.drop | mito.drop)]
@@ -943,7 +943,7 @@ Some data sets may also contain strong heterogeneity in mitochondrial RNA conten
 This heterogeneity will cause mitochondrial genes to dominate the top set of results, e.g., for identification of correlated HVGs.
 However, these genes are largely uninteresting given that most studies focus on nuclear regulation.
 As such, we filter them out prior to further analysis.
-Other candidates for removal include pseudogenes or ribosomal RNA/protein-coding genes that might not be biologically relevant but can interfere with interpretation of the results.
+Other candidates for removal include pseudogenes or ribosome-associated genes, which might not be relevant for characterising cell function or behaviour but can still interfere with interpretation of the results.
 
 ```{r}
 sce <- sce[!fData(sce)$is_feature_control_Mt,]
@@ -1051,7 +1051,7 @@ multiplot(tsne1, tsne2, cols=2)
 ```
 
 An additional effect to consider is the fact that cells were processed on many different C1 chips.
-This can lead to batch effects due to technical differences in library preparation between chips.
+This can lead to batch effects due to technical differences in library preparation between chips [@hicks2015widespread; @tung2016batch].
 To check that this is not the case, we examine the spread of cells from each chip on the PCA plot (Figure ((pca2plotbrain))).
 Cells from different chips seem to mix together, which suggests that the substructure is not being driven by a batch effect.
 Note that we separate cells by tissue because the chip factor is nested within the tissue factor.
@@ -1104,7 +1104,8 @@ Errors in fitting are negligble due to the precision of the variance estimates i
 The technical variances are also much smaller than those in the HSC data set.
 This is due to the use of UMIs which reduces the noise caused by variable PCR amplification.
 Furthermore, the spike-in trend is consistently lower than the variances of the endogenous genes.
-This means the previous strategy of fitting a trend to the endogenous variances would not be appropriate here (or necessary, given the quality of the spike-in trend). 
+This reflects the heterogeneity in gene expression across cells of different types.
+It also means the previous strategy of fitting a trend to the endogenous variances would not be appropriate here (or necessary, given the quality of the spike-in trend). 
 
 ```{r hvgplotbrain, fig.cap="Variance of normalized log-expression values for each gene in the brain data set, plotted against the mean log-expression. The red line represents the mean-   dependent trend in the technical variance of the spike-in transcripts (also highlighted as red points)."}
 plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression", 
@@ -1114,7 +1115,7 @@ o <- order(var.out$mean)
 lines(var.out$mean[o], var.out$tech[o], col="red", lwd=2)
 ```
 
-The top HVGs are are identified based on their biological components.
+The top HVGs are identified based on their biological components.
 These are saved to file for future reference.
 
 ```{r}
@@ -1156,7 +1157,7 @@ sum(sig.cor)
 The log-expression values for correlated HVGs are used to construct a heatmap that can be inspected for subpopulations.
 We also apply the `removeBatchEffect` function from the `r Biocpkg("limma")` package [@ritchie2015limma] to remove the sex effect.
 This ensures that any differences due to sex will not dominate the visualization of the expression profiles.
-(Note that, if an analysis method can accept a design matrix, then blocking on nuisance factors in the design matrix is preferable to manipulating the expression values with `removeBatchEffect`.
+(Note that, if an analysis method can accept a design matrix, blocking on nuisance factors in the design matrix is preferable to manipulating the expression values with `removeBatchEffect`.
 This is because the latter does not account for the loss of residual degrees of freedom, nor the uncertainty of estimation of the blocking factor terms.)
 
 ```{r}
@@ -1216,10 +1217,10 @@ Use Acrobat reader or zathura for linux (selecting gene names and looking a copi
 
 ## Detecting marker genes between subpopulations
 
-Once putative subpopulations are identified by clustering, we can identify marker genes for specific subpopulations of interest.
+Once putative subpopulations are identified, we can identify marker genes for specific subpopulations of interest.
 This is done by identifying genes that are consistently DE in one subpopulation compared to the others.
 DE testing can be done using a number of packages, but for this workflow, we will use the `r Biocpkg("edgeR")` package [@robinson2010edgeR].
-First, we set up a design matrix specifying which cells belong in which cluster.
+First, we set up a design matrix specifying which cells belong to each cluster.
 Each `cluster*` coefficient represents the average log-expression of all cells in the corresponding cluster.
 We also block on uninteresting factors such as sex.
 
@@ -1341,38 +1342,7 @@ Spike-in normalization should also be used if differences in the total RNA conte
 This is because the same amount of spike-in RNA is added to each cell, such that the relative quantity of endogenous RNA can be easily quantified in each cell.
 For non-DE normalization, any change in total RNA content will affect all genes in the non-DE subset, such that it will be treated as bias and removed.
 
-We demonstrate the use of spike-in normalization on the HSC data set.
-We load in the `SCESet` object that we saved earlier, which contains the count data for filtered genes in high-quality HSCs.
-We then apply the `computeSpikeFactors` method to estimate size factors for all cells.
-This method computes the total count over all spike-in transcripts in each cell, and calculates size factors to equalize the total spike-in count across cells. 
-Here, we set `general.use=TRUE` as we intend to apply the spike-in factors to all counts.
-
-```{r}
-sce <- readRDS("hsc_data.rds")
-deconv.sf <- sizeFactors(sce)
-sce <- computeSpikeFactors(sce, general.use=TRUE)
-```
-
-Applying `normalize` will use the spike-in-based size factors to compute normalized log-expression values.
-Unlike in the previous analyses, we do not have to set separate size factors for the spike-in transcripts.
-This is because the relevant factors are already being used for all genes and spike-in transcripts when `general.use=TRUE`.
-(The exception is if the experiment uses multiple spike-in sets that behave differently and need to be normalized separately.)
-
-```{r}
-sce <- normalize(sce)
-```
-
-Both non-DE methods (like deconvolution) and spike-in normalization will capture technical biases such as sequencing depth and capture efficiency.
-Figure ((normplotspikehsc)) shows a weak positive correlation between the two sets of size factors, consistent with removal of technical biases by both methods.
-However, differences between the two sets are still present and are attributable to variability in total RNA content across the HSC population.
-Spike-in normalization will preserve differences in RNA content, whereas non-DE normalization will eliminate them.
-
-```{r normplotspikehsc, fig.cap="Size factors from spike-in normalization, plotted against the size factors from deconvolution for all cells in the HSC data set. Axes are shown on a log-scale."}
-plot(sizeFactors(sce), deconv.sf, pch=16, log="xy", xlab="Size factor (spike-in)",
-    ylab="Size factor (deconvolution)")
-```
-
-This is more clearly demonstrated with a data set involving different cell types -- namely, mouse embryonic stem cells (mESCs) and mouse embryonic fibroblasts (MEFs) [@islam2011characterization].
+We demonstrate the use of spike-in normalization on a data set involving different cell types -- namely, mouse embryonic stem cells (mESCs) and mouse embryonic fibroblasts (MEFs) [@islam2011characterization].
 We load in the counts and specify the rows corresponding to spike-in transcripts.
 The negative control wells do not contain any cells and are useful for quality control but need to be removed prior to downstream analysis.
 
@@ -1386,15 +1356,33 @@ sce <- calculateQCMetrics(sce, feature_controls=list(spike=grep("SPIKE", rowname
 isSpike(sce) <- "spike"
 ```
 
-We then compute size factors using either spike-in normalization or the deconvolution method.
-If the spike-in size factors were applied to the counts, the expression values in MEFs would be scaled up while expression in mESCs would be scaled down (Figure ((normplotspikemef))).
+We then apply the `computeSpikeFactors` method to estimate size factors for all cells.
+This method computes the total count over all spike-in transcripts in each cell, and calculates size factors to equalize the total spike-in count across cells. 
+Here, we set `general.use=TRUE` as we intend to apply the spike-in factors to all counts.
+
+```{R}
+sce <- computeSpikeFactors(sce, general.use=TRUE)
+```
+
+Applying `normalize` will use the spike-in-based size factors to compute normalized log-expression values.
+Unlike in the previous analyses, we do not have to set separate size factors for the spike-in transcripts.
+This is because the relevant factors are already being used for all genes and spike-in transcripts when `general.use=TRUE`.
+(The exception is if the experiment uses multiple spike-in sets that behave differently and need to be normalized separately.)
+
+```{r}
+sce <- normalize(sce)
+```
+
+For comparison, we also compute the deconvolution size factors and plot them against the spike-in factors.
+We observe a negative correlation between the two sets of values (Figure ((normplotspikemef))).
+If the spike-in size factors were applied to the counts, the expression values in MEFs would be scaled up while expression in mESCs would be scaled down.
 However, the opposite would occur if deconvolution size factors were used.
 This is because MEFs contain more endogenous RNA which reduces the relative spike-in coverage (thereby decreasing the spike-in size factors) but increases the coverage of endogenous genes (thus increasing the deconvolution size factors).
 
 ```{r normplotspikemef, fig.cap="Size factors from spike-in normalization, plotted against the size factors from deconvolution for all cells in the mESC/fibroblast data set. Axes are shown on a log-scale, and cells are coloured according to their identity. Deconvolution size factors were computed with small pool sizes owing to the low number of cells of each type."}
 colours <- c(mESC="red", MEF="grey")
-plot(col=colours[sce$grouping], pch=16, log="xy", computeSpikeFactors(sce, sf.out=TRUE), 
-    computeSumFactors(sce, sf.out=TRUE, cluster=sce$grouping, sizes=c(10, 20, 30, 40)), 
+deconv.sf <- computeSumFactors(sce, sf.out=TRUE, cluster=sce$grouping, sizes=1:4*10)
+plot(sizeFactors(sce), deconv.sf, col=colours[sce$grouping], pch=16, log="xy", 
     xlab="Size factor (spike-in)", ylab="Size factor (deconvolution)")
 legend("bottomleft", col=colours, legend=names(colours), pch=16)
 ```
@@ -1559,7 +1547,7 @@ is.mito <- location$CDSCHROM == "chrM" & !is.na(location$CDSCHROM)
 sum(is.mito)
 ```
 
-Identification of which rows correspond to spike-in transcripts is much easier, given that the ERCC spike-ins were used.
+Identification of rows that correspond to spike-in transcripts is much easier, given that the ERCC spike-ins were used.
 
 ```{r}
 is.spike <- grepl("^ERCC", my.ids)
@@ -1594,7 +1582,7 @@ gc()
 # Conclusions
 
 This workflow provides a step-by-step guide for performing basic analyses of single-cell RNA-seq data.
-It provides instructions for a number of low-level steps such as quality control, normalization, cell cycle phase assignment, data exploration, HVG and markger gene detection, and clustering.
+It provides instructions for a number of low-level steps such as quality control, normalization, cell cycle phase assignment, data exploration, HVG and marker gene detection, and clustering.
 This is done with a number of different data sets to provide a range of usage examples.
 In addition, the processed data can be easily used for higher-level analyses with other Bioconductor packages.
 We anticipate that this workflow will assist readers in assembling analyses of their own scRNA-seq data.
