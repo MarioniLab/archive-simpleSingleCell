@@ -1,5 +1,5 @@
 ---
-title: "A step-by-step workflow for low-level analyses of single-cell RNA-seq data"
+title: "A step-by-step workflow for low-level analyses of single-cell RNA-seq data with Bioconductor"
 author: 
     - name: Aaron T. L. Lun
       affiliation: Cancer Research UK Cambridge Institute, Li Ka Shing Centre, Robinson Way, Cambridge CB2 0RE, United Kingdom
