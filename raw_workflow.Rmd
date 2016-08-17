@@ -415,10 +415,21 @@ plotExplanatoryVariables(sce, variables=c("counts_feature_controls_ERCC",
     "log10_counts_feature_controls_ERCC")) + fontsize
 ```
 
+<!--
+The percentage of variance explained also affects the correlation.
+For a factor with percentage explained 'p', the upper bound on the increase to the Pearson's correlation would be '2p', when the correlation is -1; 'p', when the correlation is zero, and 0, when the correlation is 1, obviously.
+If 'p' is decently large (>10%), we're likely to have problems, so the corresponding factor will be need to be regressed out.
+
+Of course, blocking on factors introduces more assumptions and points of failure to the analysis.
+If the model is misspecified, you can end up with spurious patterns in the residuals - possibly larger than that caused by the technical bias in the first place.
+This is compounded by the presence of zeroes, non-normality and heteroskedasticity, etc.
+Thus, blocking should be performed sparingly, rather than being performed by default.
+
 Note that the use of the spike-in total in `plotExplanatoryVariables` assumes that no quantification is performed (i.e., the amount of cDNA from each library was not equalized prior to pooling and multiplexed sequencing).
 Otherwise, the coverage of the spike-in transcripts would be dependent on the total amount of endogenous RNA in each cell.
 This means that the spike-in totals could be confounded with genuine biological effects associated with changes in RNA content.
 Thus, for heterogeneous data sets, the spike-in total would no longer be an accurate proxy for the relative technical bias in each sample.
+-->
 
 ## Classification of cell cycle phase 
 
@@ -617,7 +628,7 @@ Significant correlations provide evidence for substructure in the data set, i.e.
 The number of significantly correlated HVG pairs represents the strength of the substructure.
 If many pairs were significant, this would indicate that the subpopulations were clearly defined and distinct from one another.
 For this particular data set, a relatively low number of HVGs exhibit significant correlations.
-This suggests that any substructure in the data will be modest, which may not be unexpected given that rigorous selection was performed to obtain a homogeneous population of HSCs [@wilson2015combined].
+This suggests that any substructure in the data will be modest, which is expected given that rigorous selection was performed to obtain a homogeneous population of HSCs [@wilson2015combined].
 
 
 <!--
@@ -632,7 +643,7 @@ We visualize the expression profiles of the correlated HVGs with a heatmap (Figu
 All expression values are mean-centred for each gene to highlight the relative differences in expression between cells.
 If any subpopulations were present, they would manifest as rectangular "blocks" in the heatmap, corresponding to sets of genes that are systematically up- or down-regulated in specific groups of cells.
 This is not observed in Figure ((heatmaphsc)), consistent with the lack of strong substructure.
-There may be a subpopulation of _Fos_ and _Jun_-negative cells, but this is difficult to trust given the small numbers of cells and genes involved.
+There may be a subpopulation of _Fos_ and _Jun_-negative cells, but it is poorly defined given the small numbers of cells and genes involved.
 
 ```{r heatmaphsc, message=FALSE, fig.width=7, fig.height=7, fig.cap="Heatmap of mean-centred normalized log-expression values for correlated HVGs in the HSC data set. Dendrograms are formed by hierarchical clustering on the Euclidean distances between genes (row) or cells (column)."}
 chosen <- unique(c(var.cor$gene1[sig.cor], var.cor$gene2[sig.cor]))
@@ -1039,9 +1050,10 @@ head(hvg.out)
 ```
 
 Again, we check the distribution of expression values for the top 10 HVGs to ensure that they are not being driven by outliers (Figure ((hvgvioplotbrain))).
+Some tweaking of the `plotExpression` parameters is necessary to obtain an acceptable visualization when the number of cells is large.
 
 ```{r hvgvioplotbrain, fig.cap="Violin plots of normalized log-expression values for the top 10 HVGs in the brain data set. For each gene, each point represents the log-expression value for an individual cell."}
-plotExpression(sce, rownames(hvg.out)[1:10], alpha=0.05) + fontsize
+plotExpression(sce, rownames(hvg.out)[1:10], alpha=0.05, jitter="jitter") + fontsize
 ```
 
 To identify genes involved in defining subpopulations, the set of HVGs is tested for significant pairwise correlations.
@@ -1174,6 +1186,10 @@ dev.off()
 <!--
 Use Acrobat reader or zathura for linux (selecting gene names and looking a copied text works better than continually zooming in/out).
 -->
+
+```{r echo=FALSE, results='hide'}
+gc()
+```
 
 ## Detecting marker genes between subpopulations
 
