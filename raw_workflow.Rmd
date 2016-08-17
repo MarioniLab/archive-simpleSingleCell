@@ -533,13 +533,10 @@ In and of themselves, HVGs are not of interest -- rather, they prioritise genes 
 If HVG detection is considered as a screen, it is better to focus on potentially interesting (but possibly false) genes rather than true and uninteresting ones.
 -->
 
-We recommend checking the distribution of expression values for the top HVGs to ensure that the variance estimate is not being dominated by one or two outlier cells (Figure ((hvgboxplothsc))).
+We recommend checking the distribution of expression values for the top HVGs to ensure that the variance estimate is not being dominated by one or two outlier cells (Figure ((hvgvioplothsc))).
 
-```{r hvgboxplothsc, fig.cap="Boxplots of normalized log-expression values for the top 10 HVGs in the HSC data set. Points correspond to cells that are more than 1.5 interquartile ranges from the edge of each box."}
-examined <- rownames(hvg.out)[1:10]
-all.names <- matrix(examined, nrow=length(examined), ncol=ncol(sce))
-boxplot(split(exprs(sce)[examined,], all.names), las=2, 
-    ylab="Normalized log-expression", col="grey80")
+```{r hvgvioplothsc, fig.cap="Violin plots of normalized log-expression values for the top 10 HVGs in the HSC data set. Each point represents the log-expression value in a single cell."}
+plotExpression(sce, rownames(hvg.out)[1:10]) + fontsize
 ```
 
 There are many other strategies for defining HVGs, e.g., by using the coefficient of variation [@brennecke2013accounting;@kolod2015singlecell;@kim2015characterizing], with the dispersion parameter in the negative binomial distribution [@mccarthy2012differential], or as a proportion of total variability [@vallejos2015basics].
@@ -855,7 +852,7 @@ Low-abundance genes are removed by applying a simple mean-based filter.
 We use a lower threshold for UMI counts compared to that used for read counts.
 This is because the number of transcript molecules will always be lower than the number of reads generated from such molecules.
 While some information and power will be lost due to the decrease in the size of the counts, this is mitigated by a concomitant reduction in the variability of the counts.
-Specifically, the use of UMIs eliminates technical noise due to amplification biases.
+Specifically, the use of UMIs eliminates technical noise due to amplification biases [@islam2014quantitative].
 
 ```{r}
 ave.counts <- rowMeans(counts(sce))
@@ -1041,13 +1038,10 @@ write.table(file="brain_hvg.tsv", hvg.out, sep="\t", quote=FALSE, col.names=NA)
 head(hvg.out)
 ```
 
-Again, we check the distribution of expression values for the top 10 HVGs to ensure that they are not being driven by outliers (Figure ((hvgboxplotbrain))).
+Again, we check the distribution of expression values for the top 10 HVGs to ensure that they are not being driven by outliers (Figure ((hvgvioplotbrain))).
 
-```{r hvgboxplotbrain, fig.cap="Boxplots of normalized log-expression values for the top 10 HVGs in the brain data set. Points correspond to cells that are more than 1.5 interquartile ranges from the edge of each box."}
-examined <- rownames(hvg.out)[1:10]
-all.names <- matrix(examined, nrow=length(examined), ncol=ncol(sce))
-boxplot(split(exprs(sce)[examined,], all.names), las=2, 
-    ylab="Normalized log-expression", col="grey80")
+```{r hvgvioplotbrain, fig.cap="Violin plots of normalized log-expression values for the top 10 HVGs in the brain data set. For each gene, each point represents the log-expression value for an individual cell."}
+plotExpression(sce, rownames(hvg.out)[1:10], alpha=0.05) + fontsize
 ```
 
 To identify genes involved in defining subpopulations, the set of HVGs is tested for significant pairwise correlations.
