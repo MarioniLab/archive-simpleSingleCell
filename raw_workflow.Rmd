@@ -361,14 +361,17 @@ plot(sizeFactors(sce), sce$total_counts/1e6, log="xy",
 
 ### Computing separate size factors for spike-in transcripts
 
+Size factors computed from the counts for endogenous genes are usually not appropriate for normalizing the counts for spike-in transcripts.
 Consider an experiment where library quantification is _not_ performed, i.e., the amount of cDNA from each library is not equalized prior to pooling and multiplexed sequencing.
-Here, the size factors computed from gene counts will include differences in total RNA content between cells.
-Specifically, cells with more RNA will have greater counts and, thus, larger size factors to scale down those counts.
-However, the same amount of spike-in RNA is added to each cell, regardless of the quantity of endogenous RNA.
+Here, cells containing more RNA have greater counts for endogenous genes and thus larger size factors to scale down those counts.
+However, the same amount of spike-in RNA is added to each cell.
 This means that the counts for spike-in transcripts are not subject to the effects of RNA content.
 Attempting to normalize the spike-in counts with the gene-based size factors will lead to over-normalization and incorrect quantification of expression.
+Similar reasoning applies in cases where library quantification is performed. 
+For a constant total amount of cDNA, any increases in endogenous RNA content will suppress the coverage of spike-in transcripts.
+As a result, the bias in the spike-in counts will be opposite to that captured by the gene-based size factor.
 
-To avoid this, we compute a separate set of size factors for the spike-in set.
+To ensure normalization is performed correctly, we compute a separate set of size factors for the spike-in set.
 For each cell, the spike-in-specific size factor is defined as the total count across all transcripts in the spike-in set.
 This assumes that none of the spike-in transcripts are differentially expressed, which is reasonable given that the same amount and composition of spike-in RNA should have been added to each cell.
 (See below for a more detailed discussion on spike-in normalization.)
@@ -378,11 +381,6 @@ This ensures that they will only be used with the spike-in transcripts but not t
 ```{r}
 sce <- computeSpikeFactors(sce, type="ERCC", general.use=FALSE)
 ```
-
-We note that similar reasoning applies in situations where library quantification is performed.
-When the total amount of cDNA from each sample is held constant, any increases in total RNA content will suppress the coverage of spike-in transcripts.
-This means that the spike-in coverage for a sample will decrease as the gene-based size factor increases.
-Thus, using the latter to normalize the former would be inappropriate.
 
 ### Applying the size factors to normalize gene expression
 
