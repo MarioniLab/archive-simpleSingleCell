@@ -1,5 +1,5 @@
 ---
-title: "A step-by-step workflow for low-level analyses of single-cell RNA-seq data with Bioconductor"
+title: "A step-by-step workflow for low-level analysis of single-cell RNA-seq data with Bioconductor"
 author: 
     - name: Aaron T. L. Lun
       affiliation: Cancer Research UK Cambridge Institute, Li Ka Shing Centre, Robinson Way, Cambridge CB2 0RE, United Kingdom
@@ -74,7 +74,7 @@ From each cell, mRNA is isolated and reverse transcribed to cDNA for high-throug
 This can be done using microfluidics platforms like the Fluidigm C1 [@pollen2014lowcoverage], protocols based on microtiter plates like Smart-seq2 [@picelli2014fulllength], or droplet-based technologies like inDrop [@klein2015droplet;@macosko2015highly].
 The number of reads mapped to each gene is then used to quantify its expression in each cell.
 Alternatively, unique molecular identifiers (UMIs) can be used to directly measure the number of transcript molecules for each gene [@islam2014quantitative].
-Count data is analyzed to detect highly variable genes (HVGs) that drive heterogeneity across cells in a population, to find correlations between genes and cellular phenotypes, or to identify new subpopulations via dimensionality reduction and clustering. 
+Count data are analyzed to detect highly variable genes (HVGs) that drive heterogeneity across cells in a population, to find correlations between genes and cellular phenotypes, or to identify new subpopulations via dimensionality reduction and clustering. 
 This provides biological insights at a single-cell resolution that cannot be achieved with conventional bulk RNA sequencing of cell populations.
 
 Strategies for scRNA-seq data analysis differ markedly from those for bulk RNA-seq.
@@ -361,11 +361,12 @@ plot(sizeFactors(sce), sce$total_counts/1e6, log="xy",
 
 ### Computing separate size factors for spike-in transcripts
 
-The size factors computed from gene counts include differences in total RNA content between cells.
+Consider an experiment where library quantification is _not_ performed, i.e., the amount of cDNA from each library is not equalized prior to pooling and multiplexed sequencing.
+Here, the size factors computed from gene counts will include differences in total RNA content between cells.
 Specifically, cells with more RNA will have greater counts and, thus, larger size factors to scale down those counts.
 However, the same amount of spike-in RNA is added to each cell, regardless of the quantity of endogenous RNA.
 This means that the counts for spike-in transcripts are not subject to the effects of RNA content.
-Attempting to normalize the spike-in counts with the gene-based size factors will lead to over-normalization and incorrect quantification.
+Attempting to normalize the spike-in counts with the gene-based size factors will lead to over-normalization and incorrect quantification of expression.
 
 To avoid this, we compute a separate set of size factors for the spike-in set.
 For each cell, the spike-in-specific size factor is defined as the total count across all transcripts in the spike-in set.
@@ -377,6 +378,11 @@ This ensures that they will only be used with the spike-in transcripts but not t
 ```{r}
 sce <- computeSpikeFactors(sce, type="ERCC", general.use=FALSE)
 ```
+
+We note that similar reasoning applies in situations where library quantification is performed.
+When the total amount of cDNA from each sample is held constant, any increases in total RNA content will suppress the coverage of spike-in transcripts.
+This means that the spike-in coverage for a sample will decrease as the gene-based size factor increases.
+Thus, using the latter to normalize the former would be inappropriate.
 
 ### Applying the size factors to normalize gene expression
 
@@ -424,12 +430,12 @@ Of course, blocking on factors introduces more assumptions and points of failure
 If the model is misspecified, you can end up with spurious patterns in the residuals - possibly larger than that caused by the technical bias in the first place.
 This is compounded by the presence of zeroes, non-normality and heteroskedasticity, etc.
 Thus, blocking should be performed sparingly, rather than being performed by default.
+-->
 
-Note that the use of the spike-in total in `plotExplanatoryVariables` assumes that no quantification is performed (i.e., the amount of cDNA from each library was not equalized prior to pooling and multiplexed sequencing).
+Note that the use of the spike-in total in `plotExplanatoryVariables` assumes that no library quantification is performed.
 Otherwise, the coverage of the spike-in transcripts would be dependent on the total amount of endogenous RNA in each cell.
 This means that the spike-in totals could be confounded with genuine biological effects associated with changes in RNA content.
-Thus, for heterogeneous data sets, the spike-in total would no longer be an accurate proxy for the relative technical bias in each sample.
--->
+Thus, for heterogeneous data sets, the spike-in total would not an accurate proxy for the relative technical bias.
 
 ## Classification of cell cycle phase 
 
@@ -450,9 +456,9 @@ assignments <- cyclone(sce, mm.pairs, gene.names=ensembl)
 plot(assignments$score$G1, assignments$score$G2M, xlab="G1 score", ylab="G2/M score", pch=16)
 ```
 
-Cells are classified as being in G1 phase, if the G1 score is above 0.5 and greater than the G2/M score; 
-    in G2/M phase, if the G2/M score is above 0.5 and greater than the G1 score; 
-    and in S phase, if neither score is above 0.5.
+Cells are classified as being in G1 phase if the G1 score is above 0.5 and greater than the G2/M score; 
+    in G2/M phase if the G2/M score is above 0.5 and greater than the G1 score; 
+    and in S phase if neither score is above 0.5.
 Here, the vast majority of cells are classified as being in G1 phase.
 We will focus on these cells in the downstream analysis.
 Cells in other phases are removed to avoid potential confounding effects from cell cycle-induced differences.
@@ -1113,7 +1119,7 @@ Problems would only occur when you try to regress out uninteresting biological e
 -->
 
 We perform dimensionality reduction on the correlated HVGs to check if there is any substructure. 
-Cells separate into clear clusters in the _t_-SNE plot (Figure ((dimredplotbrain))), corresponding to distinct subpopulations.
+Cells separate into clear clusters in the _t_-SNE plot (Figure ((tsneplotbrain))), corresponding to distinct subpopulations.
 This is consistent with the presence of multiple cell types in the diverse brain population.
 
 ```{r tsneplotbrain, fig.cap="_t_-SNE plots constructed from the normalized and corrected log-expression values of correlated HVGs for cells in the brain data set. Each point represents a cell and is coloured according to its expression of the top HVG (left) or _Mog_ (right).", fig.width=15, fig.height=6}
@@ -1315,8 +1321,9 @@ Scaling normalization is then applied to equalize spike-in coverage across cells
 The choice between these two normalization strategies depends on the biology of the cells and the features of interest.
 If the majority of genes are expected to be DE and there is no reliable house-keeping set, spike-in normalization may be the only option for removing technical biases.
 Spike-in normalization should also be used if differences in the total RNA content of individual cells are of interest.
-This is because the former will preserve the effects of the latter on gene expression.
-For non-DE normalization, any change in total RNA content will systematically alter the expression of all genes in the non-DE subset, such that it will be treated as bias and removed.
+This is because an increase in the amount of endogenous RNA in a particular sample will not result in increased spike-in coverage (regardless of whether or not library quantification was performed).
+Thus, the former will not become part of the bias in the latter, which means that the effects of total RNA content on expression will not be removed upon scaling.
+With non-DE normalization, an increase in RNA content will systematically increase the expression of all genes in the non-DE subset, such that it will be treated as bias and removed.
 
 We demonstrate the use of spike-in normalization on a data set involving different cell types -- namely, mouse embryonic stem cells (mESCs) and mouse embryonic fibroblasts (MEFs) [@islam2011characterization].
 We load in the counts and specify the rows corresponding to spike-in transcripts.
