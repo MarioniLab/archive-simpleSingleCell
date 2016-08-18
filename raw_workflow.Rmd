@@ -362,7 +362,7 @@ plot(sizeFactors(sce), sce$total_counts/1e6, log="xy",
 ### Computing separate size factors for spike-in transcripts
 
 Size factors computed from the counts for endogenous genes are usually not appropriate for normalizing the counts for spike-in transcripts.
-Consider an experiment where library quantification is _not_ performed, i.e., the amount of cDNA from each library is not equalized prior to pooling and multiplexed sequencing.
+Consider an experiment without library quantification, i.e., the amount of cDNA from each library is not equalized prior to pooling and multiplexed sequencing.
 Here, cells containing more RNA have greater counts for endogenous genes and thus larger size factors to scale down those counts.
 However, the same amount of spike-in RNA is added to each cell.
 This means that the counts for spike-in transcripts are not subject to the effects of RNA content.
@@ -1319,8 +1319,8 @@ Scaling normalization is then applied to equalize spike-in coverage across cells
 The choice between these two normalization strategies depends on the biology of the cells and the features of interest.
 If the majority of genes are expected to be DE and there is no reliable house-keeping set, spike-in normalization may be the only option for removing technical biases.
 Spike-in normalization should also be used if differences in the total RNA content of individual cells are of interest.
-This is because an increase in the amount of endogenous RNA in a particular sample will not result in increased spike-in coverage (regardless of whether or not library quantification was performed).
-Thus, the former will not become part of the bias in the latter, which means that the effects of total RNA content on expression will not be removed upon scaling.
+For a given cell, an increase in the amount of endogenous RNA will not increase spike-in coverage (with or without library quantification).
+Thus, the former will not be represented as part of the bias in the latter, which means that the effects of total RNA content on expression will not be removed upon scaling.
 With non-DE normalization, an increase in RNA content will systematically increase the expression of all genes in the non-DE subset, such that it will be treated as bias and removed.
 
 We demonstrate the use of spike-in normalization on a data set involving different cell types -- namely, mouse embryonic stem cells (mESCs) and mouse embryonic fibroblasts (MEFs) [@islam2011characterization].
