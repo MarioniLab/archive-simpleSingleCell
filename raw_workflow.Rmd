@@ -891,7 +891,7 @@ nrow(sce)
 gc()
 ```
 
-Some data sets may also contain strong heterogeneity in mitochondrial RNA content, possibly due to differences in mitochondrial copy number or activity between cell types.
+Some data sets also contain strong heterogeneity in mitochondrial RNA content, possibly due to differences in mitochondrial copy number or activity between cell types.
 This heterogeneity will cause mitochondrial genes to dominate the top set of results, e.g., for identification of correlated HVGs.
 However, these genes are largely uninteresting given that most studies focus on nuclear regulation.
 As such, we filter them out prior to further analysis.
@@ -1050,7 +1050,7 @@ head(hvg.out)
 ```
 
 Again, we check the distribution of expression values for the top 10 HVGs to ensure that they are not being driven by outliers (Figure ((hvgvioplotbrain))).
-Some tweaking of the `plotExpression` parameters is necessary to obtain an acceptable visualization when the number of cells is large.
+Some tweaking of the `plotExpression` parameters is necessary to visualize a large number of cells.
 
 ```{r hvgvioplotbrain, fig.cap="Violin plots of normalized log-expression values for the top 10 HVGs in the brain data set. For each gene, each point represents the log-expression value for an individual cell."}
 plotExpression(sce, rownames(hvg.out)[1:10], alpha=0.05, jitter="jitter") + fontsize
@@ -1416,8 +1416,8 @@ dec.block <- decomposeVar(sce, fit.block)
 
 For analyses that do not use design matrices, we remove the cell cycle effect directly from the expression values using `removeBatchEffect`.
 The result of this procedure is visualized with some PCA plots in Figure ((pcaplotth2)).
-Before removal, cells in the G1 and non-G1 phases tend to be concentrated in different parts of the plot.
-Afterwards, more intermingling is observed between the phases which suggests that the cell cycle effect has been mitigated.
+Before removal, the distribution of cells along the first two principal components is strongly associated with their G1 and G2/M scores.
+This is no longer the case after removal, which suggests that the cell cycle effect has been mitigated.
 
 ```{r pcaplotth2, fig.width=12, fig.height=6, fig.cap="PCA plots before (left) and after (right) removal of the cell cycle effect in the T~H~2 data set. Each cell is represented by a point with colour and size determined by the G1 and G2/M scores, respectively. Only HVGs were used to construct each plot."}
 # Finding HVGs without blocking on phase score.
@@ -1426,15 +1426,14 @@ dec <- decomposeVar(sce, fit)
 top.hvgs <- which(dec$FDR <= 0.05 & dec$bio >= 0.5)
 sce$G1score <- assignments$score$G1
 sce$G2Mscore <- assignments$score$G2M
-out <- plotPCA(sce, select=top.hvgs, colour_by="G1score", size_by="G2Mscore") + 
+out <- plotPCA(sce, feature_set=top.hvgs, colour_by="G1score", size_by="G2Mscore") + 
     fontsize + ggtitle("Before removal")
 
 # Using HVGs after blocking on the phase score.
 top.hvgs2 <- which(dec.block$FDR <= 0.05 & dec.block$bio >= 0.5)
-corrected <- removeBatchEffect(exprs(sce), covariates=assignments$score[,c("G1", "G2M")])
-sce2 <- newSCESet(exprsData=corrected, phenoData=phenoData(sce))
-out2 <- plotPCA(sce2, select=top.hvgs2, colour_by="G1score", size_by="G2Mscore") + 
-    fontsize + ggtitle("After removal")
+norm_exprs(sce) <- removeBatchEffect(exprs(sce), covariates=assignments$score[,c("G1", "G2M")])
+out2 <- plotPCA(sce, exprs_values="norm_exprs", feature_set=top.hvgs2, colour_by="G1score", 
+    size_by="G2Mscore") + fontsize + ggtitle("After removal")
 multiplot(out, out2, cols=2)
 ```
 
@@ -1444,7 +1443,7 @@ In Figure ((diffusionth2)), cells are arranged along a trajectory in the low-dim
 The first diffusion component is likely to correspond to T~H~2 differentiation, given that a key regulator _Gata3_ [@zhu2006gata3] changes in expression from left to right.
 
 ```{r diffusionth2, fig.cap="A diffusion map for the T~H~2 data set, where each cell is coloured by its expression of _Gata3_."}
-plotDiffusionMap(sce2, colour_by="Gata3") + fontsize
+plotDiffusionMap(sce, exprs_values="norm_exprs", colour_by="Gata3") + fontsize
 ```
 
 ```{r, echo=FALSE, results='hide'}
