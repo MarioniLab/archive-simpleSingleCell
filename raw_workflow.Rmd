@@ -430,10 +430,9 @@ This is compounded by the presence of zeroes, non-normality and heteroskedastici
 Thus, blocking should be performed sparingly, rather than being performed by default.
 -->
 
-Note that the use of the spike-in total in `plotExplanatoryVariables` assumes that no library quantification is performed.
+Note that the use of the spike-in total as an accurate proxy for the relative technical bias assumes that no library quantification is performed.
 Otherwise, the coverage of the spike-in transcripts would be dependent on the total amount of endogenous RNA in each cell.
 This means that the spike-in totals could be confounded with genuine biological effects associated with changes in RNA content.
-Thus, for heterogeneous data sets, the spike-in total would not an accurate proxy for the relative technical bias.
 
 ## Classification of cell cycle phase 
 
@@ -1573,7 +1572,7 @@ We anticipate that this workflow will assist readers in assembling analyses of t
 
 All software packages used in this workflow are publicly available from the Comprehensive R Archive Network (https://cran.r-project.org) or the Bioconductor project (http://bioconductor.org).
 The specific version numbers of the packages used are shown below, along with the version of the R installation.
-The workflow takes less than an hour and 7 GB of memory to run on a desktop computer.
+The workflow takes less than an hour to run on a desktop computer with 8 GB of memory.
 
 ```{r}
 sessionInfo()
