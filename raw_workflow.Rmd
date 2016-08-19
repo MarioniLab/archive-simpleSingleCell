@@ -34,19 +34,10 @@ on.bioc <- FALSE
 ```
 
 ```{r, message=FALSE, echo=FALSE, results='hide'}
-library(DESeq2)
-library(scran)
-library(edgeR)
-library(scater)
 library(Rtsne)
 library(mvoutlier)
 library(destiny)
-library(gplots)
-library(gdata)
-library(openxlsx)
-library(R.utils)
-library(org.Mm.eg.db)
-library(TxDb.Mmusculus.UCSC.mm10.ensGene)
+library(statmod)
 ```
 
 ```{r, eval=on.bioc, echo=FALSE, results='hide'}
@@ -445,6 +436,10 @@ This approach is implemented in the `cyclone` function using a pre-trained set o
 The result of phase assignment for each cell in the HSC data set is shown in Figure ((phaseplothsc)).
 (Some additional work is necessary to match the gene symbols in the data to the Ensembl annotation in the pre-trained marker set.)
 
+```{r, echo=FALSE, results="hide", message=FALSE}
+set.seed(100)
+```
+
 ```{r phaseplothsc, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the HSC data set, where each point represents a cell."}
 mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", package="scran"))
 library(org.Mm.eg.db)
@@ -653,6 +648,7 @@ There may be a subpopulation of _Fos_ and _Jun_-negative cells, but it is poorly
 chosen <- unique(c(var.cor$gene1[sig.cor], var.cor$gene2[sig.cor]))
 norm.exprs <- exprs(sce)[chosen,,drop=FALSE]
 heat.vals <- norm.exprs - rowMeans(norm.exprs)
+library(gplots)
 heat.out <- heatmap.2(heat.vals, col=bluered, symbreak=TRUE, trace='none', cexRow=0.6)
 ```
 
@@ -1214,6 +1210,7 @@ We set up a `DGEList` object for entry into the `r Biocpkg("edgeR")` analysis.
 This new object contains all relevant information from the original `SCESet` object, including the counts and (library size-adjusted) size factors.
 
 ```{r}
+library(edgeR)
 y <- convertTo(sce, type="edgeR")
 ```
 
