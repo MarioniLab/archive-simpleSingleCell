@@ -23,6 +23,6 @@ workflow.md
 workflow.Rmd
 existing/
 
-submissions/*-1.png
+submissions/Figure*.png
 submissions/workflow.*
 
