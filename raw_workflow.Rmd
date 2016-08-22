@@ -37,7 +37,6 @@ on.bioc <- FALSE
 library(Rtsne)
 library(mvoutlier)
 library(destiny)
-library(statmod)
 ```
 
 ```{r, eval=on.bioc, echo=FALSE, results='hide'}
