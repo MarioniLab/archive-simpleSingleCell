@@ -78,31 +78,31 @@ This is simply not possible with bulk data, meaning that custom methods are requ
 
 This article describes a computational workflow for basic analysis of scRNA-seq data using software packages from the open-source Bioconductor project [@huber2015orchestrating].
 Starting from a count matrix, this workflow contains the steps required for quality control to remove problematic cells; normalization of cell-specific biases, with and without spike-ins; cell cycle phase classification from gene expression data; data exploration to identify putative subpopulations; and finally, HVG and marker gene identification to prioritize interesting genes.
-The application of different steps in the workflow will be demonstrated on several public scRNA-seq data sets involving haematopoietic stem cells, brain-derived cells, T-helper cells and mouse embryonic stem cells, generated with a range of experimental protocols and platforms [@wilson2015combined;@zeisel2015brain;@buettner2015computational;@kolod2015singlecell].
+The application of different steps in the workflow will be demonstrated on several public scRNA-seq datasets involving haematopoietic stem cells, brain-derived cells, T-helper cells and mouse embryonic stem cells, generated with a range of experimental protocols and platforms [@wilson2015combined;@zeisel2015brain;@buettner2015computational;@kolod2015singlecell].
 The aim is to provide a variety of modular usage examples that can be applied to construct custom analysis pipelines.
 
 # Analysis of haematopoietic stem cells
 
 ## Overview
 
-To introduce most of the concepts of scRNA-seq data analysis, we use a relatively simple data set from a study of haematopoietic stem cells (HSCs) [@wilson2015combined].
+To introduce most of the concepts of scRNA-seq data analysis, we use a relatively simple dataset from a study of haematopoietic stem cells (HSCs) [@wilson2015combined].
 Single mouse HSCs were isolated into microtiter plates and libraries were prepared for 96 cells using the Smart-seq2 protocol.
 A constant amount of spike-in RNA from the External RNA Controls Consortium (ERCC) was also added to each cell's lysate prior to library preparation.
 High-throughput sequencing was performed and the expression of each gene was quantified by counting the total number of reads mapped to its exonic regions.
 Similarly, the quantity of each spike-in transcript was measured by counting reads mapped to the spike-in reference sequence.
-Counts for all genes/transcripts in each cell were obtained from the NCBI Gene Expression Omnibus (GEO) as a supplementary file under the accession number GSE61533.
+Counts for all genes/transcripts in each cell were obtained from the NCBI Gene Expression Omnibus (GEO) as a supplementary file under the accession number GSE61533 (http://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE61533).
 
 For simplicity, we forego a description of the read processing steps required to generate the count matrix, i.e., read alignment and counting into features.
 These steps have been described in some detail elsewhere [@love2015rnaseq;@chen2016from], and are largely the same for bulk and single-cell data.
 The only additional consideration is that the spike-in information must be included in the pipeline.
 Typically, spike-in sequences can be included as additional FASTA files during genome index building prior to alignment, while genomic intervals for both spike-in transcripts and endogenous genes can be concatenated into a single GTF file prior to counting.
-For users favouring a R-based approach to read alignment and counting, we suggest using the methods in the `r Biocpkg("Rsubread")` package [@liao2013subread;@liao2014featurecounts].
+For users favouring an R-based approach to read alignment and counting, we suggest using the methods in the `r Biocpkg("Rsubread")` package [@liao2013subread;@liao2014featurecounts].
 Alternatively, rapid quantification of expression with alignment-free methods such as _kallisto_ [@bray2016near] or _Salmon_ [@patro2015accurate] can be performed using the functions `runKallisto` and `runSalmon` in the `r Biocpkg("scater")` package.
 
 ## Count loading
 
 The first task is to load the count matrix into memory.
-In this case, some work is required to decompress and retrieve the data from the Excel format.
+In this case, some work is required to retrieve the data from the Gzip-compressed Excel format.
 Each row of the matrix represents an endogenous gene or a spike-in transcript, and each column represents a single HSC.
 For convenience, the counts for spike-in transcripts and endogenous genes are stored in a `SCESet` object from the `r Biocpkg("scater")` package.
 
@@ -117,7 +117,7 @@ dim(sce)
 ```
 
 We identify the rows corresponding to ERCC spike-ins and mitochondrial genes.
-For this data set, this information can be easily extracted from the row names.
+For this dataset, this information can be easily extracted from the row names.
 In general, though, identifying mitochondrial genes from standard identifiers like Ensembl requires extra annotation (this will be discussed later in more detail).
 
 ```{r}
@@ -152,7 +152,7 @@ The number of expressed features in each cell is defined as the number of featur
 Any cell with very few expressed genes is likely to be of poor quality as the diverse transcript population has not been successfully captured.
 The distributions of both of these metrics are shown in Figure ((libplothsc)).
 
-```{r libplothsc, fig.height=6, fig.width=12, fig.cap="Histograms of library sizes (left) and number of expressed genes (right) for all cells in the HSC data set."}
+```{r libplothsc, fig.height=6, fig.width=12, fig.cap="Histograms of library sizes (left) and number of expressed genes (right) for all cells in the HSC dataset."}
 par(mfrow=c(1,2))
 hist(sce$total_counts/1e6, xlab="Library sizes (millions)", main="", 
     breaks=20, col="grey80", ylab="Number of cells")
@@ -162,7 +162,7 @@ hist(sce$total_features, xlab="Number of expressed genes", main="",
 
 Picking a threshold for these metrics is not straightforward as their absolute values depend on the protocol and biological system.
 For example, sequencing to greater depth will lead to more reads, regardless of the quality of the cells.
-To obtain an adaptive threshold, we assume that most of the data set consists of high-quality cells.
+To obtain an adaptive threshold, we assume that most of the dataset consists of high-quality cells.
 We remove cells with log-library sizes that are more than 3 median absolute deviations (MADs) below the median log-library size.
 (A log-transformation improves resolution at small values, especially when the MAD of the raw values is comparable to or greater than the median.)
 We also remove cells where the log-transformed number of expressed genes is 3 MADs below the median.
@@ -201,7 +201,7 @@ This is because the logit transform compresses changes within the middle of the 
 This reduces the resolution for where the threshold would usually be.
 -->
 
-```{r controlplothsc, fig.width=12, fig.height=6, fig.cap="Histogram of the proportion of reads mapped to mitochondrial genes (left) or spike-in transcripts (right) across all cells in the HSC data set."}
+```{r controlplothsc, fig.width=12, fig.height=6, fig.cap="Histogram of the proportion of reads mapped to mitochondrial genes (left) or spike-in transcripts (right) across all cells in the HSC dataset."}
 par(mfrow=c(1,2))
 hist(sce$pct_counts_feature_controls_Mt, xlab="Mitochondrial proportion (%)", 
     ylab="Number of cells", breaks=20, main="", col="grey80")
@@ -212,8 +212,8 @@ hist(sce$pct_counts_feature_controls_ERCC, xlab="ERCC proportion (%)",
 Again, the ideal threshold for these proportions depends on the cell type and the experimental protocol.
 Cells with more mitochondria or more mitochondrial activity may naturally have larger mitochondrial proportions.
 Similarly, cells with more endogenous RNA or that are assayed in protocols using less spike-in RNA will have lower spike-in proportions.
-If we assume that most cells in the data set are of high quality, then the threshold can be set to remove any large outliers from the distribution of proportions.
-We use the MAD-based definition of outliers to remove putative low-quality cells from the data set.
+If we assume that most cells in the dataset are of high quality, then the threshold can be set to remove any large outliers from the distribution of proportions.
+We use the MAD-based definition of outliers to remove putative low-quality cells from the dataset.
 
 ```{r}
 mito.drop <- isOutlier(sce$pct_counts_feature_controls_Mt, nmads=3, type="higher")
@@ -240,7 +240,7 @@ An alternative approach to quality control is to perform a principal components 
 Outliers on a PCA plot may be indicative of low-quality cells that have aberrant technical properties compared to the (presumed) majority of high-quality cells.
 In Figure ((pcaqualplothsc)), no obvious outliers are present which is consistent with the removal of suspect cells in the preceding quality control steps.
 
-```{r pcaqualplothsc, fig.cap="PCA plot for cells in the HSC data set, constructed using quality metrics. The first and second components are shown on each axis, along with the percentage of total variance explained by each component. Bars represent the coordinates of the cells on each axis."}
+```{r pcaqualplothsc, fig.cap="PCA plot for cells in the HSC dataset, constructed using quality metrics. The first and second components are shown on each axis, along with the percentage of total variance explained by each component. Bars represent the coordinates of the cells on each axis."}
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
 plotPCA(sce, pca_data_input="pdata") + fontsize
 ```
@@ -269,7 +269,7 @@ To check whether the chosen threshold is suitable, we examine the distribution o
 The peak represents the bulk of moderately expressed genes while the rectangular component corresponds to lowly expressed genes.
 The filter threshold should cut the distribution at some point along the rectangular component to remove the majority of low-abundance genes.
 
-```{r abhisthsc, fig.cap="Histogram of log-average counts for all genes in the HSC data set. The filter threshold is represented by the blue line."}
+```{r abhisthsc, fig.cap="Histogram of log-average counts for all genes in the HSC dataset. The filter threshold is represented by the blue line."}
 hist(log10(ave.counts), breaks=100, main="", col="grey80",
     xlab=expression(Log[10]~"average count"))
 abline(v=log10(1), col="blue", lwd=2, lty=2)
@@ -279,7 +279,7 @@ We also look at the identities of the most highly expressed genes (Figure ((topg
 This should generally be dominated by constitutively expressed transcripts, such as those for ribosomal or mitochondrial proteins.
 If other features are present, e.g., pseudogenes or predicted transcripts, this may be indicative of some upstream processing error.
 
-```{r topgenehsc, fig.height=9, fig.width=6, fig.cap="Percentage of total counts assigned to the top 50 most highly-abundant features in the HSC data set. For each feature, each bar represents the percentage assigned to that feature for a single cell, while the circle represents the average across all cells. Bars are coloured by the total number of expressed features in each cell, while circles are coloured according to whether the feature is labelled as a control feature."}
+```{r topgenehsc, fig.height=9, fig.width=6, fig.cap="Percentage of total counts assigned to the top 50 most highly-abundant features in the HSC dataset. For each feature, each bar represents the percentage assigned to that feature for a single cell, while the circle represents the average across all cells. Bars are coloured by the total number of expressed features in each cell, while circles are coloured according to whether the feature is labelled as a control feature."}
 plotQC(sce, type = "highest-expression", n=50) + fontsize
 ```
 
@@ -298,7 +298,7 @@ sum(alt.keep)
 The relationship between the number of expressing cells and the mean is shown in Figure ((geneplothsc)).
 The two statistics tend to be well-correlated so filtering on either should give roughly similar results.
 
-```{r geneplothsc, fig.cap="Number of expressing cells against the log-mean expression for each gene in the HSC data set. Spike-in transcripts are highlighted in red."}
+```{r geneplothsc, fig.cap="Number of expressing cells against the log-mean expression for each gene in the HSC dataset. Spike-in transcripts are highlighted in red."}
 smoothScatter(log10(ave.counts), numcells, xlab=expression(Log[10]~"average count"), 
     ylab="Number of expressing cells")
 is.ercc <- isSpike(sce, type="ERCC")
@@ -345,7 +345,7 @@ This suggests that the systematic differences between cells are primarily driven
 Any DE between cells would yield a non-linear trend between the total count and size factor, and/or increased scatter around the trend.
 This does not occur here as strong DE is unlikely to exist within a homogeneous population of cells.
 
-```{r normplothsc, fig.cap="Size factors from deconvolution, plotted against library sizes for all cells in the HSC data set. Axes are shown on a log-scale."}
+```{r normplothsc, fig.cap="Size factors from deconvolution, plotted against library sizes for all cells in the HSC dataset. Axes are shown on a log-scale."}
 plot(sizeFactors(sce), sce$total_counts/1e6, log="xy",
     ylab="Library size (millions)", xlab="Size factor")
 ```
@@ -396,7 +396,7 @@ This seems better than square-rooting it, which only works for the Poisson.
 
 We check whether there are technical factors that contribute substantially to the heterogeneity of gene expression.
 If so, the factor may need to be regressed out to ensure that it does not inflate the variances or introduce spurious correlations.
-For this data set, the simple experimental design means that there are no plate or batch effects to examine.
+For this dataset, the simple experimental design means that there are no plate or batch effects to examine.
 Instead, we use the (log-transformed) total count for the spike-in transcripts as a proxy for the relative bias in each sample.
 This bias is purely technical in origin, given that the same amount of spike-in RNA should have been added to each cell.
 Thus, any association of gene expression with this factor is not biologically interesting and should be removed.
@@ -406,7 +406,7 @@ The percentages are generally small (1-3%), indicating that the expression of mo
 This result is consistent with successful removal of cell-specific biases by scaling normalization.
 Thus, the spike-in total does not need to be explicitly modelled in our downstream analyses.
 
-```{r explvarplothsc, fig.cap="Density plot of the percentage of variance explained by the (log-transformed) total spike-in counts across all genes in the HSC data set. For each gene, the percentage of the variance of the normalized log-expression values across cells that is explained by each factor is calculated. Each curve corresponds to one factor and represents the distribution of percentages across all genes."}
+```{r explvarplothsc, fig.cap="Density plot of the percentage of variance explained by the (log-transformed) total spike-in counts across all genes in the HSC dataset. For each gene, the percentage of the variance of the normalized log-expression values across cells that is explained by each factor is calculated. Each curve corresponds to one factor and represents the distribution of percentages across all genes."}
 plotExplanatoryVariables(sce, variables=c("counts_feature_controls_ERCC", 
     "log10_counts_feature_controls_ERCC")) + fontsize
 ```
@@ -429,18 +429,18 @@ This means that the spike-in totals could be confounded with genuine biological 
 ## Classification of cell cycle phase 
 
 We use the prediction method described by @scialdone2015computational to classify cells into cell cycle phases based on the gene expression data.
-Using a training data set, the sign of the difference in expression between two genes was computed for each pair of genes.
+Using a training dataset, the sign of the difference in expression between two genes was computed for each pair of genes.
 Pairs with changes in the sign across cell cycle phases were chosen as markers.
-Cells in a test data set can then be classified into the appropriate phase, based on whether the observed sign for each marker pair is consistent with one phase or another.
+Cells in a test dataset can then be classified into the appropriate phase, based on whether the observed sign for each marker pair is consistent with one phase or another.
 This approach is implemented in the `cyclone` function using a pre-trained set of marker pairs for mouse data.
-The result of phase assignment for each cell in the HSC data set is shown in Figure ((phaseplothsc)).
+The result of phase assignment for each cell in the HSC dataset is shown in Figure ((phaseplothsc)).
 (Some additional work is necessary to match the gene symbols in the data to the Ensembl annotation in the pre-trained marker set.)
 
 ```{r, echo=FALSE, results="hide", message=FALSE}
 set.seed(100)
 ```
 
-```{r phaseplothsc, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the HSC data set, where each point represents a cell."}
+```{r phaseplothsc, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the HSC dataset, where each point represents a cell."}
 mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", package="scran"))
 library(org.Mm.eg.db)
 anno <- select(org.Mm.eg.db, keys=rownames(sce), keytype="SYMBOL", column="ENSEMBL")
@@ -465,7 +465,7 @@ sce <- sce[,assignments$phases=="G1"]
 Pre-trained classifiers are available in `r Biocpkg("scran")` for human and mouse data. 
 While the mouse classifier used here was trained on data from embryonic stem cells, it is still accurate for other cell types [@scialdone2015computational].
 This may be due to the conservation of the transcriptional program associated with the cell cycle [@bertoli2013control;@conboy2007cell].
-The pair-based method is also a non-parametric procedure that is robust to most technical differences between data sets.
+The pair-based method is also a non-parametric procedure that is robust to most technical differences between datasets.
 However, it will be less accurate for data that are substantially different from those used in the training set.
 In such cases, users can construct a custom classifier from their own training data using the `sandbag` function.
 This will be necessary for other model organisms where pre-trained classifiers are not available.
@@ -501,7 +501,7 @@ This strategy exploits the large number of endogenous genes to obtain a stable t
 However, if our assumption did _not_ hold, we would instead fit the trend directly to the spike-in variances with the default `use.spikes=TRUE`.
 This sacrifices stability to reduce systematic errors in the estimate of the biological component for each gene.
 
-```{r hvgplothsc, fig.cap="Variance of normalized log-expression values for each gene in the HSC data set, plotted against the mean log-expression. The blue line represents the mean-dependent trend fitted to the variances of the endogenous genes. Variance estimates for spike-in transcripts are highlighted in red."}
+```{r hvgplothsc, fig.cap="Variance of normalized log-expression values for each gene in the HSC dataset, plotted against the mean log-expression. The blue line represents the mean-dependent trend fitted to the variances of the endogenous genes. Variance estimates for spike-in transcripts are highlighted in red."}
 plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression", 
     ylab="Variance of log-expression")
 o <- order(var.out$mean)
@@ -545,7 +545,7 @@ If HVG detection is considered as a screen, it is better to focus on potentially
 
 We recommend checking the distribution of expression values for the top HVGs to ensure that the variance estimate is not being dominated by one or two outlier cells (Figure ((hvgvioplothsc))).
 
-```{r hvgvioplothsc, fig.cap="Violin plots of normalized log-expression values for the top 10 HVGs in the HSC data set. Each point represents the log-expression value in a single cell."}
+```{r hvgvioplothsc, fig.cap="Violin plots of normalized log-expression values for the top 10 HVGs in the HSC dataset. Each point represents the log-expression value in a single cell."}
 plotExpression(sce, rownames(hvg.out)[1:10]) + fontsize
 ```
 
@@ -623,10 +623,10 @@ cl <- cl[order(lengths(cl), decreasing=TRUE)]
 head(cl)
 ```
 
-Significant correlations provide evidence for substructure in the data set, i.e., subpopulations of cells with systematic differences in their expression profiles.
+Significant correlations provide evidence for substructure in the dataset, i.e., subpopulations of cells with systematic differences in their expression profiles.
 The number of significantly correlated HVG pairs represents the strength of the substructure.
 If many pairs were significant, this would indicate that the subpopulations were clearly defined and distinct from one another.
-For this particular data set, a relatively low number of HVGs exhibit significant correlations.
+For this particular dataset, a relatively low number of HVGs exhibit significant correlations.
 This suggests that any substructure in the data will be modest, which is expected given that rigorous selection was performed to obtain a homogeneous population of HSCs [@wilson2015combined].
 
 
@@ -644,7 +644,7 @@ If any subpopulations were present, they would manifest as rectangular "blocks" 
 This is not observed in Figure ((heatmaphsc)), consistent with the lack of strong substructure.
 There may be a subpopulation of _Fos_ and _Jun_-negative cells, but it is poorly defined given the small numbers of cells and genes involved.
 
-```{r heatmaphsc, message=FALSE, fig.width=7, fig.height=7, fig.cap="Heatmap of mean-centred normalized log-expression values for correlated HVGs in the HSC data set. Dendrograms are formed by hierarchical clustering on the Euclidean distances between genes (row) or cells (column)."}
+```{r heatmaphsc, message=FALSE, fig.width=7, fig.height=7, fig.cap="Heatmap of mean-centred normalized log-expression values for correlated HVGs in the HSC dataset. Dendrograms are formed by hierarchical clustering on the Euclidean distances between genes (row) or cells (column)."}
 chosen <- unique(c(var.cor$gene1[sig.cor], var.cor$gene2[sig.cor]))
 norm.exprs <- exprs(sce)[chosen,,drop=FALSE]
 heat.vals <- norm.exprs - rowMeans(norm.exprs)
@@ -658,7 +658,7 @@ Cells with similar expression profiles should be located close together in the p
 We only use the correlated HVGs in `plotPCA` because any substructure should be most pronounced in the expression profiles of these genes.
 Even so, no clear separation of cells into distinct subpopulations is observed.
 
-```{r pcaplothsc, fig.cap="PCA plot constructed from normalized log-expression values of correlated HVGs, where each point represents a cell in the HSC data set. First and second components are shown, along with the percentage of variance explained. Bars represent the coordinates of the cells on each axis. Each cell is coloured according to its total number of expressed features."}
+```{r pcaplothsc, fig.cap="PCA plot constructed from normalized log-expression values of correlated HVGs, where each point represents a cell in the HSC dataset. First and second components are shown, along with the percentage of variance explained. Bars represent the coordinates of the cells on each axis. Each cell is coloured according to its total number of expressed features."}
 plotPCA(sce, exprs_values="exprs", colour_by="total_features",
     feature_set=chosen) + fontsize
 ```
@@ -669,7 +669,7 @@ In particular, _t_-SNE is a stochastic method, so users should run the algorithm
 It is also advisable to test different settings of the "perplexity" parameter as this will affect the distribution of points in the low-dimensional space.
 This is demonstrated below in Figure ((tsneplothsc)), though no consistent substructure is observed in all plots. 
 
-```{r tsneplothsc, fig.cap="_t_-SNE plots constructed from normalized log-expression values of correlated HVGs, using a range of perplexity values. In each plot, each point represents a cell in the HSC data set. Bars represent the coordinates of the cells on each axis. Each cell is coloured according to its total number of expressed features.", fig.width=12, fig.height=6}
+```{r tsneplothsc, fig.cap="_t_-SNE plots constructed from normalized log-expression values of correlated HVGs, using a range of perplexity values. In each plot, each point represents a cell in the HSC dataset. Bars represent the coordinates of the cells on each axis. Each cell is coloured according to its total number of expressed features.", fig.width=12, fig.height=6}
 set.seed(100)
 out5 <- plotTSNE(sce, exprs_values="exprs", perplexity=5, colour_by="total_features", 
     feature_set=chosen) + fontsize + ggtitle("Perplexity = 5")
@@ -731,7 +731,7 @@ gc()
 
 ## Overview
 
-We proceed to a more heterogeneous data set from a study of cell types in the mouse brain [@zeisel2015brain].
+We proceed to a more heterogeneous dataset from a study of cell types in the mouse brain [@zeisel2015brain].
 This contains approximately 3000 cells of varying types such as oligodendrocytes, microglia and neurons.
 Individual cells were isolated using the Fluidigm C1 microfluidics system and library preparation was performed on each cell using a UMI-based protocol.
 After sequencing, expression was quantified by counting the number of UMIs mapped to each gene.
@@ -741,7 +741,7 @@ Count data for all endogenous genes, mitochondrial genes and spike-in transcript
 
 The count data are distributed across several files, so some work is necessary to consolidate them into a single matrix.
 We define a simple utility function for loading data in from each file. 
-(We stress that this function is only relevant to the current data set, and should not be used for other data sets.
+(We stress that this function is only relevant to the current dataset, and should not be used for other datasets.
 This kind of effort is generally not required if all of the counts are in a single file and separated from the metadata.)
 
 ```{r}
@@ -815,7 +815,7 @@ isSpike(sce) <- "Spike"
 
 We examine the distribution of library sizes and numbers of expressed genes across cells (Figure ((libplotbrain))).
 
-```{r libplotbrain, fig.width=12, fig.height=6, fig.cap="Histograms of library sizes (left) and number of expressed genes (right) for all cells in the brain data set."}
+```{r libplotbrain, fig.width=12, fig.height=6, fig.cap="Histograms of library sizes (left) and number of expressed genes (right) for all cells in the brain dataset."}
 par(mfrow=c(1,2))
 hist(sce$total_counts/1e3, xlab="Library sizes (thousands)", main="", 
     breaks=20, col="grey80", ylab="Number of cells")
@@ -824,10 +824,10 @@ hist(sce$total_features, xlab="Number of expressed genes", main="",
 ```
 
 We also examine the distribution of the proportions of UMIs assigned to mitochondrial genes or spike-in transcripts (Figure ((controlplotbrain))).
-The spike-in proportions here are more variable than in the HSC data set.
+The spike-in proportions here are more variable than in the HSC dataset.
 This may reflect a greater variability in the total amount of endogenous RNA per cell when many cell types are present.
 
-```{r controlplotbrain, fig.width=12, fig.height=6, fig.cap="Histogram of the proportion of UMIs assigned to mitochondrial genes (left) or spike-in transcripts (right) across all cells in the brain data set."}
+```{r controlplotbrain, fig.width=12, fig.height=6, fig.cap="Histogram of the proportion of UMIs assigned to mitochondrial genes (left) or spike-in transcripts (right) across all cells in the brain dataset."}
 par(mfrow=c(1,2))
 hist(sce$pct_counts_feature_controls_Mt, xlab="Mitochondrial proportion (%)", 
     ylab="Number of cells", breaks=20, main="", col="grey80")
@@ -873,14 +873,14 @@ keep <- rowMeans(counts(sce)) >= 0.2
 Figure ((abhistbrain)) suggests that our choice of threshold is appropriate.
 The filter removes the bulk of lowly expressed genes while preserving the peak of moderately expressed genes.
 
-```{r abhistbrain, fig.cap="Histogram of log-average counts for all genes in the brain data set. The filter threshold is represented by the blue line."}
+```{r abhistbrain, fig.cap="Histogram of log-average counts for all genes in the brain dataset. The filter threshold is represented by the blue line."}
 hist(log10(ave.counts), breaks=100, main="", col="grey",
     xlab=expression(Log[10]~"average count"))
 abline(v=log10(0.2), col="blue", lwd=2, lty=2)
 ```
 
-The mean-based filter is applied to the data set by subsetting `sce` as previously described.
-Despite the reduced threshold, the number of retained genes is lower than that in the HSC data set, simply because the library sizes are much smaller with UMI counts.
+The mean-based filter is applied to the dataset by subsetting `sce` as previously described.
+Despite the reduced threshold, the number of retained genes is lower than that in the HSC dataset, simply because the library sizes are much smaller with UMI counts.
 
 ```{r}
 sce <- sce[keep,]
@@ -891,7 +891,7 @@ nrow(sce)
 gc()
 ```
 
-Some data sets also contain strong heterogeneity in mitochondrial RNA content, possibly due to differences in mitochondrial copy number or activity between cell types.
+Some datasets also contain strong heterogeneity in mitochondrial RNA content, possibly due to differences in mitochondrial copy number or activity between cell types.
 This heterogeneity will cause mitochondrial genes to dominate the top set of results, e.g., for identification of correlated HVGs.
 However, these genes are largely uninteresting given that most studies focus on nuclear regulation.
 As such, we filter them out prior to further analysis.
@@ -925,7 +925,7 @@ Compared to the HSC analysis, more scatter is observed around the trend between 
 This is consistent with an increased amount of DE between cells of different types, which compromises the accuracy of library size normalization [@robinson2010scaling].
 In contrast, the size factors are estimated based on median ratios and are more robust to the presence of DE between cells.
 
-```{r normplotbrain, fig.cap="Size factors from deconvolution, plotted against library sizes for all cells in the brain data set. Axes are shown on a log-scale."}
+```{r normplotbrain, fig.cap="Size factors from deconvolution, plotted against library sizes for all cells in the brain dataset. Axes are shown on a log-scale."}
 plot(sizeFactors(sce), sce$total_counts/1e3, log="xy",
     ylab="Library size (thousands)", xlab="Size factor")
 ```
@@ -945,7 +945,7 @@ sce <- normalize(sce)
 ## Checking for important technical factors
 
 Larger experiments contain more technical factors that need to be investigated.
-In this data set, factors include the sex of the animal from which the cells were extracted, the age of the animal, the tissue of origin for each cell, and the total spike-in count in each cell.
+In this dataset, factors include the sex of the animal from which the cells were extracted, the age of the animal, the tissue of origin for each cell, and the total spike-in count in each cell.
 Figure ((explvarplotbrain)) shows that the tissue of origin explains a substantial proportion of the variance for a subset of genes.
 This is probably because each tissue contains a different composition of cell types, leading to systematic differences in gene expression between tissues.
 The other factors explain only a small proportion of the variance for most genes and do not need to be incorporated into our downstream analyses.
@@ -954,7 +954,7 @@ The other factors explain only a small proportion of the variance for most genes
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
 ```
 
-```{r explvarplotbrain, fig.cap="Density plot of the percentage of variance explained by each factor across all genes in the brain data set. For each gene, the percentage of the variance of the normalized log-expression values that is explained by the (log-transformed) total spike-in counts, the sex or age of the mouse, or the tissue of origin is calculated. Each curve corresponds to one factor and represents the distribution of percentages across all genes."}
+```{r explvarplotbrain, fig.cap="Density plot of the percentage of variance explained by each factor across all genes in the brain dataset. For each gene, the percentage of the variance of the normalized log-expression values that is explained by the (log-transformed) total spike-in counts, the sex or age of the mouse, or the tissue of origin is calculated. Each curve corresponds to one factor and represents the distribution of percentages across all genes."}
 plotExplanatoryVariables(sce, variables=c("counts_feature_controls_Spike", 
     "log10_counts_feature_controls_Spike", "sex", "tissue", "age")) + fontsize
 ```
@@ -976,9 +976,9 @@ Blocking on these factors may be necessary to account for batch effects that are
 
 We attempt to classify cells into cell cycle phases using the `cyclone` method.
 However, examination of Figure ((phaseplotbrain)) indicates that many of the G1 and G2/M scores are ambiguous.
-This highlights the risks of using a classifier on a data set that is substantially different to the training set.
+This highlights the risks of using a classifier on a dataset that is substantially different to the training set.
 In particular, the classifier was trained on C1 SMARTer data [@scialdone2015computational] and accounts for the biases in that protocol. 
-The brain data set uses UMI counts, which has an entirely different set of biases, e.g., 3'-end coverage only, no length bias, no amplification noise.
+The brain dataset uses UMI counts, which has an entirely different set of biases, e.g., 3'-end coverage only, no length bias, no amplification noise.
 These new biases and the absence of expected biases will confound the classifier and interfere with accurate calling of cell cycle phase.
 
 ```{r, echo=FALSE, results='hide', message=FALSE}
@@ -986,7 +986,7 @@ mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", package="sc
 library(org.Mm.eg.db)
 ```
 
-```{r phaseplotbrain, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the brain data set, where each point represents a cell."}
+```{r phaseplotbrain, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the brain dataset, where each point represents a cell."}
 anno <- select(org.Mm.eg.db, keys=rownames(sce), keytype="SYMBOL", column="ENSEMBL")
 ensembl <- anno$ENSEMBL[match(rownames(sce), anno$SYMBOL)]
 assignments <- cyclone(sce, mm.pairs, gene.names=ensembl)
@@ -1001,7 +1001,7 @@ This will lead to a deterioration in the accuracy of the classifier.
 In general, this is unlikely to be a major issue as the cell cycle should be a conserved process across many lineages and conditions.
 -->
 
-Given the lack of definitive classification, we will not perform any processing of the data set by cell cycle phase.
+Given the lack of definitive classification, we will not perform any processing of the dataset by cell cycle phase.
 This is unlikely to be problematic for this analysis, as the cell cycle effect will be relatively subtle compared to the obvious differences between cell types in a diverse population.
 Thus, the former is unlikely to distort the conclusions regarding the latter.
 Indeed, classification may be irrelevant for many neuronal cell types which are postmitotic and do not belong in any phase of the cell cycle.
@@ -1022,14 +1022,14 @@ gc()
 ```
 
 Figure ((hvgplotbrain)) suggests that the trend is fitted accurately to the technical variances.
-Errors in fitting are negligible due to the precision of the variance estimates in a large data set containing thousands of cells.
-The technical variances are also much smaller than those in the HSC data set.
+Errors in fitting are negligible due to the precision of the variance estimates in a large dataset containing thousands of cells.
+The technical variances are also much smaller than those in the HSC dataset.
 This is due to the use of UMIs which reduces the noise caused by variable PCR amplification.
 Furthermore, the spike-in trend is consistently lower than the variances of the endogenous genes.
 This reflects the heterogeneity in gene expression across cells of different types.
 It also means the previous strategy of fitting a trend to the endogenous variances would not be appropriate here (or necessary, given the quality of the spike-in trend). 
 
-```{r hvgplotbrain, fig.cap="Variance of normalized log-expression values for each gene in the brain data set, plotted against the mean log-expression. The red line represents the mean-   dependent trend in the technical variance of the spike-in transcripts (also highlighted as red points)."}
+```{r hvgplotbrain, fig.cap="Variance of normalized log-expression values for each gene in the brain dataset, plotted against the mean log-expression. The red line represents the mean-   dependent trend in the technical variance of the spike-in transcripts (also highlighted as red points)."}
 plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression", 
     ylab="Variance of log-expression")
 points(var.fit$mean, var.fit$var, col="red", pch=16)
@@ -1052,13 +1052,13 @@ head(hvg.out)
 Again, we check the distribution of expression values for the top 10 HVGs to ensure that they are not being driven by outliers (Figure ((hvgvioplotbrain))).
 Some tweaking of the `plotExpression` parameters is necessary to visualize a large number of cells.
 
-```{r hvgvioplotbrain, fig.cap="Violin plots of normalized log-expression values for the top 10 HVGs in the brain data set. For each gene, each point represents the log-expression value for an individual cell."}
+```{r hvgvioplotbrain, fig.cap="Violin plots of normalized log-expression values for the top 10 HVGs in the brain dataset. For each gene, each point represents the log-expression value for an individual cell."}
 plotExpression(sce, rownames(hvg.out)[1:10], alpha=0.05, jitter="jitter") + fontsize
 ```
 
 To identify genes involved in defining subpopulations, the set of HVGs is tested for significant pairwise correlations.
 Given the size of the set, we only use the top 500 HVGs to reduce computational work.
-Here, the number of significantly correlated pairs is much higher than in the HSC data set, indicating that strong substructure is present.
+Here, the number of significantly correlated pairs is much higher than in the HSC dataset, indicating that strong substructure is present.
 These results are also saved to file for use in designing validation experiments.
 
 <!--
@@ -1116,7 +1116,7 @@ We perform dimensionality reduction on the correlated HVGs to check if there is 
 Cells separate into clear clusters in the _t_-SNE plot (Figure ((tsneplotbrain))), corresponding to distinct subpopulations.
 This is consistent with the presence of multiple cell types in the diverse brain population.
 
-```{r tsneplotbrain, fig.cap="_t_-SNE plots constructed from the normalized and corrected log-expression values of correlated HVGs for cells in the brain data set. Each point represents a cell and is coloured according to its expression of the top HVG (left) or _Mog_ (right).", fig.width=15, fig.height=6}
+```{r tsneplotbrain, fig.cap="_t_-SNE plots constructed from the normalized and corrected log-expression values of correlated HVGs for cells in the brain dataset. Each point represents a cell and is coloured according to its expression of the top HVG (left) or _Mog_ (right).", fig.width=15, fig.height=6}
 chosen <- unique(c(var.cor$gene1[sig.cor], var.cor$gene2[sig.cor]))
 top.hvg <- rownames(hvg.out)[1]
 tsne1 <- plotTSNE(sce, exprs_values="norm_exprs", colour_by=top.hvg,
@@ -1130,7 +1130,7 @@ The PCA plot is less effective at separating cells into many different clusters 
 This is because the first two principal components are driven by strong differences between specific subpopulations, which reduces the resolution of more subtle differences between some of the other subpopulations.
 Nonetheless, some substructure is still visible.
 
-```{r pcaplotbrain, fig.cap="PCA plots constructed from the normalized and corrected log-expression values of correlated HVGs for cells in the brain data set. Each point          represents a cell and is coloured according to its expression of the top HVG (left) or _Mog_ (right).", fig.width=15, fig.height=6}
+```{r pcaplotbrain, fig.cap="PCA plots constructed from the normalized and corrected log-expression values of correlated HVGs for cells in the brain dataset. Each point          represents a cell and is coloured according to its expression of the top HVG (left) or _Mog_ (right).", fig.width=15, fig.height=6}
 pca1 <- plotPCA(sce, exprs_values="norm_exprs", colour_by=top.hvg) + fontsize
 pca2 <- plotPCA(sce, exprs_values="norm_exprs", colour_by="Mog") + fontsize
 multiplot(pca1, pca2, cols=2)
@@ -1167,7 +1167,7 @@ my.clusters <- unname(cutreeDynamic(my.tree, distM=as.matrix(my.dist), verbose=0
 Figure ((heatmapbrain)) contains a clear block-like pattern, representing systematic differences between clusters of cells with distinct expression profiles.
 This is consistent with the presence of well-defined subpopulations that were previously observed in the dimensionality reduction plots.
 
-```{r heatmapbrain, message=FALSE, fig.width=7, fig.height=10, fig.cap="Heatmap of mean-centred normalized and corrected log-expression values for correlated HVGs in the brain data set. Dendrograms are formed by hierarchical clustering on the Euclidean distances between genes (row) or cells (column). Column colours represent the cluster to which each cell is assigned after a dynamic tree cut."}
+```{r heatmapbrain, message=FALSE, fig.width=7, fig.height=10, fig.cap="Heatmap of mean-centred normalized and corrected log-expression values for correlated HVGs in the brain dataset. Dendrograms are formed by hierarchical clustering on the Euclidean distances between genes (row) or cells (column). Column colours represent the cluster to which each cell is assigned after a dynamic tree cut."}
 heat.vals <- chosen.exprs - rowMeans(chosen.exprs)
 clust.col <- rainbow(max(my.clusters))
 heatmap.2(heat.vals, col=bluered, symbreak=TRUE, trace='none', cexRow=0.3,
@@ -1230,7 +1230,7 @@ gc()
 ```
 
 We assume that one of the clusters corresponds to our subpopulation of interest.
-Each gene is tested for DE between the chosen cluster and every other cluster in the data set.
+Each gene is tested for DE between the chosen cluster and every other cluster in the dataset.
 We demonstrate this below for cluster 1, though the same process can be applied to any other cluster by changing `chosen.clust`.
 
 ```{r}
@@ -1266,7 +1266,7 @@ We also examine their expression profiles to verify that the DE signature is rob
 Figure ((heatmapmarkerbrain)) indicates that most of the top markers have strong and consistent up- or downregulation in cells of cluster 1 compared to some or all of the other clusters.
 Thus, cells from the subpopulation of interest can be identified as those that express the upregulated markers and do not express the downregulated markers.
 
-```{r heatmapmarkerbrain, fig.cap="Heatmap of mean-centred normalized and corrected log-expression values for the top set of markers for cluster 1 in the brain data set. Column colours represent the cluster to which each cell is assigned, as indicated by the legend."}
+```{r heatmapmarkerbrain, fig.cap="Heatmap of mean-centred normalized and corrected log-expression values for the top set of markers for cluster 1 in the brain dataset. Column colours represent the cluster to which each cell is assigned, as indicated by the legend."}
 write.table(marker.set, file="brain_marker_1.tsv", sep="\t", quote=FALSE, col.names=NA)
 top.markers <- marker.set$Gene[marker.set$Top <= 10]
 top.exprs <- norm_exprs(sce)[top.markers,,drop=FALSE]
@@ -1292,7 +1292,7 @@ For such analyses, the FDR-adjusted _p_-value can be directly used to define sig
 ## Additional comments
 
 Having completed the basic analysis, we save the `SCESet` object with its associated data to file.
-This is especially important here as the brain data set is quite large.
+This is especially important here as the brain dataset is quite large.
 If further analyses are to be performed, it would be inconvenient to have to repeat all of the pre-processing steps described above.
 
 ```{r}
@@ -1320,8 +1320,9 @@ In any particular cell, an increase in the amount of endogenous RNA will not inc
 Thus, the former will not be represented as part of the bias in the latter, which means that the effects of total RNA content on expression will not be removed upon scaling.
 With non-DE normalization, an increase in RNA content will systematically increase the expression of all genes in the non-DE subset, such that it will be treated as bias and removed.
 
-We demonstrate the use of spike-in normalization on a data set involving different cell types -- namely, mouse embryonic stem cells (mESCs) and mouse embryonic fibroblasts (MEFs) [@islam2011characterization].
-We load in the counts and specify the rows corresponding to spike-in transcripts.
+We demonstrate the use of spike-in normalization on a dataset involving different cell types -- namely, mouse embryonic stem cells (mESCs) and mouse embryonic fibroblasts (MEFs) [@islam2011characterization].
+The count table was obtained from NCBI GEO as a supplementary file under the accession GSE29087 (http://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE29087).
+We load the counts into R and specify the rows corresponding to spike-in transcripts.
 The negative control wells do not contain any cells and are useful for quality control but need to be removed prior to downstream analysis.
 
 ```{r}
@@ -1357,7 +1358,7 @@ This is because MEFs contain more endogenous RNA, which reduces the relative spi
 If the spike-in size factors were applied to the counts, the expression values in MEFs would be scaled up while expression in mESCs would be scaled down.
 However, the opposite would occur if deconvolution size factors were used.
 
-```{r normplotspikemef, fig.cap="Size factors from spike-in normalization, plotted against the size factors from deconvolution for all cells in the mESC/MEF data set. Axes are shown on a log-scale, and cells are coloured according to their identity. Deconvolution size factors were computed with small pool sizes owing to the low number of cells of each type."}
+```{r normplotspikemef, fig.cap="Size factors from spike-in normalization, plotted against the size factors from deconvolution for all cells in the mESC/MEF dataset. Axes are shown on a log-scale, and cells are coloured according to their identity. Deconvolution size factors were computed with small pool sizes owing to the low number of cells of each type."}
 colours <- c(mESC="red", MEF="grey")
 deconv.sf <- computeSumFactors(sce, sf.out=TRUE, cluster=sce$grouping, sizes=1:4*10)
 plot(sizeFactors(sce), deconv.sf, col=colours[sce$grouping], pch=16, log="xy", 
@@ -1397,7 +1398,7 @@ fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=
 set.seed(100)
 ```
 
-```{r phaseplotth2, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the T~H~2 data set, where each point represents a cell."}
+```{r phaseplotth2, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the T~H~2 dataset, where each point represents a cell."}
 anno <- select(org.Mm.eg.db, keys=rownames(sce), keytype="SYMBOL", column="ENSEMBL")
 ensembl <- anno$ENSEMBL[match(rownames(sce), anno$SYMBOL)]
 assignments <- cyclone(sce, mm.pairs, gene.names=ensembl, assay="exprs")
@@ -1421,7 +1422,7 @@ The result of this procedure is visualized with some PCA plots in Figure ((pcapl
 Before removal, the distribution of cells along the first two principal components is strongly associated with their G1 and G2/M scores.
 This is no longer the case after removal, which suggests that the cell cycle effect has been mitigated.
 
-```{r pcaplotth2, fig.width=12, fig.height=6, fig.cap="PCA plots before (left) and after (right) removal of the cell cycle effect in the T~H~2 data set. Each cell is represented by a point with colour and size determined by the G1 and G2/M scores, respectively. Only HVGs were used to construct each plot."}
+```{r pcaplotth2, fig.width=12, fig.height=6, fig.cap="PCA plots before (left) and after (right) removal of the cell cycle effect in the T~H~2 dataset. Each cell is represented by a point with colour and size determined by the G1 and G2/M scores, respectively. Only HVGs were used to construct each plot."}
 # Finding HVGs without blocking on phase score.
 fit <- trendVar(sce, use.spikes=NA, trend="loess") 
 dec <- decomposeVar(sce, fit)
@@ -1439,12 +1440,12 @@ out2 <- plotPCA(sce, exprs_values="norm_exprs", feature_set=top.hvgs2, colour_by
 multiplot(out, out2, cols=2)
 ```
 
-As an aside, this data set contains cells at various stages of differentiation [@mahata2014singlecell].
+As an aside, this dataset contains cells at various stages of differentiation [@mahata2014singlecell].
 This is an ideal use case for diffusion maps which perform dimensionality reduction along a continuous process.
 In Figure ((diffusionth2)), cells are arranged along a trajectory in the low-dimensional space.
 The first diffusion component is likely to correspond to T~H~2 differentiation, given that a key regulator _Gata3_ [@zhu2006gata3] changes in expression from left to right.
 
-```{r diffusionth2, fig.cap="A diffusion map for the T~H~2 data set, where each cell is coloured by its expression of _Gata3_."}
+```{r diffusionth2, fig.cap="A diffusion map for the T~H~2 dataset, where each cell is coloured by its expression of _Gata3_."}
 plotDiffusionMap(sce, exprs_values="norm_exprs", colour_by="Gata3") + fontsize
 ```
 
@@ -1457,7 +1458,7 @@ gc()
 ### Using cycle-annotated genes to identify hidden variation
 
 An alternative approach uses genes that have annotated functions in cell cycling and division.
-We extract all genes associated with the relevant GO terms and use them to construct a PCA plot for the brain data set.
+We extract all genes associated with the relevant GO terms and use them to construct a PCA plot for the brain dataset.
 Figure ((braincyclepca)) contains three clusters that may correspond to distinct phases of the cell cycle.
 This can be determined explicitly by identifying marker genes for each cluster as previously described, and checking whether each marker has known phase-specific expression with resources such as [Cyclebase](http://www.cyclebase.org) [@santos2015cyclebase].
 
@@ -1466,7 +1467,7 @@ library(org.Mm.eg.db)
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
 ```
 
-```{r braincyclepca, fig.width=10, fig.height=5, fig.cap="PCA plot of the brain data set, using only genes with annotated functions in cell cycling or division.", eval=FALSE}
+```{r braincyclepca, fig.width=10, fig.height=5, fig.cap="PCA plot of the brain dataset, using only genes with annotated functions in cell cycling or division.", eval=FALSE}
 ccgenes <- select(org.Mm.eg.db, keys=c("GO:0022403", "GO:0051301"), keytype="GOALL", column="SYMBOL")
 sce <- readRDS("brain_data.rds")
 chosen.genes <- which(rownames(sce) %in% ccgenes$SYMBOL)
@@ -1476,7 +1477,7 @@ plotPCA(sce, feature_set=chosen.genes) + fontsize
 We can also identify hidden factors of variation across the annotated genes using `r Biocpkg("RUVSeq")`.
 This assumes that, if all cells were in the same phase of the cell cycle, there should be no DE across cells for genes associated with the cell cycle.
 Any systematic differences between cells are incorporated into the `W` matrix containing the factors of unwanted variation.
-These factors can then be included as covariates in the design matrix to absorb cell cycle effects in the rest of the data set.
+These factors can then be included as covariates in the design matrix to absorb cell cycle effects in the rest of the dataset.
 We set `k=2` here to capture the variation corresponding to the two principal components in Figure ((braincyclepca)).
 
 ```{r, eval=FALSE}
@@ -1503,7 +1504,7 @@ Feature-counting tools typically report genes in terms of standard identifiers l
 These identifiers are used as they are unambiguous and highly stable.
 However, they are difficult to interpret compared to the gene symbols which are more commonly used in the literature.
 We can easily convert from one to the other using annotation packages like `r Biocpkg("org.Mm.eg.db")`.
-This is demonstrated below for Ensembl identifiers in a mESC data set [@kolod2015singlecell] obtained from http://www.ebi.ac.uk/teichmann-srv/espresso.
+This is demonstrated below for Ensembl identifiers in a mESC dataset [@kolod2015singlecell] obtained from http://www.ebi.ac.uk/teichmann-srv/espresso.
 The `select` call extracts the specified data from the annotation object, and the `match` call ensures that the first gene symbol is used if multiple symbols correspond to a single Ensembl identifier.
 
 ```{r}
@@ -1562,7 +1563,7 @@ gc()
 
 This workflow provides a step-by-step guide for performing basic analyses of single-cell RNA-seq data in R.
 It provides instructions for a number of low-level steps such as quality control, normalization, cell cycle phase assignment, data exploration, HVG and marker gene detection, and clustering.
-This is done with a number of different data sets to provide a range of usage examples.
+This is done with a number of different datasets to provide a range of usage examples.
 In addition, the processed data can be easily used for higher-level analyses with other Bioconductor packages.
 We anticipate that this workflow will assist readers in assembling analyses of their own scRNA-seq data.
 
@@ -1583,7 +1584,7 @@ unlink("GSE61533_HTSEQ_count_results.xls")
 
 # Author contributions
 
-A.T.L.L. developed and tested the workflow on all data sets.
+A.T.L.L. developed and tested the workflow on all datasets.
 A.T.L.L. and D.J.M. implemented improvements to the software packages required by the workflow.
 J.C.M. provided direction to the software and workflow development.
 All authors wrote and approved the final manuscript.
@@ -1600,7 +1601,7 @@ D.J.M and J.C.M. were also supported by core funding from EMBL.
 
 # Acknowledgements
 
-We would like to thank Antonio Scialdone for helpful discussions, and Michael Epstein for testing the workflow on other data sets.
+We would like to thank Antonio Scialdone for helpful discussions, and Michael Epstein for testing the workflow on other datasets.
 
 # References
 
