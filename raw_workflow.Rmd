@@ -170,6 +170,8 @@ We also remove cells where the log-transformed number of expressed genes is 3 MA
 By improving resolution, I refer to compression of high values and expansion of the range of low values.
 The former reduces the MAD relative to the median, such that "3 MADs away" is a sensible statistic.
 The latter makes it easier to distinguish between outliers and the edge of the distribution of acceptable values.
+Or, from another perspective, the large MAD that is driven by greater variability at high values isn't relevant to the threshold choice at low values when working on the raw scale.
+By transforming to the log scale, the variance is stabilised across the real line.
 -->
 
 ```{r}
