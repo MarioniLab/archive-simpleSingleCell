@@ -281,7 +281,8 @@ abline(v=log10(1), col="blue", lwd=2, lty=2)
 
 We also look at the identities of the most highly expressed genes (Figure ((topgenehsc))).
 This should generally be dominated by constitutively expressed transcripts, such as those for ribosomal or mitochondrial proteins.
-If other features are present, e.g., pseudogenes or predicted transcripts, this may be indicative of some upstream processing error.
+The presence of other classes of features may be cause for concern if they are not consistent with expected biology.
+For example, a top set containing many spike-in transcripts suggests that too much spike-in RNA was added during library preparation, while the absence of ribosomal proteins and/or the presence of their pseudogenes are indicative of suboptimal alignment.
 
 ```{r topgenehsc, fig.height=9, fig.width=6, fig.cap="Percentage of total counts assigned to the top 50 most highly-abundant features in the HSC dataset. For each feature, each bar represents the percentage assigned to that feature for a single cell, while the circle represents the average across all cells. Bars are coloured by the total number of expressed features in each cell, while circles are coloured according to whether the feature is labelled as a control feature."}
 plotQC(sce, type = "highest-expression", n=50) + fontsize
