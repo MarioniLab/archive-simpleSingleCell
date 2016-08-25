@@ -172,6 +172,9 @@ The former reduces the MAD relative to the median, such that "3 MADs away" is a 
 The latter makes it easier to distinguish between outliers and the edge of the distribution of acceptable values.
 Or, from another perspective, the large MAD that is driven by greater variability at high values isn't relevant to the threshold choice at low values when working on the raw scale.
 By transforming to the log scale, the variance is stabilised across the real line.
+
+On a more conceptual note, the MAD is necessary to account for genuine biological heterogeneity in these metrics.
+That's why we don't use a hard-and-fast fold-change threshold from the median, as this would be too aggressive or not aggressive enough in some situations.
 -->
 
 ```{r}
