@@ -88,7 +88,7 @@ To introduce most of the concepts of scRNA-seq data analysis, we use a relativel
 Single mouse HSCs were isolated into microtiter plates and libraries were prepared for 96 cells using the Smart-seq2 protocol.
 A constant amount of spike-in RNA from the External RNA Controls Consortium (ERCC) was also added to each cell's lysate prior to library preparation.
 High-throughput sequencing was performed and the expression of each gene was quantified by counting the total number of reads mapped to its exonic regions.
-Similarly, the quantity of each spike-in transcript was measured by counting reads mapped to the spike-in reference sequence.
+Similarly, the quantity of each spike-in transcript was measured by counting the number of reads mapped to the spike-in reference sequences.
 Counts for all genes/transcripts in each cell were obtained from the NCBI Gene Expression Omnibus (GEO) as a supplementary file under the accession number GSE61533 (http://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE61533).
 
 For simplicity, we forego a description of the read processing steps required to generate the count matrix, i.e., read alignment and counting into features.
@@ -215,7 +215,7 @@ hist(sce$pct_counts_feature_controls_ERCC, xlab="ERCC proportion (%)",
 
 Again, the ideal threshold for these proportions depends on the cell type and the experimental protocol.
 Cells with more mitochondria or more mitochondrial activity may naturally have larger mitochondrial proportions.
-Similarly, cells with more endogenous RNA or that are assayed in protocols using less spike-in RNA will have lower spike-in proportions.
+Similarly, cells with more endogenous RNA or that are assayed with protocols using less spike-in RNA will have lower spike-in proportions.
 If we assume that most cells in the dataset are of high quality, then the threshold can be set to remove any large outliers from the distribution of proportions.
 We use the MAD-based definition of outliers to remove putative low-quality cells from the dataset.
 
@@ -523,7 +523,7 @@ Not sure how much effort it's worth to extract HVG information from this part of
 -->
 
 HVGs are defined as genes with biological components that are significantly greater than zero at a false discovery rate (FDR) of 5%. 
-These genes are interesting as they drive differences in expression between cells, and should be prioritized for further investigation.
+These genes are interesting as they drive differences in the expression profiles between cells, and should be prioritized for further investigation.
 In addition, we only consider a gene to be a HVG if it has a biological component greater than or equal to 0.5.
 For transformed expression values on the log~2~ scale, this means that the average difference in true expression between any two cells will be at least 2-fold.
 (This reasoning assumes that the true log-expression values are Normally distributed with variance of 0.5.
@@ -900,7 +900,7 @@ Some datasets also contain strong heterogeneity in mitochondrial RNA content, po
 This heterogeneity will cause mitochondrial genes to dominate the top set of results, e.g., for identification of correlated HVGs.
 However, these genes are largely uninteresting given that most studies focus on nuclear regulation.
 As such, we filter them out prior to further analysis.
-Other candidates for removal include pseudogenes or ribosome-associated genes, which might not be relevant for characterising cell types but can still interfere with interpretation of the results.
+Other candidates for removal include pseudogenes or ribosome-associated genes, which might not be relevant for characterising cell types but can still interfere with the interpretation of the results.
 
 ```{r}
 sce <- sce[!fData(sce)$is_feature_control_Mt,]
@@ -1505,7 +1505,7 @@ In contrast, cyclone wouldn't care as the relative amounts of expression within 
 
 ## Extracting annotation from Ensembl identifiers
 
-Feature-counting tools typically report genes in terms of standard identifiers like Ensembl or Entrez.
+Feature-counting tools typically report genes in terms of standard identifiers from Ensembl or Entrez.
 These identifiers are used as they are unambiguous and highly stable.
 However, they are difficult to interpret compared to the gene symbols which are more commonly used in the literature.
 We can easily convert from one to the other using annotation packages like `r Biocpkg("org.Mm.eg.db")`.
