@@ -1277,6 +1277,14 @@ We also examine their expression profiles to verify that the DE signature is rob
 Figure ((heatmapmarkerbrain)) indicates that most of the top markers have strong and consistent up- or downregulation in cells of cluster 1 compared to some or all of the other clusters.
 Thus, cells from the subpopulation of interest can be identified as those that express the upregulated markers and do not express the downregulated markers.
 
+<!--
+DE genes between subpopulations are not necessarily marker genes.
+The latter requires that the gene be consistently expressed (or not) in all cells of one subpopulation compared to the other.
+This means that the variance needs to be modelled across cells.
+For DE genes, any change will do, even if it only appears in a small percentage of cells of the subpopulation.
+This requires modelling of the variance across replicate instances of the entire subpopulation.
+-->
+
 ```{r heatmapmarkerbrain, fig.cap="Heatmap of mean-centred normalized and corrected log-expression values for the top set of markers for cluster 1 in the brain dataset. Column colours represent the cluster to which each cell is assigned, as indicated by the legend."}
 write.table(marker.set, file="brain_marker_1.tsv", sep="\t", quote=FALSE, col.names=NA)
 top.markers <- marker.set$Gene[marker.set$Top <= 10]
