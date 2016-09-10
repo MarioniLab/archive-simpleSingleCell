@@ -548,9 +548,13 @@ Specifically, for a standard normal, the square root of the expected squared dis
 So, if you set the standard error to 1/sqrt(2), the distance would become 1 (i.e., 2-fold change).
 Setting this threshold avoids selecting genes with high fold changes above the technical variance, but small absolute total variances.
 Such genes are more likely to be true positives but also less likely to be strongly variable and biologically interesting.
+
 The threshold is a bit informal, but that's okay (the DM, for example, is no better, and Brennecke has that +0.25 value that isn't very interpretable).
 In and of themselves, HVGs are not of interest -- rather, they prioritise genes for more interesting analyses, e.g., clustering, correlation and gene set analyses.
 If HVG detection is considered as a screen, it is better to focus on potentially interesting (but possibly false) genes rather than true and uninteresting ones.
+
+In any case, the p-values calculated here are probably more appropriate than those from Brennecke.
+Log-expression values are a lot more normal-looking than the raw counts, due to the skew of the latter.
 -->
 
 We recommend checking the distribution of expression values for the top HVGs to ensure that the variance estimate is not being dominated by one or two outlier cells (Figure ((hvgvioplothsc))).
