@@ -517,8 +517,8 @@ plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression",
     ylab="Variance of log-expression")
 o <- order(var.out$mean)
 lines(var.out$mean[o], var.out$tech[o], col="dodgerblue", lwd=2)
-spike.fit <- trendVar(sce, use.spikes=TRUE) # To compute spike-in variances.
-points(spike.fit$mean, spike.fit$var, col="red", pch=16)
+cur.spike <- isSpike(sce)
+points(var.out$mean[cur.spike], var.out$total[cur.spike], col="red", pch=16)
 ```
 
 <!--
