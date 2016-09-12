@@ -510,6 +510,7 @@ The trend passes through or close to most of the spike-in variances, indicating 
 This strategy exploits the large number of endogenous genes to obtain a stable trend, with the spike-in transcripts used as diagnostic features rather than in the trend fitting itself. 
 However, if our assumption did _not_ hold, we would instead fit the trend directly to the spike-in variances with the default `use.spikes=TRUE`.
 This sacrifices stability to reduce systematic errors in the estimate of the biological component for each gene.
+(In such cases, tinkering with the trend fitting parameters may yield a more stable curve -- see `?trendVar` for more details.)
 
 ```{r hvgplothsc, fig.cap="Variance of normalized log-expression values for each gene in the HSC dataset, plotted against the mean log-expression. The blue line represents the mean-dependent trend fitted to the variances of the endogenous genes. Variance estimates for spike-in transcripts are highlighted in red."}
 plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression", 
@@ -879,12 +880,12 @@ gc()
 
 ## Cell cycle classification
 
-We attempt to classify cells into cell cycle phases using the `cyclone` method.
-However, examination of Figure ((phaseplotbrain)) indicates that many of the G1 and G2/M scores are ambiguous.
+Application of `cyclone` to the brain dataset suggests that most of the cells are in G1 phase (Figure ((phaseplotbrain))).
+However, a small number of cells lie in the centre of the plot with ambiguous scores.
 This highlights the risks of using a classifier on a dataset that is substantially different to the training set.
 In particular, the classifier was trained on C1 SMARTer data [@scialdone2015computational] and accounts for the biases in that protocol. 
 The brain dataset uses UMI counts, which has an entirely different set of biases, e.g., 3'-end coverage only, no length bias, no amplification noise.
-These new biases and the absence of expected biases will confound the classifier and interfere with accurate calling of cell cycle phase.
+These new biases (and the absence of expected biases) may interfere with accurate calling of cell cycle phase.
 
 ```{r, echo=FALSE, results='hide', message=FALSE}
 mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", package="scran"))
@@ -906,10 +907,14 @@ This will lead to a deterioration in the accuracy of the classifier.
 In general, this is unlikely to be a major issue as the cell cycle should be a conserved process across many lineages and conditions.
 -->
 
-Given the lack of definitive classification, we will not perform any processing of the dataset by cell cycle phase.
+An additional complication is that many neuronal cell types are postmitotic and do not belong in any phase of the cell cycle.
+It is not clear how these cells should be classified -- so, to avoid misleading conclusions, we will not perform any processing of this dataset by cell cycle phase.
 This is unlikely to be problematic for this analysis, as the cell cycle effect will be relatively subtle compared to the obvious differences between cell types in a diverse population.
 Thus, the former is unlikely to distort the conclusions regarding the latter.
-Indeed, classification may be irrelevant for many neuronal cell types which are postmitotic and do not belong in any phase of the cell cycle.
+
+```{r echo=FALSE, results='hide'}
+gc()
+```
 
 ## Removing uninteresting genes
 
