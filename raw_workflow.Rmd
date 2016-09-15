@@ -553,6 +553,8 @@ Such genes are more likely to be true positives but also less likely to be stron
 The threshold is a bit informal, but that's okay (the DM, for example, is no better, and Brennecke has that +0.25 value that isn't very interpretable).
 In and of themselves, HVGs are not of interest -- rather, they prioritise genes for more interesting analyses, e.g., clustering, correlation and gene set analyses.
 If HVG detection is considered as a screen, it is better to focus on potentially interesting (but possibly false) genes rather than true and uninteresting ones.
+To this end, it is permissible to relax the FDR for detecting HVGs, especially if you didn't get anything interesting things with a low threshold.
+(Of course, this would also increase the amount of genes dominated by technical noise later on, so it's not preferable if you can avoid it.)
 
 In any case, the p-values calculated here are probably more appropriate than those from Brennecke.
 Log-expression values are a lot more normal-looking than the raw counts, due to the skew of the latter.
@@ -602,7 +604,12 @@ While it won't preserve the population mean, this is largely irrelevant if HVGs 
 Another useful procedure is to identify the HVGs that are highly correlated with one another.
 This distinguishes between HVGs caused by random noise and those involved in driving systematic differences between subpopulations.
 Gene pairs with significantly large positive or negative values for Spearman's rho are identified using the `correlatePairs` function.
-We only apply this function to the set of HVGs -- doing so for all possible gene pairs would require too much computational time and may prioritize uninteresting genes that have strong correlations but low variance, e.g., tightly co-regulated house-keeping genes.
+We only apply this function to the set of HVGs, because these genes have large biological components and are more likely to exhibit strong correlations driven by biology.
+In contrast, calculating correlations for all possible gene pairs would require too much computational time and increase the severity of the multiple testing correction, and may prioritize uninteresting genes that have strong correlations but low variance, e.g., tightly co-regulated house-keeping genes.
+
+<!--
+As opposed to technical noise, which should be random and reduce the correlations (and power). 
+-->
 
 ```{r}
 set.seed(100)
