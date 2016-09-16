@@ -444,6 +444,10 @@ The computed values are stored as an `exprs` matrix in addition to the other ass
 <!-- 
 Specifically, variance stabilization for NB-distributed counts with a constant dispersion but a variable mean. 
 This seems better than square-rooting it, which only works for the Poisson.
+
+We don't bother imputing, because we don't know whether a zero is a true dropout or a genuine zero.
+Besides, it seems somewhat circular if you try to impute from the same data, rather than using some external data (e.g., in variant calling).
+The simpler approach seems to be to try to properly model it downstream.
 -->
 
 ## Checking for important technical factors 
