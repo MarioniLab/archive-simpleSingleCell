@@ -470,7 +470,7 @@ The percentage of variance explained also affects the correlation.
 For a factor with percentage explained 'p', the upper bound on the increase to the Pearson's correlation would be '2p', when the correlation is -1; 'p', when the correlation is zero, and 0, when the correlation is 1, obviously.
 If 'p' is decently large (>10%), we're likely to have problems, so the corresponding factor will be need to be regressed out.
 
-Of course, blocking on factors introduces more assumptions and points of failure to the analysis.
+Of course, blocking on factors introduces more assumptions and points of failure to the analysis (e.g., linearity in the covariates).
 If the model is misspecified, you can end up with spurious patterns in the residuals - possibly larger than that caused by the technical bias in the first place.
 This is compounded by the presence of zeroes, non-normality and heteroskedasticity, etc.
 Thus, blocking should be performed sparingly, rather than being performed by default.
@@ -553,8 +553,10 @@ Such genes are more likely to be true positives but also less likely to be stron
 The threshold is a bit informal, but that's okay (the DM, for example, is no better, and Brennecke has that +0.25 value that isn't very interpretable).
 In and of themselves, HVGs are not of interest -- rather, they prioritise genes for more interesting analyses, e.g., clustering, correlation and gene set analyses.
 If HVG detection is considered as a screen, it is better to focus on potentially interesting (but possibly false) genes rather than true and uninteresting ones.
+
 To this end, it is permissible to relax the FDR for detecting HVGs, especially if you didn't get anything interesting things with a low threshold.
-(Of course, this would also increase the amount of genes dominated by technical noise later on, so it's not preferable if you can avoid it.)
+Of course, this would also increase the amount of genes dominated by technical noise later on, so it's not preferable if you can avoid it.
+One could argue that this is not problematic if you just get more low-variability genes, but technical noise is still high (in absolute terms) and there are a lot more of them.
 
 In any case, the p-values calculated here are probably more appropriate than those from Brennecke.
 Log-expression values are a lot more normal-looking than the raw counts, due to the skew of the latter.
