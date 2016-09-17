@@ -592,6 +592,7 @@ But we can do it, so it's a technical challenge rather than a philosophical one.
 The use of variance of log-values is also more consistent with downstream applications.
 For example, PCA and t-SNE are applied on the log-values, as is visualization of expression with boxplots or violin plots.
 Making the latter with genes identified as HVGs from CV2 would give outliers that get shrunk upon log-transformation.
+Indeed, the variance of the log-values provides a measure of the log-fold change between cells, which is arguably more relevant than the absolute differences in expression.
 -->
 
 <!--
