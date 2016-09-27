@@ -560,7 +560,8 @@ If HVG detection is considered as a screen, it is better to focus on potentially
 
 To this end, it is permissible to relax the FDR for detecting HVGs, especially if you didn't get anything interesting things with a low threshold.
 Of course, this would also increase the amount of genes dominated by technical noise later on, so it's not preferable if you can avoid it.
-One could argue that this is not problematic if you just get more low-variability genes, but technical noise is still high (in absolute terms) and there are a lot more of them.
+One could argue that this is not problematic if you just get more low-variability genes, as these don't contribute much to relative differences betwen cells.
+However, technical noise is still high (in absolute terms) and there are a lot more of them, so it would probably still mess up the results.
 
 In any case, the p-values calculated here are probably more appropriate than those from Brennecke.
 Log-expression values are a lot more normal-looking than the raw counts, due to the skew of the latter.
@@ -640,6 +641,9 @@ This gets around problems in validation where double positive/negative signals m
 Of course, relying solely on correlations is also a bit less interpretable, as the identities of the cells in the subpopulations are not explicitly set.
 It is also limited to the top set of HVGs, whereas DE between clusters can be checked between all genes.
 (Although the rest of the genes are unlikely to have strong DE, otherwise they would have been HVGs.)
+
+At the very least, one can use the correlation results to back up the (less reliable but more interpretable) higher-level analyses.
+So if you get a result from the latter that you mightn't trust (due to uncertainty of clustering, etc.), you can fall back to the correlations if it shows up there.
 -->
 
 ```{r}
