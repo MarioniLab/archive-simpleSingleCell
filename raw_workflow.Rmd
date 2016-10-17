@@ -1619,6 +1619,7 @@ gc()
 This workflow provides a step-by-step guide for performing basic analyses of single-cell RNA-seq data in R.
 It provides instructions for a number of low-level steps such as quality control, normalization, cell cycle phase assignment, data exploration, HVG and marker gene detection, and clustering.
 This is done with a number of different datasets to provide a range of usage examples.
+The workflow is modular so individual steps can be substituted with alternative methods according to user preferences.
 In addition, the processed data can be easily used for higher-level analyses with other Bioconductor packages.
 We anticipate that this workflow will assist readers in assembling analyses of their own scRNA-seq data.
 
