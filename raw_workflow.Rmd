@@ -928,8 +928,9 @@ This will lead to a deterioration in the accuracy of the classifier.
 In general, this is unlikely to be a major issue as the cell cycle should be a conserved process across many lineages and conditions.
 -->
 
-An additional complication is that many neuronal cell types are quiescent and do not belong in any phase of the cell cycle [@coller2006new].
-It is not clear how these cells should be classified -- so, for simplicity, we will not perform any processing of this dataset by cell cycle phase.
+An additional complication is that many neuronal cell types are expected to lie in the G0 resting phase, which is distinct from the other phases of the cell cycle [@coller2006new].
+Application of `cyclone` to these cells may not be appropriate, because `cyclone` assumes that each cell must belong to one of the G1, S or G2/M phases.
+To avoid problems due to incorrect classification, we will not perform any processing of this dataset by cell cycle phase.
 This is unlikely to be problematic for this analysis, as the cell cycle effect will be relatively subtle compared to the obvious differences between cell types in a diverse population.
 Thus, the former is unlikely to distort the conclusions regarding the latter.
 
