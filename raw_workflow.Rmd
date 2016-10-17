@@ -902,11 +902,11 @@ gc()
 ## Cell cycle classification
 
 Application of `cyclone` to the brain dataset suggests that most of the cells are in G1 phase (Figure ((phaseplotbrain))).
-However, a small number of cells lie in the centre of the plot with ambiguous scores.
-This highlights the risks of using a classifier on a dataset that is substantially different to the training set.
+However, a small number of cells have ambiguous classifications, lying in the top-right of the plot with high scores for both G1 and G2/M phases.
+This uncertainty may be caused by differences between the test and training data.
 In particular, the classifier was trained on C1 SMARTer data [@scialdone2015computational] and accounts for the biases in that protocol. 
 The brain dataset uses UMI counts, which has an entirely different set of biases, e.g., 3'-end coverage only, no length bias, no amplification noise.
-These new biases (and the absence of expected biases) may interfere with accurate calling of cell cycle phase.
+These new biases (and the absence of expected biases) may interfere with accurate classification of these cells.
 
 ```{r, echo=FALSE, results='hide', message=FALSE}
 mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", package="scran"))
@@ -928,8 +928,8 @@ This will lead to a deterioration in the accuracy of the classifier.
 In general, this is unlikely to be a major issue as the cell cycle should be a conserved process across many lineages and conditions.
 -->
 
-An additional complication is that many neuronal cell types are postmitotic and do not belong in any phase of the cell cycle.
-It is not clear how these cells should be classified -- so, to avoid misleading conclusions, we will not perform any processing of this dataset by cell cycle phase.
+An additional complication is that many neuronal cell types are quiescent and do not belong in any phase of the cell cycle [@coller2006new].
+It is not clear how these cells should be classified -- so, for simplicity, we will not perform any processing of this dataset by cell cycle phase.
 This is unlikely to be problematic for this analysis, as the cell cycle effect will be relatively subtle compared to the obvious differences between cell types in a diverse population.
 Thus, the former is unlikely to distort the conclusions regarding the latter.
 
