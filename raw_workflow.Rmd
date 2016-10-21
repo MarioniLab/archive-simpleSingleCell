@@ -81,7 +81,7 @@ The application of different steps in the workflow will be demonstrated on sever
 The aim is to provide a variety of modular usage examples that can be applied to construct custom analysis pipelines.
 
 ```{r, results='asis', eval=on.bioc, echo=FALSE}
-cat("***Note:*** for how to cite this article, please refer to http://f1000research.com/articles/5-2122/v1 for instructions.*")
+cat("***Note:*** *for how to cite this article, please refer to http://f1000research.com/articles/5-2122/v1 for instructions.*")
 ```
 
 # Analysis of haematopoietic stem cells
