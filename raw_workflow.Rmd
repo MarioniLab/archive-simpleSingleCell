@@ -615,7 +615,8 @@ While it won't preserve the population mean, this is largely irrelevant if HVGs 
 
 Another useful procedure is to identify the HVGs that are highly correlated with one another.
 This distinguishes between HVGs caused by random noise and those involved in driving systematic differences between subpopulations.
-Gene pairs with significantly large positive or negative values for Spearman's rho are identified using the `correlatePairs` function.
+Correlations between genes are quantified by computing Spearman's rho, which accommodates non-linear relationships in the expression values.
+Gene pairs with significantly large positive or negative values of rho are identified using the `correlatePairs` function.
 We only apply this function to the set of HVGs, because these genes have large biological components and are more likely to exhibit strong correlations driven by biology.
 In contrast, calculating correlations for all possible gene pairs would require too much computational time and increase the severity of the multiple testing correction, and may prioritize uninteresting genes that have strong correlations but low variance, e.g., tightly co-regulated house-keeping genes.
 
@@ -710,7 +711,9 @@ plotPCA(sce, exprs_values="exprs", colour_by="total_features",
 ```
 
 Another widely used approach is the _t_-stochastic neighbour embedding (_t_-SNE) method [@van2008visualizing].
-_t_-SNE tends to work better than PCA for separating cells in more diverse populations, at the cost of more computational effort and complexity.
+_t_-SNE tends to work better than PCA for separating cells in more diverse populations.
+This is because the former can directly capture non-linear relationships in high-dimensional space, whereas the latter must represent them (suboptimally) as linear components.
+However, this improvement comes at the cost of more computational effort and complexity.
 In particular, _t_-SNE is a stochastic method, so users should run the algorithm several times to ensure that the results are representative, and then set a seed to ensure that the chosen results are reproducible.
 It is also advisable to test different settings of the "perplexity" parameter as this will affect the distribution of points in the low-dimensional space.
 This is demonstrated below in Figure ((tsneplothsc)), though no consistent substructure is observed in all plots. 
@@ -1139,6 +1142,7 @@ sum(sig.cor)
 
 We first remove the sex effect using the `removeBatchEffect` function from the `r Biocpkg("limma")` package [@ritchie2015limma].
 This ensures that any sex-specific differences will not dominate the visualization of the expression profiles.
+In this manner, we maintain consistency with the use of `design` in the previous steps.
 (However, if an analysis method can accept a design matrix, blocking on nuisance factors in the design matrix is preferable to manipulating the expression values with `removeBatchEffect`.
 This is because the latter does not account for the loss of residual degrees of freedom, nor the uncertainty of estimation of the blocking factor terms.)
 We store these sex-corrected expression values in the `norm_exprs` field of the `SCESet` object for later use.
