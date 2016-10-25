@@ -235,7 +235,7 @@ It may also reflect genuine biology in extreme cases (e.g., low numbers of expre
 
 <!-- 
 There's an additional implicit assumption that these technical metrics are homogeneous across cells.
-That won't be true for extreme cases like erythrocytes.
+That won't be true for extreme cases like erythrocytes, where the "outliers" would just be a genuine biological clustering.
 -->
 
 ```{r}
@@ -377,6 +377,14 @@ This removes all rows corresponding to endogenous genes or spike-in transcripts 
 ```{r}
 sce <- sce[keep,] 
 ```
+
+<!--
+It could be argued that you don't need to do filtering on abundance if you're going to select on HVGs anyway.
+This is because the HVG screen would throw out low-abundance genes, so you might as well skip the abundance filter.
+The disadvantage is if the HVG screen depends on significance, in which case the low abundances would increase the severity of the MTC.
+This could be mild (~20% increase in the p-value) or quite severe (2-3-fold), depending on how many annotated genes are retained.
+The worst case occurs if you had mild contamination so that every gene had a count of one - you'd retain too many uninteresting genes if you just filtered on non-zero totals.
+-->
 
 ## Normalization of cell-specific biases
 
