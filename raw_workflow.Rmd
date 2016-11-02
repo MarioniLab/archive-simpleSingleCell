@@ -1183,7 +1183,7 @@ For correlations with one-way layouts, comparisons are done within each level so
 There are problems for additive designs, but we knew that already.
 
 With all that being said, correction is probably the lesser of two evils if you have a strong batch effect that compromises the visualization.
-It shouldn't matter for technical effects that are largely orthogonal to population structure.
+It shouldn't matter for technical effects that are largely orthogonal to population structure (e.g., balanced designs).
 Problems would only occur when you try to regress out uninteresting biological effects that might have some composition differences.
 -->
 
