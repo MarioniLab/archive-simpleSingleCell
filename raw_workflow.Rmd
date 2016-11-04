@@ -1259,17 +1259,17 @@ heat.vals <- chosen.exprs - rowMeans(chosen.exprs)
 clust.col <- rainbow(max(my.clusters))
 heatmap.2(heat.vals, col=bluered, symbreak=TRUE, trace='none', cexRow=0.3,
     ColSideColors=clust.col[my.clusters], Colv=as.dendrogram(my.tree), 
-    breaks=seq(-5, 5, length.out=21), symmbreaks=FALSE)
+    breaks=seq(-5, 5, length.out=21))
 ```
 
 This heatmap can be stored at a greater resolution for detailed inspection later.
 
 ```{r, results='hide'}
-pdf("brain_heat.pdf", width=10, height=100) # Large 'height' to store all genes
+pdf("brain_heat.pdf", width=10, height=100) # Large 'height' to show all gene names.
 heatmap.2(heat.vals, col=bluered, symbreak=TRUE, trace='none', cexRow=0.3,
     ColSideColors=clust.col[my.clusters], Colv=as.dendrogram(my.tree), 
-    keysize=0.5, # Avoid having a very large colour key.
-    breaks=seq(-5, 5, length.out=21), symmbreaks=FALSE)
+    lwid=c(1, 4), lhei=c(1, 50), # Avoid having a very large colour key.
+    breaks=seq(-5, 5, length.out=21))
 dev.off()
 ```
 
