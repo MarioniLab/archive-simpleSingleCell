@@ -1135,8 +1135,7 @@ plotExpression(sce, rownames(hvg.out)[1:10], alpha=0.05, jitter="jitter") + font
 ```
 
 To identify genes involved in defining subpopulations, the set of HVGs is tested for significant pairwise correlations.
-Here, the number of significantly correlated pairs is much higher than in the HSC dataset, indicating that strong substructure is present.
-These results are also saved to file for use in designing validation experiments.
+Here, the proportion of significantly correlated pairs is much higher than in the HSC dataset, indicating that strong substructure is present.
 
 <!--
 We could also set a threshold on the absolute value of the correlation.
@@ -1154,10 +1153,17 @@ In any case, it actually doesn't take that long, so we might as well just do it 
 ```{r}
 set.seed(100)
 var.cor <- correlatePairs(sce, design=design, subset.row=rownames(hvg.out))
-write.table(file="brain_cor.tsv", var.cor, sep="\t", quote=FALSE, row.names=FALSE)
 head(var.cor)
 sig.cor <- var.cor$FDR <= 0.05
-sum(sig.cor)
+summary(sig.cor)
+```
+
+These pairs are saved to file for future use in designing validation experiments.
+
+```{r}
+cor.out <- gzfile("brain_cor.tsv.gz", open="wb") # Compression to save space.
+write.table(file=cor.out, var.cor, sep="\t", quote=FALSE, row.names=FALSE)
+close(cor.out)
 ```
 
 ## Further data exploration with the correlated HVGs
@@ -1280,7 +1286,7 @@ Use Acrobat reader or zathura for linux (selecting gene names and looking a copi
 When examining very heterogeneous datasets, it can be useful to repeat the HVG detection and clustering using only the cells within a particular cluster.
 This can be achieved by subsetting `sce` according to a particular level of `my.clusters`, and applying the same functions that were previously described.
 Doing so may identify a different set of correlated HVGs that define heterogeneity within the cluster, as opposed to those that define differences between clusters.
-In this manner, fine-scale structure within each cluster can be explored at greater resolution. 
+This would allow fine-scale structure within each cluster to be explored at greater resolution. 
 For simplicity, though, we will only use the broad clusters corresponding to clear subpopulations in this workflow.
 
 <!--
