@@ -1285,8 +1285,7 @@ Use Acrobat reader or zathura for linux (selecting gene names and looking a copi
 
 <!--
 Note that stripes, rather than blocks, are likely to be visual artifacts.
-Some cells are small and have lots of zeroes; these show up as blue stripes with strong red dots, even when all genes are non-DE.
-To balance that out, everyone else is liable to show up as slightly red stripes, when they should just be white.
+This is because smaller cells have less stable expression and accumulate red/blue colours, while larger cells get more white.
 Obviously, if there are problems with normalization, it'll show up here as well.
 In general, these can be ignored; if they're not artifacts, then they'll be impossible to validate.
 -->
