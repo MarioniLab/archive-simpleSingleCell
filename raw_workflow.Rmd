@@ -75,7 +75,7 @@ Dedicated steps are required to deal with this noise during analysis, especially
 In addition, scRNA-seq data can be used to study cell-to-cell heterogeneity, e.g., to identify new cell subtypes, to characterize differentiation processes, to assign cells into their cell cycle phases, or to identify HVGs driving variability across the population [@vallejos2015basics;@fan2016characterizing;@trapnell2014dynamics].
 This is simply not possible with bulk data, meaning that custom methods are required to perform these analyses. 
 
-This article describes a computational workflow for basic analysis of scRNA-seq data, using software packages from the open-source Bioconductor project (release 3.4) [@huber2015orchestrating].
+This article describes a computational workflow for basic analysis of scRNA-seq data, using software packages from the open-source Bioconductor project (release 3.5) [@huber2015orchestrating].
 Starting from a count matrix, this workflow contains the steps required for quality control to remove problematic cells; normalization of cell-specific biases, with and without spike-ins; cell cycle phase classification from gene expression data; data exploration to identify putative subpopulations; and finally, HVG and marker gene identification to prioritize interesting genes.
 The application of different steps in the workflow will be demonstrated on several public scRNA-seq datasets involving haematopoietic stem cells, brain-derived cells, T-helper cells and mouse embryonic stem cells, generated with a range of experimental protocols and platforms [@wilson2015combined;@zeisel2015brain;@buettner2015computational;@kolod2015singlecell].
 The aim is to provide a variety of modular usage examples that can be applied to construct custom analysis pipelines.
@@ -138,11 +138,11 @@ head(colnames(pData(sce)))
 
 We need to explicitly indicate that the ERCC set is, in fact, a spike-in set.
 This is necessary as spike-ins require special treatment in some downstream steps such as variance estimation and normalization.
-We do this by supplying the name of the spike-in set to `isSpike`.
+We do this by supplying the name of the spike-in set to `setSpike`.
 
 ```{r}
 library(scran)
-isSpike(sce) <- "ERCC"
+setSpike(sce) <- "ERCC"
 ```
 
 ## Quality control on the cells 
@@ -878,7 +878,7 @@ Nonetheless, we compute some quality control metrics to check whether the remain
 
 ```{r}
 sce <- calculateQCMetrics(sce, feature_controls=list(Spike=is.spike, Mt=is.mito)) 
-isSpike(sce) <- "Spike"
+setSpike(sce) <- "Spike"
 ```
 
 We examine the distribution of library sizes and numbers of expressed genes across cells (Figure ((libplotbrain))).
@@ -1283,6 +1283,14 @@ dev.off()
 Use Acrobat reader or zathura for linux (selecting gene names and looking a copied text works better than continually zooming in/out).
 -->
 
+<!--
+Note that stripes, rather than blocks, are likely to be visual artifacts.
+Some cells are small and have lots of zeroes; these show up as blue stripes with strong red dots, even when all genes are non-DE.
+To balance that out, everyone else is liable to show up as slightly red stripes, when they should just be white.
+Obviously, if there are problems with normalization, it'll show up here as well.
+In general, these can be ignored; if they're not artifacts, then they'll be impossible to validate.
+-->
+
 When examining very heterogeneous datasets, it can be useful to repeat the HVG detection and clustering using only the cells within a particular cluster.
 This can be achieved by subsetting `sce` according to a particular level of `my.clusters`, and applying the same functions that were previously described.
 Doing so may identify a different set of correlated HVGs that define heterogeneity within the cluster, as opposed to those that define differences between clusters.
@@ -1447,7 +1455,7 @@ sce <- newSCESet(countData=counts)
 sce$grouping <- rep(c("mESC", "MEF", "Neg"), c(48, 44, 4))
 sce <- sce[,sce$grouping!="Neg"] # Removing negative control wells.
 sce <- calculateQCMetrics(sce, feature_controls=list(spike=grep("SPIKE", rownames(counts))))
-isSpike(sce) <- "spike"
+setSpike(sce) <- "spike"
 ```
 
 We then apply the `computeSpikeFactors` method to estimate size factors for all cells.
@@ -1657,7 +1665,7 @@ anno <- anno[,-1,drop=FALSE]
 rownames(anno) <- my.ids
 sce <- newSCESet(countData=incoming, featureData=AnnotatedDataFrame(anno))
 sce <- calculateQCMetrics(sce, feature_controls=list(ERCC=is.spike))
-isSpike(sce) <- "ERCC"
+setSpike(sce) <- "ERCC"
 ```
 
 We filter out rows that do not correspond to endogenous genes or spike-in transcripts.
@@ -1687,7 +1695,7 @@ We anticipate that this workflow will assist readers in assembling analyses of t
 
 All software packages used in this workflow are publicly available from the Comprehensive R Archive Network (https://cran.r-project.org) or the Bioconductor project (http://bioconductor.org).
 The specific version numbers of the packages used are shown below, along with the version of the R installation.
-Version numbers of all Bioconductor packages correspond to release version 3.4 of the Bioconductor project.
+Version numbers of all Bioconductor packages correspond to release version 3.5 of the Bioconductor project.
 ```{r, echo=FALSE, results='asis'}
 if (!on.bioc) { 
     cat("Users can install all required packages and execute the workflow by following the instructions at https://www.bioconductor.org/help/workflows/simpleSingleCell.\n")
