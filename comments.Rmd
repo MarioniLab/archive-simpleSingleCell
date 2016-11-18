@@ -168,6 +168,7 @@ counts <- sim$counts
 is.spike <- sim$is.spike
 
 # Adding some substructure - in this case, a trajectory.
+# The CV2 is resistant to scaling, so don't worry too much about the absolute values.
 affect <- 20
 counts[sum(is.spike)+1:affect,] <- matrix(1:nsamples, ncol=nsamples, nrow=affect, byrow=TRUE)
 
@@ -177,13 +178,14 @@ subcounts[sample(length(subcounts), 200)] <- 500
 counts <- rbind(counts, subcounts)
 is.spike <- c(is.spike, logical(nrow(subcounts)))
 
-# CV2 picks up none of the HVGs.
+# CV2 picks up none of the HVGs - the CV2 is too small.
+# Might be due to a continuum, where the variance just can't get particularly large
+# (compared to bimodal expression patterns).
 out <- technicalCV2(counts, is.spike, sf.cell=rep(1, nsamples), sf.spike=rep(1, nsamples))
 lcounts <- log2(counts+1)
 is.sig <- which(out$FDR <= 0.05 & !is.na(out$FDR))
 sum(is.sig >= 101 & is.sig <= 120)
 sig.out <- lcounts[is.sig,]
-pr.out <- prcomp(t(sig.out))
 
 # Log-variances picks up all of the HVGs but not the outliers.
 fit <- trendVar(lcounts[is.spike,])
@@ -191,9 +193,10 @@ ref <- decomposeVar(lcounts, fit)
 is.sig <- which(ref$FDR <= 0.05 & !is.na(ref$FDR) & ref$bio > 0.5)
 sum(is.sig >= 101 & is.sig <= 120)
 sig.ref <- lcounts[is.sig,]
-pr.ref <- prcomp(t(sig.ref))
 
 par(mfrow=c(1,2))
+pr.out <- prcomp(t(sig.out))
+pr.ref <- prcomp(t(sig.ref))
 plot(pr.out$x[,1])# pr.out$x[,2])
 plot(pr.ref$x[,1])#, pr.ref$x[,2])
 
@@ -251,6 +254,8 @@ lapply(split(clust.ref$cluster, rep(c("A", "B"), each=500)), table)
 
 On the other hand, as a result of the robustness to outliers, detection power of the log-based method is reduced for HVGs driven by rare subpopulations.
 CV^2^-based methods do better, as shown below where HVGs corresponding to rare subpopulations are detected with lower mean expression in those cells.
+This performance gap increases for genes that are expressed at some level and upregulated in the rare subpopulation.
+It is difficult to detect these with the log-based method, given that uniquely expressed genes with a near-infinite fold-change are already hard to pick up. 
 
 ```{r}
 set.seed(100)
@@ -287,6 +292,7 @@ my.means[min(which(ref$FDR[chosen] <= 0.05 & ref$bio[chosen]>0.5))]
 
 On the flip side, CV2-based methods are less effective at detecting HVGs for subpopulations characterised by a loss of expression.
 This is probably because the mean is already large, which limits the scale of the change in the CV^2^.
+The log-based method can detect such genes, provided that expression is high (around 500) in all other cells.
 To some extent, this mitigates the loss of power for expressed genes in rare subpopulations, allowing the cells to be correctly classified.
 
 ```{r}
@@ -321,6 +327,9 @@ lines(ref$mean[o], ref$tech[o], col="red", lwd=2)
 sum(ref$FDR[chosen] <= 0.05)
 sum(ref$FDR[chosen] <= 0.05 & ref$bio[chosen]>0.5)
 ```
+
+In short, the final recommendation is to use the log-based methods for initial exploration, because it's better at recovering major features in the data.
+You can then switch to `technicalCV2` when pulling out rare subpopulations.
 
 ## Biological interpretion of HVGs
 
