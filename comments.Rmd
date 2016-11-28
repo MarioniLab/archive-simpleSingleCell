@@ -62,6 +62,43 @@ The disadvantage is if the HVG screen depends on significance, in which case the
 This could be mild (~20% increase in the p-value) or quite severe (2-3-fold), depending on how many annotated genes are retained.
 The worst case occurs if you had mild contamination so that every gene had a count of one - you'd retain too many uninteresting genes if you just filtered on non-zero totals.
 
+To this end, the choice of filter is guided by the upper bound of the variance compared to the expected amount of technical noise.
+In the HVG data set, an average count of 1 corresponds to a maximum variance of around 1 (as in, the maximum possible variance, given that counts must be positive). 
+The technical noise is around about this much anyway, so it makes no sense to keep genes with lower average counts, because they just wouldn't be called as HVGs.
+We could be more stringent and require some minimum increase above the technical noise, but we won't do that.
+
+```{r}
+plot(0, 0, type="n", xlab="Log mean", ylab="Variance", xlim=c(0, 1), ylim=c(0, 1.5))
+for (ave.count in 1:20/20) {
+    lmus <- log2(ave.count/(1-x)+1) * (1-x) + log(0+1)*x
+    lvars <- (log2(0+1)-lmus)^2 * x + (log2(ave.count/(1-x)+1)-lmus)^2*(1-x)
+    points(lmus, lvars)
+}
+lines(c(0, 0.2, 0.4), c(0, 1, 2), col="red", lwd=2) # Technical noise trend.
+```
+
+The reasoning in the brain data is slightly different.
+In this case, the technical noise is lower, but so are the absolute sizes of the maximum variances.
+Here, we set a filter of 0.2 to remove genes where the maximum variance is too small to be of interest, even if it is greater than the technical trend.
+A rule of thumb is that the max variance should be above 0.5 (see below), though we're a bit more relaxed just in case a low-variance HVG turns out to be useful later.
+
+```{r}
+plot(0, 0, type="n", xlab="Log mean", ylab="Variance", xlim=c(0, 0.5), ylim=c(0, 0.5))
+for (ave.count in 1:4/20) {
+    lmus <- log2(ave.count/(1-x)+1) * (1-x) + log(0+1)*x
+    lvars <- (log2(0+1)-lmus)^2 * x + (log2(ave.count/(1-x)+1)-lmus)^2*(1-x)
+    points(lmus, lvars)
+}
+lines(c(0, 0.3, 1), c(0, 0.3, 0.6), col="red", lwd=2) # Technical noise trend.
+```
+
+## Saving the original data
+
+It's also good practice to save the full data set.
+This is because the filtered genes in one context (e.g., for the full data set) might not be of the greatest interest in another context (e.g., with a subset of the data).
+A prime example would be in iterative clustering, or when looking at subgroups.
+In such cases, it's useful to filter and process everything afresh.
+
 # Normalization comments
 
 ## Why use log-transformed normalized counts?
@@ -125,7 +162,13 @@ So, if you set the standard error to 1/sqrt(2), the distance would become 1 (i.e
 Setting this threshold avoids selecting genes with high fold changes above the technical variance, but small absolute total variances.
 Such genes are more likely to be true positives but also less likely to be strongly variable and biologically interesting.
 
-The threshold is a bit informal, but that's okay (the DM, for example, is no better, and Brennecke has that +0.25 value that isn't very interpretable).
+(Of course, genes driving separation of rare subpopulations would have variances below 0.5.
+Even if the log-fold changes between subpopulations is strong, the average squared difference across all cells would be low.
+However, you've got to draw the line somewhere, otherwise you'll end up with lots of genes with really homogenous expression profiles, and irrelevant noise during PCA, etc.
+I guess this is just the price that needs to be paid before you can go on and do clustering to explicitly identify subpopulations.)
+
+The threshold is a bit informal, but that's okay.
+The DM, for example, is no better, and Brennecke has that +0.25 value that isn't very interpretable).
 In and of themselves, HVGs are not of interest -- rather, they prioritise genes for more interesting analyses, e.g., clustering, correlation and gene set analyses.
 If HVG detection is considered as a screen, it is better to focus on potentially interesting (but possibly false) genes rather than true and uninteresting ones.
 
