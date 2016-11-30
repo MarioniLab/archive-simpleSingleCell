@@ -63,34 +63,61 @@ This could be mild (~20% increase in the p-value) or quite severe (2-3-fold), de
 The worst case occurs if you had mild contamination so that every gene had a count of one - you'd retain too many uninteresting genes if you just filtered on non-zero totals.
 
 To this end, the choice of filter is guided by the upper bound of the variance compared to the expected amount of technical noise.
-In the HVG data set, an average count of 1 corresponds to a maximum variance of around 1 (as in, the maximum possible variance, given that counts must be positive). 
+The variance is bounded as the counts must be non-negative, so a gene with a low mean count can only achieve a particular variance (of the logs).
+Below, we use linear programming to identify the maximum variance of logs at any specified mean of logs/mean of counts. 
+We optimize over the proportions of cells with counts from 0 to 200.
+
+```{r}
+library(lpSolve)
+counts <- 0:200
+lmeanfun <- log2(counts+1)
+meanfun <- counts
+
+sumfun <- rep(1, length(counts))
+sumval <- 1
+posfun <- diag(length(counts))
+
+collected <- list()
+for (meanval in 1:100/100) {
+    for (lmeanval in 1:100/100) {
+        lvarfun <- (log2(counts+1) - lmeanval)^2
+        out <- lp(direction="max", objective.in=lvarfun, 
+                const.mat=rbind(meanfun, lmeanfun, sumfun, posfun), 
+                const.dir=c("=", "=", "=", rep(">=", length(counts))),
+                const.rhs=c(meanval, lmeanval, sumval, rep(0, length(counts))))
+        if (out$objval==0) { next }
+        collected[[length(collected)+1]] <- c(lmeanval, meanval, out$objval)
+    }
+}
+collected <- do.call(rbind, collected)
+```
+
+In the HVG data set, an average count of 1 corresponds to a maximum variance of around 1.
 The technical noise is around about this much anyway, so it makes no sense to keep genes with lower average counts, because they just wouldn't be called as HVGs.
 We could be more stringent and require some minimum increase above the technical noise, but we won't do that.
 
 ```{r}
-plot(0, 0, type="n", xlab="Log mean", ylab="Variance", xlim=c(0, 1), ylim=c(0, 1.5))
-for (ave.count in 1:20/20) {
-    lmus <- log2(ave.count/(1-x)+1) * (1-x) + log(0+1)*x
-    lvars <- (log2(0+1)-lmus)^2 * x + (log2(ave.count/(1-x)+1)-lmus)^2*(1-x)
-    points(lmus, lvars)
-}
-lines(c(0, 0.2, 0.4), c(0, 1, 2), col="red", lwd=2) # Technical noise trend.
+plot(collected[,1], collected[,3], xlim=c(0, 1), ylim=c(0, 1))
+comp <- read.table("hsc_hvg.tsv", header=TRUE)
+o <- order(comp$mean)
+lines(comp$mean[o], comp$tech[o], col="red", pch=16, cex=0.5)
 ```
 
-The reasoning in the brain data is slightly different.
-In this case, the technical noise is lower, but so are the absolute sizes of the maximum variances.
-Here, we set a filter of 0.2 to remove genes where the maximum variance is too small to be of interest, even if it is greater than the technical trend.
-A rule of thumb is that the max variance should be above 0.5 (see below), though we're a bit more relaxed just in case a low-variance HVG turns out to be useful later.
+Similar logic applies in the brain data set.
+Here, the technical noise is lower, so we set a smaller filter.
+It depends somewhat on whether you want to extrapolate the trend with `rule=2` or as a line passing through the origin.
+In both cases, though, it's safe to say that the maximum variances are comparable to the trend.
 
 ```{r}
-plot(0, 0, type="n", xlab="Log mean", ylab="Variance", xlim=c(0, 0.5), ylim=c(0, 0.5))
-for (ave.count in 1:4/20) {
-    lmus <- log2(ave.count/(1-x)+1) * (1-x) + log(0+1)*x
-    lvars <- (log2(0+1)-lmus)^2 * x + (log2(ave.count/(1-x)+1)-lmus)^2*(1-x)
-    points(lmus, lvars)
-}
-lines(c(0, 0.3, 1), c(0, 0.3, 0.6), col="red", lwd=2) # Technical noise trend.
+plot(collected[,1], collected[,3],xlim=c(0, 1), ylim=c(0, 1), cex=ifelse(collected[,2] < 0.2, 1, 0))
+comp <- read.table("brain_hvg.tsv", header=TRUE)
+o <- order(comp$mean)
+lines(comp$mean[o], comp$tech[o], col="red", pch=16, cex=0.5)
 ```
+
+Note that directly filtering on the log-means is _technically_ correct, in that it's independent of HVG detection.
+However, it's possible for genes to have very small log-means and very large variances, e.g., if you have a rare subpopulation with a very strongly expressed gene.
+Filtering on the log-means would discard such genes.
 
 ## Saving the original data
 
