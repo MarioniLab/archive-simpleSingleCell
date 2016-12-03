@@ -117,11 +117,19 @@ lines(comp$mean[o], comp$tech[o], col="red", pch=16, cex=0.5)
 
 Note that directly filtering on the log-means is _technically_ correct, in that it's independent of HVG detection.
 However, it's possible for genes to have very small log-means and very large variances, e.g., if you have a rare subpopulation with a very strongly expressed gene.
-Filtering on the log-means would discard such genes.
+Filtering on the log-means would discard such genes, which we don't want to do.
+
+## Justification on biological grounds
+
+Genes with low counts may be due to transcriptional leakage or mapping/sequencing errors (especially pseudogenes).
+This makes them uninteresting as they're unlikely to be related to any genuine biology.
+One could even go so far as to say that genes that aren't expressed much are likely to be irrelevant to the phenotype.
+Of course, there's likely to be a couple of low-abundance genes that (a) are important and (b) vary noticeably across cells.
+However, this is probably the exception rather than the rule; getting hammered by the MTC and other statistical problems to squeeze these genes out seems suboptimal.
 
 ## Saving the original data
 
-It's also good practice to save the full data set.
+It's also good practice to save the full data set before filtering.
 This is because the filtered genes in one context (e.g., for the full data set) might not be of the greatest interest in another context (e.g., with a subset of the data).
 A prime example would be in iterative clustering, or when looking at subgroups.
 In such cases, it's useful to filter and process everything afresh.
