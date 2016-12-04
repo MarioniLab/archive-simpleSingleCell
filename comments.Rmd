@@ -486,11 +486,31 @@ Rather, the main utility of a consensus method is that it tells you which cluste
 These clusters can be considered conservative as you need everyone to detect them, resulting in some loss of power.
 However, if you assume that each method is affected by noise in different ways, then the consensus clusters are effectively denoised, which is nice.
 
-## Why not bootstrapping?
+## Assessing the reliability of clustering
 
+I don't think bootstrapping is appropriate here.
 Standard bootstrapping requires IID genes in order to generate bootstrap replicates of the original data.
 This is not the case, which makes it difficult to interpret the bootstrap probabilities on an absolute scale.
 Doing it correctly would require block resampling to account for correlations -- hence the difficulty.
+
+Using silhouette profiles seems to work pretty well.
+The silhouette should be near zero for clusters formed from unstructured data in high dimensions.
+This is because the inside/outside distsance will increase with more dimensions, while the distance between adjacent subspaces will stay the same.
+As a result, the silhouette value will approach zero.
+
+```{r}
+x <- matrix(rnorm(500000), ncol=500) # no real structure
+d <- dist(t(x))
+out <- kmeans(t(x), centers=3)
+require(cluster)
+sil <- silhouette(out$cluster, d)
+plot(sil)
+```
+
+In genomics data with thousands of dimensions, any value above 0.2 is probably fine.
+I would consider 0.5 as a strong clustering value, i.e., points in the next cluster are twice as far away as points in the current cluster.
+You can also maximize the average silhouette to get the best number of clusters.
+This is better than the gap statistic in that it allows you to see the quality of the clusters at the same time.
 
 ## Using diffusion maps
 
