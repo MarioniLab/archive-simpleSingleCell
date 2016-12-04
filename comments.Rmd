@@ -461,13 +461,30 @@ Thus, you can threshold on the correlation without affecting FDR control, becaus
 However, I'm disinclined to recommend this explicitly, as you would lose power to detect subtle correlations driving minor subpopulations.
 This would defeat the purpose of having lots of cells to improve power to detect those subpopulations.
 
-## Using all genes in the brain data set
+## Using all HVGs in the brain data set
 
-I also switched to using all genes, rather than the top 500 as published.
-This is because if you have lots of heterogeneity, genes corresponding to relatively weaker effects are not visible, even if those effects are actually absolutely large.
+I also switched to using all HVGs, rather than the top 500 as published.
+This is because if you have lots of heterogeneity, genes corresponding to relatively weaker effects are not visible if they get excluded from the top 500.
+This occurs even if those effects are actually absolutely large, leading to the inability to detect obvious substructure.
 In any case, it actually doesn't take that long, so we might as well just do it using all genes.
 
 # Clustering comments
+
+## Choice of clustering method
+
+Ward's method seems to work well, but complete linkage would also probably do a good job here.
+The problem with method selection is that the "best" method depends on the unknown nature of the underlying data.
+Ward and complete linkage assume compact clusters, but this might not be the case, e.g., density-based methods would do better for irregular shapes.
+This might suggest that ensemble or consensus clustering would perform best.
+
+The issue is with the interpretability of whatever clusters crawl out at the end.
+If an assigment only occurs with a minority of methods, should it be discarded, even if those methods focus on particularly pertinent aspects of the data?
+This is likely to occur if you use substantially different clustering methods, given that the use of similar methods would defeat the purpose.
+Upon summarization, these minority assignments would be discarded and power would be lost relative to application of the minority methods by themselves.
+
+Rather, the main utility of a consensus method is that it tells you which clusters are the most robust with respect to variability from the choice of method.
+These clusters can be considered conservative as you need everyone to detect them, resulting in some loss of power.
+However, if you assume that each method is affected by noise in different ways, then the consensus clusters are effectively denoised, which is nice.
 
 ## Why not bootstrapping?
 
