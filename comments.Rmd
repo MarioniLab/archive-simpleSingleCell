@@ -496,6 +496,44 @@ This means that the variance needs to be modelled across cells.
 For DE genes, any change will do, even if it only appears in a small percentage of cells of the subpopulation.
 This requires modelling of the variance across replicate instances of the entire subpopulation.
 
+That being said, testing for differential expression is not the best approach to identify marker genes.
+This is because marker genes are defined not just by a change in mean expression, but also low variability.
+Just testing for the former doesn't guarantee that it's not variable -- if the difference is strong enough, the null hypothesis will be rejected.
+The reasoning above only favours the rejection of genes with low variability across the population, which may or may not improve the ranking of candidate markers.
+
+Simultaneously testing for both criterions might seem like the solution.
+However, this raises the question of how much variability is too much, and the desirable trade-off with strong DE.
+The resulting rankings may favour genes with weaker DE but less variability, especially for high-abundance genes expressed in both groups that aren't really markers.
+
+```r
+set.seed(100)
+library(statmod)
+ngroup <- 50
+design <- model.matrix(~rep(LETTERS[1:2], each=ngroup))
+design0 <- cbind(rep(1, nrow(design)))
+
+# Scenario 1: strong difference, highly variable.
+# This is arguably a strong candidate for a marker gene.
+y1 <- c(integer(ngroup), rnbinom(ngroup, mu=100, size=1)) 
+sum(y1==0) - ngroup # only one cell in the second group is zero.
+LR1 <- glmnb.fit(design0, y1, dispersion=1, offset=0)$deviance - 
+       glmnb.fit(design, y1, dispersion=1, offset=0)$deviance
+
+# Scenario 2: weaker difference, lowly variable.
+# This is not a particularly good marker gene.
+y2 <- c(rnbinom(ngroup, mu=50, size=100), 
+        rnbinom(ngroup, mu=100, size=100)) 
+LR2 <- glmnb.fit(design0, y2, dispersion=0.01, offset=0)$deviance - 
+       glmnb.fit(design, y2, dispersion=0.01, offset=0)$deviance
+ 
+# Despite that, the second gene has a greater LR than the first.
+LR1
+LR2
+```
+
+In short, whether you sum across cells or model cell-to-cell variability directly, you'll still get bad candidate markers in the rankings.
+Strong markers should appear at the top no matter what you do, so perhaps that's reassuring.
+
 # Cell cycle phase correction comments
 
 An alternative approach uses genes that have annotated functions in cell cycling and division.
