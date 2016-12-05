@@ -33,6 +33,7 @@ This reduces the resolution for where the threshold would usually be.
 There's an implicit assumption that these technical metrics are homogeneous across cells.
 That won't be true for extreme cases like erythrocytes, where the "outliers" would just be a genuine biological clustering.
 It also won't be true for batches with known differences in experimental processing, e.g., sequencing at different depth or had different amounts of spike-in added.
+This can be handled to some extent using the `block` argument in the `isOutlier` function.
 
 # Cell cycle classification comments
 
@@ -40,6 +41,7 @@ It also won't be true for batches with known differences in experimental process
 
 It seems to more sense to apply `cyclone` before filtering out low-abundance genes.
 This is because phase-specific genes that are not expressed in *any* cell will still be useful for classification.
+Their lack of expression relative to other genes will make them informative pairs, so tossing them out would be counterproductive.
 
 ## Explaining poor performance on the brain data set
 
@@ -511,6 +513,10 @@ In genomics data with thousands of dimensions, any value above 0.2 is probably f
 I would consider 0.5 as a strong clustering value, i.e., points in the next cluster are twice as far away as points in the current cluster.
 You can also maximize the average silhouette to get the best number of clusters.
 This is better than the gap statistic in that it allows you to see the quality of the clusters at the same time.
+
+Of course, the gap statistic, silhouette, etc. only check for the separatedness of the clusters.
+It doesn't actually know how robust the clusters are to biological/experimental variability, in which case you'd need biological replicates.
+The assumption is that well-separated clusters would be more robust to noise, but this really depends on the extent of noise that you'd expect to see.
 
 ## Using diffusion maps
 
