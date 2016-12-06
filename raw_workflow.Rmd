@@ -279,7 +279,7 @@ These genes are likely to be dominated by drop-out events [@brennecke2013account
 Removal of these genes mitigates discreteness and reduces the amount of computational work without major loss of information.
 
 ```{r}
-ave.counts <- rowMeans(counts(sce))
+ave.counts <- calcAverage(sce)
 keep <- ave.counts >= 1
 sum(keep)
 ```
@@ -688,6 +688,15 @@ stopifnot(identical(endo.data$metadata$cell_id, spike.data$metadata$cell_id)) # 
 stopifnot(all(endo.data$metadata$cell_id==mito.data$metadata$cell_id)) # should now be the same.
 ```
 
+In this particular data set, some genes are represented by multiple rows corresponding to alternative genomic locations.
+We sum the counts for all rows corresponding to a single gene for ease of interpretation.
+
+```{r}
+raw.names <- sub("_loc[0-9]+$", "", rownames(endo.data$counts))
+new.counts <- rowsum(endo.data$counts, group=raw.names, reorder=FALSE)
+endo.data$counts <- new.counts
+```
+
 The counts are then combined into a single matrix for constructing a `SCESet` object.
 For convenience, metadata for all cells are stored in the same object for later access.
 
@@ -708,7 +717,7 @@ is.mito <- rep(c(FALSE, TRUE, FALSE), nrows)
 
 ```{r, echo=FALSE, results='hide'}
 # Save some memory.
-rm(mito.data, endo.data, spike.data)
+rm(mito.data, endo.data, spike.data, new.counts)
 gc()
 ```
 
@@ -805,8 +814,8 @@ While some information and power will be lost due to the decrease in the size of
 Specifically, the use of UMIs eliminates technical noise due to amplification biases [@islam2014quantitative].
 
 ```{r}
-ave.counts <- rowMeans(counts(sce))
-keep <- rowMeans(counts(sce)) >= 0.2
+ave.counts <- calcAverage(sce)
+keep <- ave.counts >= 0.1
 ```
 
 Figure ((abhistbrain)) suggests that our choice of threshold is appropriate.
@@ -815,7 +824,7 @@ The filter removes the bulk of lowly expressed genes while preserving the peak o
 ```{r abhistbrain, fig.cap="Histogram of log-average counts for all genes in the brain dataset. The filter threshold is represented by the blue line."}
 hist(log10(ave.counts), breaks=100, main="", col="grey",
     xlab=expression(Log[10]~"average count"))
-abline(v=log10(0.2), col="blue", lwd=2, lty=2)
+abline(v=log10(0.1), col="blue", lwd=2, lty=2)
 ```
 
 The mean-based filter is applied to the dataset by subsetting `sce` as previously described.
@@ -1284,7 +1293,7 @@ Rather, more sophisticated strategies are required, one of which is demonstrated
 library(openxlsx)
 incoming <- read.xlsx("nbt.3102-S7.xlsx", sheet=1, rowNames=TRUE)
 incoming <- incoming[,!duplicated(colnames(incoming))] # Remove duplicated genes.
-sce <- newSCESet(exprsData=t(incoming), logged=TRUE)
+sce <- newSCESet(exprsData=t(incoming))
 ```
 
 We empirically identify the cell cycle phase using the pair-based classifier in `cyclone`.
