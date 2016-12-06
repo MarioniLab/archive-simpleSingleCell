@@ -111,7 +111,7 @@ It depends somewhat on whether you want to extrapolate the trend with `rule=2` o
 In both cases, though, it's safe to say that the maximum variances are comparable to the trend.
 
 ```{r}
-plot(collected[,1], collected[,3],xlim=c(0, 1), ylim=c(0, 1), cex=ifelse(collected[,2] < 0.2, 1, 0))
+plot(collected[,1], collected[,3],xlim=c(0, 1), ylim=c(0, 1), cex=ifelse(collected[,2] < 0.1, 1, 0))
 comp <- read.table("brain_hvg.tsv", header=TRUE)
 o <- order(comp$mean)
 lines(comp$mean[o], comp$tech[o], col="red", pch=16, cex=0.5)
@@ -121,6 +121,10 @@ Note that directly filtering on the log-means is _technically_ correct, in that 
 However, it's possible for genes to have very small log-means and very large variances, e.g., if you have a rare subpopulation with a very strongly expressed gene.
 Filtering on the log-means would discard such genes, which we don't want to do.
 
+Note that `technicalCV2` can reject the null at any average count.
+This is because it is possible to obtain arbitrarily large CV^2^ values for infintesimally small means.
+However, this mainly picks up genes with outlier expression profiles, which probably aren't interesting in most applications.
+
 ## Justification on biological grounds
 
 Genes with low counts may be due to transcriptional leakage or mapping/sequencing errors (especially pseudogenes).
@@ -128,6 +132,11 @@ This makes them uninteresting as they're unlikely to be related to any genuine b
 One could even go so far as to say that genes that aren't expressed much are likely to be irrelevant to the phenotype.
 Of course, there's likely to be a couple of low-abundance genes that (a) are important and (b) vary noticeably across cells.
 However, this is probably the exception rather than the rule; getting hammered by the MTC and other statistical problems to squeeze these genes out seems suboptimal.
+
+Note that this reasoning has nothing to do with the rectangular component on the plot.
+That component just represents the bunch of genes with near-zero expression, as the log-transform spreads them out across a larger range for greater resolution. 
+Thus, if you want to get rid of low-abundance genes, you should be setting your filter threshold somewhere within this component.
+Otherwise, if it's too high, you might end up removing the bulk of moderately-expressed genes.
 
 ## Saving the original data
 
