@@ -125,7 +125,7 @@ Note that `technicalCV2` can reject the null at any average count.
 This is because it is possible to obtain arbitrarily large CV^2^ values for infintesimally small means.
 However, this mainly picks up genes with outlier expression profiles, which probably aren't interesting in most applications.
 
-## Justification on biological grounds
+## Justification on other grounds
 
 Genes with low counts may be due to transcriptional leakage or mapping/sequencing errors (especially pseudogenes).
 This makes them uninteresting as they're unlikely to be related to any genuine biology.
@@ -137,6 +137,17 @@ Note that this reasoning has nothing to do with the rectangular component on the
 That component just represents the bunch of genes with near-zero expression, as the log-transform spreads them out across a larger range for greater resolution. 
 Thus, if you want to get rid of low-abundance genes, you should be setting your filter threshold somewhere within this component.
 Otherwise, if it's too high, you might end up removing the bulk of moderately-expressed genes.
+
+An additional motivation is to protect the normalization machinery from low-abundance genes.
+Most ratio-based normalization methods will be messed up by low counts, because the count:mean ratios for low-abundance genes will be more variable (CV^2^ is higher).
+Many methods also use a robust average like the median to approximate the mean count.
+The median of the count:mean ratio should thus be near the true size factor, but this is only accurate for NB distributions with large means.
+It could also be argued that you should do the analysis using only the genes used for normalization, lest there be other biases in the filtered genes.
+
+In the deconvolution method, you can consider the threshold multiplied by the minimum pool size (20 cells by default) as the minimum pooled count.
+This gives us pooled counts of around `20*1` for read data, which should be large enough to avoid the above problems for NB dispersions below 0.5.
+For UMI data, we get pooled counts of `20*0.1` -- however, the variability is near-Poisson anyway, so variability and bias in the ratio should be okay.
+In general, the maximum bias seems to be about 20%, which is probably tolerable if the data set is dominated by genes in the the high-abundance peak.
 
 ## Saving the original data
 
