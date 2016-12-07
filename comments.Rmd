@@ -147,6 +147,23 @@ In such cases, it's useful to filter and process everything afresh.
 
 # Normalization comments
 
+## Motivation for not using non-linear normalization
+
+There are probably some non-linear biases in scRNA-seq data, i.e., beyond global scaling.
+However, these are a pain to deal with because it's hard to fit a robust trend with respect to abundance.
+Most robust methods (e.g., loess) rely on normality, and log-transforming counts becomes highly dependent on the pseudo-count at low counts.
+Conversely, we could use discrete GLMs but that depends on proper specification of dispersions and is also less robust to outliers.
+
+Another problem is that non-linear normalization assumes that most genes at each point of the covariate range are not DE.
+This is reasonable in bulk data, but might not hold at the single-cell level.
+Cell-to-cell heterogeneity and intra-cell correlations means that it is entirely possible that we get large-scale shifts in highly expressed genes.
+This would be eliminated upon normalization, which would not be ideal.
+
+Finally, the non-linear effects seem relatively minor compared to other things, e.g., between-cell variability, plate effects.
+With the HSC and brain data sets, the variance explained due to the (log-)total count is well under 10%.
+It's probably worse between batches, but then you should be blocking on batch anyway.
+The worst affected is probably DE analyses that are overpowered due to the large number of cells, but that has other problems...
+
 ## Why use log-transformed normalized counts?
 
 The log-transformation provides some measure of variance stabilization for NB-distributed counts with a constant dispersion but a variable mean. 
@@ -518,10 +535,22 @@ sil <- silhouette(out$cluster, d)
 plot(sil)
 ```
 
-In genomics data with thousands of dimensions, any value above 0.2 is probably fine.
-I would consider 0.5 as a strong clustering value, i.e., points in the next cluster are twice as far away as points in the current cluster.
+In genomics data with thousands of dimensions, any value above 0.1 is probably fine.
 You can also maximize the average silhouette to get the best number of clusters.
 This is better than the gap statistic in that it allows you to see the quality of the clusters at the same time.
+It's actually advisable to do this, otherwise even well-clustered data will look crap if you overcluster and all the silhouette widths are low.
+
+Another visibility solution is to colour the silhouette by its own colour if positive, and by the colour of its neighbour if negative.
+This tells you where the "wrong" cells _should_ have been assigned to.
+Thus, a cluster is only well-separated if most its cells have positive width;
+and if only a few cells in other clusters have negative widths and have the target cluster as a closest neighbour.
+
+```r
+o <- order(sil[,1], sil[,3])
+osil <- sil[o,]
+ocol <- c("black", "red", "blue")[ifelse(osil[,3] > 0, osil[,1], osil[,2])]
+barplot(osil[,3], horiz=TRUE, col=ocol, border=NA)
+```
 
 Of course, the gap statistic, silhouette, etc. only check for the separatedness of the clusters.
 It doesn't actually know how robust the clusters are to biological/experimental variability, in which case you'd need biological replicates.
