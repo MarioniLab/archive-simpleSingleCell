@@ -198,6 +198,13 @@ sf.low2 <- computeSumFactors(sce2, subset.row=bottom2, cluster=clusters, sf.out=
 sf.hi2 <- computeSumFactors(sce2, subset.row=!bottom2, cluster=clusters, sf.out=TRUE)
 var(log10(sf.hi2)) # 0.0941
 var(log10(sf.hi2/sf.low2)) # 0.0082
+
+# In comparison, the difference between size factors and library sizes
+# still explains a fairly large proportion of the size factor variability.
+var(log10(sizeFactors(sce2)/colSums(counts(sce2)))) # 0.0300
+var(log10(colSums(counts(sce)))) # 0.0369
+var(log10(sizeFactors(sce2))) # 0.1039
+# Obviously doesn't happen in the HSC data, which is too homogeneous to care.
 ```
 
 ## Why use log-transformed normalized counts?
