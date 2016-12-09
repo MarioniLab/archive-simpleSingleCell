@@ -172,27 +172,32 @@ For example, a subpopulation may upregulate a set of genes, resulting in a skew 
 This would be eliminated upon normalization, which would not be ideal.
 
 Finally, the non-linear effects seem relatively minor compared to other things, e.g., between-cell variability, plate effects.
-With the HSC and brain data sets, the variance explained due to the (log-)total count is around 1% for most genes, and well under 5-10% in general (via `plotExplanatoryFactors`).
+Variance in the size factors due to non-linearity in the HSC data set is an order of magnitude smaller than variance in the size factors themselves.
 It's probably worse between batches, but then you should be blocking on batch anyway.
-The worst affected is probably DE analyses that are overpowered due to the large number of cells, but that has other problems...
-
-The better way to tell is to look at the spike-ins, where we can attribute non-linearity with respect to abundance as technical bias.
-We plot the total count of low-abundance spike-ins against that of the high-abundance spike-ins.
-If low- and high-abundance transcripts differ in their behaviour, there should be a trend here that does not have an intercept of 1.
-In other words, a doubling for high-abundance transcript will not produce a doubling for low-abundance transcripts.
-Fortunately, we see intercepts fairly close to 1 in both data sets, so I'm pretty happy with this. 
+The worst is likely observed DE analyses that are overpowered due to the large number of cells, but that has other problems...
 
 ```{r}
 library(scran)
 sce <- readRDS("hsc_data.rds")
-sp <- spikes(sce)
-middle <- median(ab)
-log.high <- log10(colSums(sp[ab>middle,]))
-log.low <- log10(colSums(sp[ab<middle,]))
-summary(log.high)
-summary(log.low) # 2 order of magnitude difference
-drop <- is.finite(log.low)
-lm(log.low[drop] ~ log.high[drop])
+ab <- calcAverage(sce)
+bottom <- ab < median(ab)
+summary(ab[bottom])
+summary(ab[!bottom])
+sf.low <- computeSumFactors(sce, subset.row=bottom, sizes=c(20, 40, 60, 80), sf.out=TRUE)
+sf.hi <- computeSumFactors(sce, subset.row=!bottom, sizes=c(20, 40, 60, 80), sf.out=TRUE)
+var(log10(sf.hi)) # 0.0161
+var(log10(sf.hi/sf.low)) # 0.0013
+
+sce2 <- readRDS("brain_data.rds")
+clusters <- quickCluster(sce2)
+ab2 <- calcAverage(sce2)
+bottom2 <- ab2 < quantile(ab2, 0.75)
+summary(ab2[bottom2])
+summary(ab2[!bottom2])
+sf.low2 <- computeSumFactors(sce2, subset.row=bottom2, cluster=clusters, sf.out=TRUE)
+sf.hi2 <- computeSumFactors(sce2, subset.row=!bottom2, cluster=clusters, sf.out=TRUE)
+var(log10(sf.hi2)) # 0.0941
+var(log10(sf.hi2/sf.low2)) # 0.0082
 ```
 
 ## Why use log-transformed normalized counts?
