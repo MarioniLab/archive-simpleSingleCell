@@ -532,6 +532,32 @@ Thus, you can threshold on the correlation without affecting FDR control, becaus
 However, I'm disinclined to recommend this explicitly, as you would lose power to detect subtle correlations driving minor subpopulations.
 This would defeat the purpose of having lots of cells to improve power to detect those subpopulations.
 
+## Why spike-ins are detected as HVGs
+
+A few spike-ins are detected as being highly variable, despite the fact that they should not exhibit any variability at all.
+This seems to be caused by cell- and spike-specific amplification biases that introduce additional variability for a few spike-ins.
+As a result, the total variance is increased above the technical trend, mimicking the effect of biological variance.
+I think it's due to PCR because the fluctuations are less pronounced for UMI data.
+
+```{r}
+out <- technicalCV2(sce, min.bio.disp=0)
+out["ERCC-00108",]
+plot(out$mean, out$cv2, log="xy", col=ifelse(out$FDR <= 0.05, "black", "grey"), pch=16)
+points(out$mean, out$cv2, col="red", cex=ifelse(is.na(out$FDR), 1, 0), pch=16)
+
+fit <- trendVar(sce, trend="semiloess", span=0.2, start=list(a=2, b=2, n=5))
+dec <- decomposeVar(sce, fit)
+dec["ERCC-00108",]
+plot(dec$mean, dec$total, col=ifelse(dec$FDR <= 0.05, "black", "grey"), pch=16)
+curve(fit$trend(x), col="blue", add=TRUE)
+points(dec$mean, dec$total,  col="red", cex=ifelse(is.na(out$FDR), 1, 0), pch=16)
+```
+
+This affects all HVG detection methods, though to differing extents.
+The CV^2^ method is more robust with the default `min.bio.disp`, which scales up the null CV^2^ to mitigate detection of spike-ins.
+The 0.5 threshold for the log-based method is less protective, because the absolute biological component for the spike-ins is quite large.
+The solution would be to model the spread around the trend with an F-distribution, but there's not enough spike-ins to do that precisely.
+
 ## Using all HVGs in the brain data set
 
 I also switched to using all HVGs, rather than the top 500 as published.
