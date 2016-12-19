@@ -701,9 +701,9 @@ This is because the mean-variance trend is sharply decreasing so a small number 
 As a result, DE genes with high variability across the majority of cells will be highly ranked, because that variability is ignored by the model.
 
 Technically, this is correct as we shouldn't trust variability due to dropouts and other technical noise.
-However, if we want to be conservative, then we look for genes that are expressed consistently _in spite of_ the technical noise.
-This favours DE genes in which we know that expression is consistent, at the expense of genes where we don't know either way due to the noise.
-To do this, we take the log-expression values at face value and just use _limma_ without further work.
+However, if we want to be conservative, then we look for genes that are expressed consistently _in spite of_ the dropouts.
+This favours DE genes in which we know that expression is consistent, at the expense of genes where we don't know either way due to dropouts/noise.
+To do this, we take the log-expression values at face value and just use _limma_ without weighting.
 
 # Cell cycle phase correction comments
 
