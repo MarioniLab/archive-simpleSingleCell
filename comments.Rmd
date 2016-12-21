@@ -288,10 +288,14 @@ Log-expression values are a lot more normal-looking than the raw counts, due to 
 
 ## Pros and con of using log-count variances over CV^2^
 
+### Overview
+
 Log-count variances are also more consistent with downstream applications.
 For example, PCA and t-SNE are applied on the log-values, as is visualization of expression with boxplots or violin plots.
 Making the latter with genes identified as HVGs from CV2 would give outliers that get shrunk upon log-transformation.
 Indeed, the variance of the log-values provides a measure of the log-fold change between cells, which is arguably more relevant than the absolute differences in expression.
+
+### Dealing with trajectories
 
 With CV^2^ you pick up a lot of genes expressed in few cells, which can be a pain for downstream analyses.
 Most directly, it means that the HVG list isn't easily interpretable if you have to manually weed out a lot of uninteresting genes.
@@ -356,7 +360,9 @@ plot(dm.out$DC1)# pr.out$x[,2])
 plot(dm.ref$DC1)#, pr.ref$x[,2])
 ```
 
-... and clustering of large but subtle subpopulations (i.e., subpopulations consisting of many cells, which are poorly separated from neighbouring subpopulations). 
+### Dealing with subtle subpopulations
+
+A similar issue arises for clustering of large but subtle subpopulations (i.e., subpopulations consisting of many cells, which are poorly separated from neighbouring subpopulations). 
 This is because the relevant genes don't get picked up if the mean is decently large -- or, if they do get picked up, they get dominated by noise from outliers.
 Of course, this is all relative -- for strong trajectories or clear subpopulations, both methods should perform well.
 
@@ -400,6 +406,8 @@ clust.ref <- kmeans(t(sig.ref), 2)
 lapply(split(clust.out$cluster, rep(c("A", "B"), each=500)), table)
 lapply(split(clust.ref$cluster, rep(c("A", "B"), each=500)), table)
 ```
+
+### Dealing with rare subpopulations
 
 On the other hand, as a result of the robustness to outliers, detection power of the log-based method is reduced for HVGs driven by rare subpopulations.
 CV^2^-based methods do better, as shown below where HVGs corresponding to rare subpopulations are detected with lower mean expression in those cells.
@@ -477,6 +485,8 @@ sum(ref$FDR[chosen] <= 0.05)
 sum(ref$FDR[chosen] <= 0.05 & ref$bio[chosen]>0.5)
 ```
 
+### Conclusion
+
 In short, the final recommendation is to use the log-based methods for initial exploration, because it's better at recovering major features in the data.
 You can then switch to `technicalCV2` when pulling out rare subpopulations.
 
@@ -496,6 +506,34 @@ While it won't preserve the population mean, this is largely irrelevant if HVGs 
 The set of HVGs detected within a cluster may be more relevant.
 This is because you can detect HVGs at greater power if you didn't have uninvolved, constantly-expressing cells dragging down the variance/correlations.
 Similarly, you'd get rid of genes that are HVGs between clusters but are not within the cluster, which wouldn't help with internal clustering.
+
+## Why spike-ins are detected as HVGs
+
+A few spike-ins are detected as being highly variable, despite the fact that they should not exhibit any variability at all.
+This seems to be caused by cell- and spike-specific amplification biases that introduce additional variability for a few spike-in transcripts.
+(For example, if a transcript is hard to capture consistently but easy to amplify, it'll get a large mean and large variability.)
+As a result, the total variance is increased above the technical trend, mimicking the effect of biological variance.
+I think it's due to PCR because the fluctuations are less pronounced for UMI data.
+
+```{r}
+sce <- readRDS("hsc_data.rds")
+out <- technicalCV2(sce, min.bio.disp=0)
+out["ERCC-00108",]
+plot(out$mean, out$cv2, log="xy", col=ifelse(out$FDR <= 0.05, "black", "grey"), pch=16)
+points(out$mean, out$cv2, col="red", cex=ifelse(is.na(out$FDR), 1, 0), pch=16)
+
+fit <- trendVar(sce, trend="semiloess", span=0.2, start=list(a=2, b=2, n=5))
+dec <- decomposeVar(sce, fit)
+dec["ERCC-00108",]
+plot(dec$mean, dec$total, col=ifelse(dec$FDR <= 0.05, "black", "grey"), pch=16)
+curve(fit$trend(x), col="blue", add=TRUE)
+points(dec$mean, dec$total,  col="red", cex=ifelse(is.na(out$FDR), 1, 0), pch=16)
+```
+
+This affects all HVG detection methods, and it's unlikely that we can do much computationally to correct it, given that it's indistinguishable from genuine biological variance.
+The CV^2^ method is more robust with the default `min.bio.disp`, which scales up the null CV^2^ to mitigate detection of spike-ins.
+The 0.5 threshold for the log-based method is less protective, because the absolute biological component for the spike-ins is quite large.
+The solution would be to model the spread around the trend with an F-distribution, but there's not enough spike-ins to do that precisely.
 
 # Correlation comments
 
@@ -532,39 +570,68 @@ Thus, you can threshold on the correlation without affecting FDR control, becaus
 However, I'm disinclined to recommend this explicitly, as you would lose power to detect subtle correlations driving minor subpopulations.
 This would defeat the purpose of having lots of cells to improve power to detect those subpopulations.
 
-## Why spike-ins are detected as HVGs
-
-A few spike-ins are detected as being highly variable, despite the fact that they should not exhibit any variability at all.
-This seems to be caused by cell- and spike-specific amplification biases that introduce additional variability for a few spike-in transcripts.
-(For example, if a transcript is hard to capture consistently but easy to amplify, it'll get a large mean and large variability.)
-As a result, the total variance is increased above the technical trend, mimicking the effect of biological variance.
-I think it's due to PCR because the fluctuations are less pronounced for UMI data.
-
-```{r}
-out <- technicalCV2(sce, min.bio.disp=0)
-out["ERCC-00108",]
-plot(out$mean, out$cv2, log="xy", col=ifelse(out$FDR <= 0.05, "black", "grey"), pch=16)
-points(out$mean, out$cv2, col="red", cex=ifelse(is.na(out$FDR), 1, 0), pch=16)
-
-fit <- trendVar(sce, trend="semiloess", span=0.2, start=list(a=2, b=2, n=5))
-dec <- decomposeVar(sce, fit)
-dec["ERCC-00108",]
-plot(dec$mean, dec$total, col=ifelse(dec$FDR <= 0.05, "black", "grey"), pch=16)
-curve(fit$trend(x), col="blue", add=TRUE)
-points(dec$mean, dec$total,  col="red", cex=ifelse(is.na(out$FDR), 1, 0), pch=16)
-```
-
-This affects all HVG detection methods, and it's unlikely that we can do much computationally to correct it, given that it's indistinguishable from genuine biological variance.
-The CV^2^ method is more robust with the default `min.bio.disp`, which scales up the null CV^2^ to mitigate detection of spike-ins.
-The 0.5 threshold for the log-based method is less protective, because the absolute biological component for the spike-ins is quite large.
-The solution would be to model the spread around the trend with an F-distribution, but there's not enough spike-ins to do that precisely.
-
 ## Using all HVGs in the brain data set
 
 I also switched to using all HVGs, rather than the top 500 as published.
 This is because if you have lots of heterogeneity, genes corresponding to relatively weaker effects are not visible if they get excluded from the top 500.
 This occurs even if those effects are actually absolutely large, leading to the inability to detect obvious substructure.
 In any case, it actually doesn't take that long, so we might as well just do it using all genes.
+
+## Statistical issues with detecting significant correlations
+
+### Problems with exchangeability
+
+Generation of the null distribution assumes exchangeability of observations.
+Specifically, there is the assumption that all observations are equally likely to receive any rank when performing the permutations.
+This will not be the case in practice as some observations are more variable than others, depending on the mean-variance relationship.
+As such, the variance of the correlations under the null will be underestimated: 
+
+```{r}
+means <- rep(c(5, 50), each=50)
+disp <- rep(c(1, 0.1), each=50)
+counts <- matrix(rnbinom(50000, mu=means, size=1/disp), byrow=TRUE, ncol=length(means))
+counts <- t(t(counts)/means)
+actual.cor <- cor(t(counts), method="spearman") 
+pretend.cor <- correlateNull(100, iters=10000)
+var(as.vector(actual.cor))
+var(pretend.cor)
+testing <- correlatePairs(counts, pretend.cor)
+hist(testing$p.value) # fairly substantial loss of type I error control
+```
+
+I'm not sure that there's any way to get around this, without making some strong parametric assumptions about how the variance affects the ranking.
+I guess we'll just have to suck it up - at least we get some level of protection from spurious correlations.
+
+### Deficiencies with residuals
+
+An obvious approach is to just estimate the correlations between residuals.
+However, this is problematic, even in simple one-way layouts.
+Consider a situation where you have two groups, with zeroes in almost all cells except for a few.
+When you calculate residuals for each gene, you'll get blocks of values corresponding to the zeroes.
+The exact value of these blocks with likely differ between groups; this can generate apparent correlations between genes.
+
+```{r}
+X <- model.matrix(~rep(LETTERS[1:2], each=50))
+g1 <- integer(100)
+g1[1] <- 100
+g1[51] <- 1000
+r1 <- lm.fit(X, g1)$residuals
+g2 <- integer(100)
+g2[2] <- 200
+g2[52] <- 2000
+r2 <- lm.fit(X, g2)$residuals
+cor(r1, r2, method="spearman")
+```
+
+The problem above is why we calculate correlations within each group.
+However, this is not possible for complex designs where we need to know the exact effect of each nuisance term on expression (and thus the rank).
+Consider a real-valued covariate of 1:100 for 100 cells, where the count for the last cell is unity in each of two genes, and zeroes everywhere else.
+You'll get correlations of 1 because the residual effects will be negative for the zeros.
+This seems unavoidable; after all, the likelihood of obtaining a zero does change across cells, given the changes in the fitted value you want to correct for.
+
+Don't bother trying to fit a linear model to the ranks, either.
+I thought it would be a generalization of the definition of Spearman's (Pearson's on ranks).
+However, there's no guarantee that unevenly-spaced covariates (or factors, for that matter) will make sense when fitted to ranks.
 
 # Clustering comments
 
