@@ -485,8 +485,6 @@ sum(ref$FDR[chosen] <= 0.05)
 sum(ref$FDR[chosen] <= 0.05 & ref$bio[chosen]>0.5)
 ```
 
-### Conclusion
-
 In short, the final recommendation is to use the log-based methods for initial exploration, because it's better at recovering major features in the data.
 You can then switch to `technicalCV2` when pulling out rare subpopulations.
 
@@ -578,6 +576,8 @@ You could get more power by bootstrapping to estimate the sampling distribution,
 In practice, it's probably not worth worrying about conservativeness from the sample distribution of the variance estimate.
 If this were a problem, the second d.f. would be infinity for the F-distribution (see above) as the sampling variance would be lower than expected under the chi-squared distribution.
 This is not the case in most data sets, which suggests that conservativeness is not the problem here.
+(Or even if it was, and the first d.f. was effectively underestimated under non-normality, `fitFDistRobustly` would compensate by increasing the second d.f.
+This only works to a point, though, because if the second d.f. is already large, further increases will converge to the chi-squared boundary.)
 
 # Correlation comments
 
