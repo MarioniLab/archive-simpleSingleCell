@@ -533,7 +533,51 @@ points(dec$mean, dec$total,  col="red", cex=ifelse(is.na(out$FDR), 1, 0), pch=16
 This affects all HVG detection methods, and it's unlikely that we can do much computationally to correct it, given that it's indistinguishable from genuine biological variance.
 The CV^2^ method is more robust with the default `min.bio.disp`, which scales up the null CV^2^ to mitigate detection of spike-ins.
 The 0.5 threshold for the log-based method is less protective, because the absolute biological component for the spike-ins is quite large.
-The solution would be to model the spread around the trend with an F-distribution, but there's not enough spike-ins to do that precisely.
+
+The solution would be to model the spread around the trend with an F-distribution, which is what `test="f"` does in `testVar`.
+This assumes that the true technical variance for each gene is sampled from an inverse chi-squared distribution, depending on the amount of amplification biases.
+In this manner, some protection is provided against the scatter around the trend.
+The question is whether there's enough spike-ins to do that precisely, and whether we can assume that the second d.f. is constant over all abundances.
+The answer to both questions is probably no, but it's better than nothing - at least there's no obvious defect from discreteness at low abundances that would warrant filtering. 
+
+```{r}
+set.seed(100)
+nspikes <- 100
+ncells <- 100
+spike.means <- 2^runif(nspikes, -2, 8)
+spike.disp <- (100/spike.means + 0.5) * 10/rchisq(nspikes, df=10)
+library(scran)
+library(limma)
+
+collected <- list()
+for (it in 1:100) {
+    spike.data <- matrix(rnbinom(nspikes*ncells, mu=spike.means, size=1/spike.disp), ncol=ncells)
+    
+    # Fitting the trend
+    exprs <- log2(spike.data/(colSums(spike.data)/mean(colSums(spike.data)))+1)
+    fit <- trendVar(exprs)
+    ab <- fit$mean
+
+    # Estimating the F-distribution
+    vals <- fit$var/fit$trend(fit$mean)
+    fit.all <- fitFDistRobustly(vals, df1=ncells-1)
+    fit.1   <- fitFDistRobustly(vals[ab > 1], df1=ncells-1)
+    fit.2   <- fitFDistRobustly(vals[ab > 2], df1=ncells-1)
+    fit.4   <- fitFDistRobustly(vals[ab > 4], df1=ncells-1)
+    collected[[it]] <- c(fit.all$df2, fit.1$df2, fit.2$df2, fit.4$df2)
+}
+summary(do.call(rbind, collected))
+```
+
+## Sampling distribution of the variance 
+
+The chi-squared assumption above considers normally-distributed observations, where larger values are less precise.
+However, the variance estimate for non-normal distributions could be large but more precise than expected, e.g., if there's a consistent number of zeros.
+You could get more power by bootstrapping to estimate the sampling distribution, though this is computationally inconvenient.
+
+In practice, it's probably not worth worrying about conservativeness from the sample distribution of the variance estimate.
+If this were a problem, the second d.f. would be infinity for the F-distribution (see above) as the sampling variance would be lower than expected under the chi-squared distribution.
+This is not the case in most data sets, which suggests that conservativeness is not the problem here.
 
 # Correlation comments
 
