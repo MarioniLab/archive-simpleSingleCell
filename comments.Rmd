@@ -1,3 +1,13 @@
+# Read alignment comments
+
+## What to do about duplicate removal
+
+Obviously, UMI counts already have duplicates removed, but what about read count-based methods?
+It probably doesn't make much difference for SMART-seq2 and friends performing whole-transcript amplification.
+This is because reads at different positions could be derived from amplified copies of the same transcript.
+Duplicate removal based on genomic position only protects against PCR duplicates during library preparation.
+See https://doi.org/10.1038/srep25533 for further details.
+
 # Quality control comments
 
 ## Improving resolution with log-transformed QC metrics
