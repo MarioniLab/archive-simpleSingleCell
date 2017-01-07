@@ -220,11 +220,37 @@ var(log10(sizeFactors(sce2))) # 0.1039
 ## Why use log-transformed normalized counts?
 
 The log-transformation provides some measure of variance stabilization for NB-distributed counts with a constant dispersion but a variable mean. 
-This seems better than square-rooting it, which only works for the Poisson.
+This seems better than square-rooting it, which is the VST for the Poisson only.
+I guess you could play around with various Box-Cox transformations, but the mean-variance trend is pretty extreme and probably won't go away just by changing lambda.
 
-We don't bother imputing the drop-outs, because we don't know whether a zero is a true dropout or a genuine zero.
-Besides, it seems somewhat circular if you try to impute from the same data, rather than using some external data (e.g., in variant calling).
-The simpler approach seems to be to try to properly model it downstream.
+## Dealing with dropouts 
+
+The difficulty with dealing with dropouts is that you don't know whether a zero count is a true dropout or due to a genuine lack of expression.
+It's possible to figure this out based on expression in other cells, e.g., a zero is more likely to be a dropout if expression is low in other cells.
+However, this makes some assumptions, e.g., that the true expression is sampled from the same distribution for all cells.
+Getting an actual value also requires that the true dropout rate for all genes follow the trend, which might not be true if you have gene-specific dropouts.
+
+Putting this issue aside, there are several ways of handling dropouts on a per-observation basis - imputation, censoring or downweighting.
+Imputing seems somewhat circular if you try to impute from the same data, rather than using some external data (e.g., in variant calling).
+Censoring suspected dropouts avoids the need to guess what the non-zero value would be, though it results in loss of a proportion of genuine zeroes.
+Downweighting seems most gradated but it depends on a sensible definition of the weights (which is not obvious) and the ability of downstream tools to use such weights.
+
+Our approach is to handle the drop-outs on a per-gene basis, by modelling the technical variability introduced by them.
+This is simpler but doesn't deal with situations where the dropout rate varies per cell due to changes in total RNA content.
+(Note, not due to changes in sequencing depth or amplification, because these should not affect the capture rate.)
+This is analogous to the difference between `voom` and _limma_-trend.
+
+However, I guess that there mightn't be much to be concerned about.
+This is because you can get a natural sigmoidal curve without requiring an explicit zero inflation term in a distribution.
+Thus, scaling of the values would work just as well to account for changes in total RNA content.
+
+```{r}
+means <- 1:1000/10
+disp <- 1
+y <- matrix(rnbinom(100000, mu=means, size=1), nrow=length(means))
+dropout <- rowSums(y==0)/ncol(y)
+plot(means, dropout, log="x")
+```
 
 ## Additional normalization for confounding effects
 
