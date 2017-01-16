@@ -7,7 +7,7 @@ author:
       affiliation: EMBL European Bioinformatics Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SD, United Kingdom; St Vincent's Institute of Medical Research, 41 Victoria Parade, Fitzroy, Victoria 3065, Australia
     - name: John C. Marioni
       affiliation: Cancer Research UK Cambridge Institute, Li Ka Shing Centre, Robinson Way, Cambridge CB2 0RE, United Kingdom; EMBL European Bioinformatics Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SD, United Kingdom; Wellcome Trust Sanger Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SA, United Kingdom
-date: 7 December 2016
+date: 16 January 2017
 vignette: >
     %\VignetteIndexEntry{A worfklow for low-level analyses of single-cell RNA-seq data}
     %\VignetteEngine{knitr::rmarkdown}
@@ -548,6 +548,17 @@ If many pairs were significant, this would indicate that the subpopulations were
 For this particular dataset, a relatively low number of HVGs exhibit significant correlations.
 This suggests that any substructure in the data will be modest, which is expected given that rigorous selection was performed to obtain a homogeneous population of HSCs [@wilson2015combined].
 
+The `correlatePairs` function can also return gene-centric output by setting `per.gene=TRUE`.
+This calculates a combined _p_-value [@simes1986improved] for each HVG that indicates whether it is significantly correlated to at least one other HVG.
+From a statistical perspective, this is a more natural approach to correcting for multiple testing when genes, rather than pairs of genes, are of interest.
+We define correlated HVGs as those that are detected here at a FDR of 5%.
+
+```{r}
+var.cor <- correlatePairs(sce, subset.row=rownames(hvg.out), per.gene=TRUE)
+head(var.cor)
+sig.cor <- var.cor$FDR <= 0.05
+summary(sig.cor)
+```
 
 ## Using correlated HVGs for further data exploration
 
@@ -558,7 +569,7 @@ This is not observed in Figure ((heatmaphsc)), consistent with the lack of stron
 There may be a subpopulation of _Fos_ and _Jun_-negative cells, but it is poorly defined given the small numbers of cells and genes involved.
 
 ```{r heatmaphsc, message=FALSE, fig.width=7, fig.height=7, fig.cap="Heatmap of mean-centred normalized log-expression values for correlated HVGs in the HSC dataset. Dendrograms are formed by hierarchical clustering on the Euclidean distances between genes (row) or cells (column)."}
-chosen <- unique(c(var.cor$gene1[sig.cor], var.cor$gene2[sig.cor]))
+chosen <- var.cor$gene[sig.cor]
 norm.exprs <- exprs(sce)[chosen,,drop=FALSE]
 heat.vals <- norm.exprs - rowMeans(norm.exprs)
 library(gplots)
@@ -971,23 +982,17 @@ Some tweaking of the `plotExpression` parameters is necessary to visualize a lar
 plotExpression(sce, rownames(hvg.out)[1:10], alpha=0.05, jitter="jitter") + fontsize
 ```
 
-To identify genes involved in defining subpopulations, the set of HVGs is tested for significant pairwise correlations.
-Here, the proportion of significantly correlated pairs is much higher than in the HSC dataset, indicating that strong substructure is present.
+To identify genes involved in defining subpopulations, correlations in the expression profiles are calculated between pairs of HVGs.
+Correlated HVGs are defined as those with significant correlations to one or more other HVGs at a FDR of 5%.
+Here, the proportion of HVGs with significant correlations is much higher than in the HSC dataset, indicating that strong substructure is present.
 
 ```{r}
 set.seed(100)
-var.cor <- correlatePairs(sce, design=design, subset.row=rownames(hvg.out))
+var.cor <- correlatePairs(sce, design=design, subset.row=rownames(hvg.out), per.gene=TRUE)
+write.table(file="brain_cor.tsv", var.cor, sep="\t", quote=FALSE, row.names=FALSE)
 head(var.cor)
 sig.cor <- var.cor$FDR <= 0.05
 summary(sig.cor)
-```
-
-These pairs are saved to file for future use in designing validation experiments.
-
-```{r}
-cor.out <- gzfile("brain_cor.tsv.gz", open="wb") # Compression to save space.
-write.table(file=cor.out, var.cor, sep="\t", quote=FALSE, row.names=FALSE)
-close(cor.out)
 ```
 
 ## Further data exploration with the correlated HVGs
@@ -1011,7 +1016,7 @@ Cells separate into clear clusters in the _t_-SNE plot (Figure ((tsneplotbrain))
 This is consistent with the presence of multiple cell types in the diverse brain population.
 
 ```{r tsneplotbrain, fig.cap="_t_-SNE plots constructed from the normalized and corrected log-expression values of correlated HVGs for cells in the brain dataset. Each point represents a cell and is coloured according to its expression of the top HVG (left) or _Mog_ (right).", fig.width=15, fig.height=6}
-chosen <- unique(c(var.cor$gene1[sig.cor], var.cor$gene2[sig.cor]))
+chosen <- var.cor$gene[sig.cor]
 top.hvg <- rownames(hvg.out)[1]
 tsne1 <- plotTSNE(sce, exprs_values="norm_exprs", colour_by=top.hvg,
     perplexity=10, rand_seed=100, feature_set=chosen) + fontsize
