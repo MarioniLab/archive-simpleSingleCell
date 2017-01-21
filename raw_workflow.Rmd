@@ -967,13 +967,12 @@ It also means the previous strategy of fitting a trend to the endogenous varianc
 
 ```{r hvgplotbrain, fig.width=12, fig.height=6, fig.cap="Variance of normalized log-expression values against the mean for each gene, calculated across all cells from male (left) or female mice (right). In each plot, the red line represents the mean-dependent trend in the technical variance of the spike-in transcripts (also highlighted as red points)."}
 par(mfrow=c(1,2))
-is <- isSpike(sce)
 for (block in c("1", "-1")) { 
     var.out <- collected[[block]]
     plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression", 
         ylab="Variance of log-expression", main=ifelse(block=="1", "Male", "Female"))
-    points(var.out$mean[is], var.out$total[is], col="red", pch=16)
-    o <- var.out$mean
+    points(var.out$mean[iSpike(sce)], var.out$total[isSpike(sce)], col="red", pch=16)
+    o <- order(var.out$mean)
     lines(var.out$mean[o], var.out$tech[o], col="red", lwd=2)
 }
 ```
