@@ -615,6 +615,15 @@ This is not the case in most data sets, which suggests that conservativeness is 
 (Or even if it was, and the first d.f. was effectively underestimated under non-normality, `fitFDistRobustly` would compensate by increasing the second d.f.
 This only works to a point, though, because if the second d.f. is already large, further increases will converge to the chi-squared boundary.)
 
+## Comparing biological components between conditions
+
+If you want to compare the size of the components between conditions to find differential variability, it's best to also compare the total:technical variance ratio.
+This is because the ratio determines the significance of the HVG detection. 
+It's possible to get a gene with a larger component in condition X but with a smaller ratio (and large _p_-value) if the technical variance is large.
+Thus, to be sure that a gene is differentially variable, you would need a consistent change in both the absolute and relative value of the biological component.
+Otherwise, you can't be sure whether the decrease in precision of the variance estimate is driving an absolute increase in the biological component.
+Similarly, if you only used the ratio, you could end up in situations where the ratio increases but the actual variance component does not, which would be nonsensical.
+
 # Correlation comments
 
 ## Using HVGs as a pre-screen
