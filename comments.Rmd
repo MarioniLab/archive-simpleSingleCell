@@ -324,205 +324,26 @@ Log-expression values are a lot more normal-looking than the raw counts, due to 
 
 ## Pros and con of using log-count variances over CV^2^
 
-### Overview
-
 Log-count variances are also more consistent with downstream applications.
 For example, PCA and t-SNE are applied on the log-values, as is visualization of expression with boxplots or violin plots.
 Making the latter with genes identified as HVGs from CV2 would give outliers that get shrunk upon log-transformation.
 Indeed, the variance of the log-values provides a measure of the log-fold change between cells, which is arguably more relevant than the absolute differences in expression.
 
-### Dealing with trajectories
-
 With CV^2^ you pick up a lot of genes expressed in few cells, which can be a pain for downstream analyses.
 Most directly, it means that the HVG list isn't easily interpretable if you have to manually weed out a lot of uninteresting genes.
-It also disrupts identification of trajectories:
-
-```{r}
-set.seed(100)
-
-nsamples <- 1000  
-standardSetup <- function(ngenes, nspikes) {
-    total.genes <- ngenes + nspikes
-    means <- 2^runif(total.genes, -2, 10)
-    dispersions <- 10/means + 0.2
-    counts <- matrix(rnbinom(total.genes*nsamples, mu=means, size=1/dispersions), ncol=nsamples)
-    is.spike <- logical(total.genes)
-    is.spike[seq_len(nspikes)] <- TRUE
-    return(list(counts=counts, is.spike=is.spike))
-}
-    
-# All of the standard genes...
-sim <- standardSetup(1000, 100)
-counts <- sim$counts
-is.spike <- sim$is.spike
-
-# Adding some substructure - in this case, a trajectory.
-# The CV2 is resistant to scaling, so don't worry too much about the absolute values.
-affect <- 20
-counts[sum(is.spike)+1:affect,] <- matrix(1:nsamples, ncol=nsamples, nrow=affect, byrow=TRUE)
-
-# Adding some outliers.
-subcounts <- matrix(0, 200, nsamples)
-subcounts[sample(length(subcounts), 200)] <- 500 
-counts <- rbind(counts, subcounts)
-is.spike <- c(is.spike, logical(nrow(subcounts)))
-
-# CV2 picks up none of the HVGs - the CV2 is too small.
-# Might be due to a continuum, where the variance just can't get particularly large
-# (compared to bimodal expression patterns).
-out <- technicalCV2(counts, is.spike, sf.cell=rep(1, nsamples), sf.spike=rep(1, nsamples))
-lcounts <- log2(counts+1)
-is.sig <- which(out$FDR <= 0.05 & !is.na(out$FDR))
-sum(is.sig >= 101 & is.sig <= 120)
-sig.out <- lcounts[is.sig,]
-
-# Log-variances picks up all of the HVGs but not the outliers.
-fit <- trendVar(lcounts[is.spike,])
-ref <- decomposeVar(lcounts, fit)
-is.sig <- which(ref$FDR <= 0.05 & !is.na(ref$FDR) & ref$bio > 0.5)
-sum(is.sig >= 101 & is.sig <= 120)
-sig.ref <- lcounts[is.sig,]
-
-par(mfrow=c(1,2))
-pr.out <- prcomp(t(sig.out))
-pr.ref <- prcomp(t(sig.ref))
-plot(pr.out$x[,1])# pr.out$x[,2])
-plot(pr.ref$x[,1])#, pr.ref$x[,2])
-
-library(destiny)
-dm.out <- DiffusionMap(t(sig.out))
-dm.ref <- DiffusionMap(t(sig.ref))
-plot(dm.out$DC1)# pr.out$x[,2])
-plot(dm.ref$DC1)#, pr.ref$x[,2])
-```
-
-### Dealing with subtle subpopulations
-
-A similar issue arises for clustering of large but subtle subpopulations (i.e., subpopulations consisting of many cells, which are poorly separated from neighbouring subpopulations). 
+It also disrupts identification of trajectories, as well as clustering of large but subtle populations 
+(i.e., subpopulations consisting of many cells, which are poorly separated from neighbouring subpopulations). 
 This is because the relevant genes don't get picked up if the mean is decently large -- or, if they do get picked up, they get dominated by noise from outliers.
 Of course, this is all relative -- for strong trajectories or clear subpopulations, both methods should perform well.
 
-```{r}
-set.seed(100)
-
-# More of the standard genes...
-sim <- standardSetup(1000, 100)
-counts <- sim$counts
-is.spike <- sim$is.spike
-
-# Adding some substructure - in this case, some clusters.
-extrasim <- standardSetup(50, 0)
-subcounts <- extrasim$counts
-subcounts[,1:500] <- subcounts[,1:500] * 2
-counts <- rbind(counts, subcounts)
-is.spike <- c(is.spike, logical(nrow(subcounts)))
-
-# Adding some outliers.
-subcounts <- matrix(0, 200, nsamples)
-subcounts[sample(length(subcounts), 200)] <- 500 
-counts <- rbind(counts, subcounts)
-is.spike <- c(is.spike, logical(nrow(subcounts)))
-
-# CV2 picks up mostly outliers, not the HVGs.
-out <- technicalCV2(counts, is.spike, sf.cell=rep(1, nsamples), sf.spike=rep(1, nsamples))
-lcounts <- log2(counts+1)
-is.sig <- which(out$FDR <= 0.05 & !is.na(out$FDR))
-sum(is.sig >= 1101 & is.sig <= 1150)
-sig.out <- lcounts[is.sig,]
-clust.out <- kmeans(t(sig.out), 2)
-
-# Log-variances picks up the HVGs but not the outliers.
-fit <- trendVar(lcounts[is.spike,])
-ref <- decomposeVar(lcounts, fit)
-is.sig <- which(ref$FDR <= 0.05 & !is.na(ref$FDR) & ref$bio > 0.5)
-sum(is.sig >= 1101 & is.sig <= 1150)
-sig.ref <- lcounts[is.sig,]
-clust.ref <- kmeans(t(sig.ref), 2)
-
-lapply(split(clust.out$cluster, rep(c("A", "B"), each=500)), table)
-lapply(split(clust.ref$cluster, rep(c("A", "B"), each=500)), table)
-```
-
-### Dealing with rare subpopulations
-
 On the other hand, as a result of the robustness to outliers, detection power of the log-based method is reduced for HVGs driven by rare subpopulations.
-CV^2^-based methods do better, as shown below where HVGs corresponding to rare subpopulations are detected with lower mean expression in those cells.
-This performance gap increases for genes that are expressed at some level and upregulated in the rare subpopulation.
 It is difficult to detect these with the log-based method, given that uniquely expressed genes with a near-infinite fold-change are already hard to pick up. 
-
-```{r}
-set.seed(100)
-    
-# All of the standard genes...
-sim <- standardSetup(5000, 500)
-counts <- sim$counts
-is.spike <- sim$is.spike
-
-# Adding some genes only present in a small (1%) subpopulation.
-subcounts <- matrix(0, 500, nsamples)
-my.means <- 1:500*10
-chosen <- nrow(counts) + seq_along(my.means)
-subcounts[,1:10] <- my.means
-counts <- rbind(counts, subcounts)
-is.spike <- c(is.spike, logical(length(my.means)))
-
-# CV2 can detect it at a count of 10-20.
-out <- technicalCV2(counts, is.spike, sf.cell=rep(1, nsamples), sf.spike=rep(1, nsamples))
-plot(out$mean, out$cv2, log="xy")
-points(out$mean, out$trend, col="red", pch=16, cex=0.5)
-my.means[min(which(out$FDR[chosen] <= 0.05))]
-
-# Log-variances detects it at a count of 100 (around 1000 if you also require biological variances above 0.5). 
-lcounts <- log2(counts+1)
-fit <- trendVar(lcounts[is.spike,])
-ref <- decomposeVar(lcounts, fit)
-plot(ref$mean, ref$total)
-o <- order(ref$mean)
-lines(ref$mean[o], ref$tech[o], col="red", lwd=2)
-my.means[min(which(ref$FDR[chosen] <= 0.05))]
-my.means[min(which(ref$FDR[chosen] <= 0.05 & ref$bio[chosen]>0.5))]
-```
-
-On the flip side, CV2-based methods are less effective at detecting HVGs for subpopulations characterised by a loss of expression.
+CV^2^-based methods do better, thought they are also less effective at detecting HVGs for subpopulations characterised by a loss of expression.
 This is probably because the mean is already large, which limits the scale of the change in the CV^2^.
-The log-based method can detect such genes, provided that expression is high (around 500) in all other cells.
-To some extent, this mitigates the loss of power for expressed genes in rare subpopulations, allowing the cells to be correctly classified.
-
-```{r}
-set.seed(100)
-
-# All of the standard genes, again.
-sim <- standardSetup(5000, 500)
-counts <- sim$counts
-is.spike <- sim$is.spike
-
-# Adding some genes not present in a small (1%) subpopulation.
-extrasim <- standardSetup(500, 0)
-subcounts <- extrasim$counts
-subcounts[,1:10] <- 0
-chosen <- nrow(counts) + seq_len(nrow(subcounts))
-counts <- rbind(counts, subcounts)
-is.spike <- c(is.spike, logical(nrow(subcounts)))
-
-# CV2 detects a few.
-out <- technicalCV2(counts, is.spike, sf.cell=rep(1, nsamples), sf.spike=rep(1, nsamples))
-plot(out$mean, out$cv2, log="xy")
-points(out$mean, out$trend, col="red", pch=16, cex=0.5)
-sum(out$FDR[chosen] <= 0.05)
-
-# Log-variances detects more.
-lcounts <- log2(counts+1)
-fit <- trendVar(lcounts[is.spike,])
-ref <- decomposeVar(lcounts, fit)
-plot(ref$mean, ref$total)
-o <- order(ref$mean)
-lines(ref$mean[o], ref$tech[o], col="red", lwd=2)
-sum(ref$FDR[chosen] <= 0.05)
-sum(ref$FDR[chosen] <= 0.05 & ref$bio[chosen]>0.5)
-```
 
 In short, the final recommendation is to use the log-based methods for initial exploration, because it's better at recovering major features in the data.
 You can then switch to `technicalCV2` when pulling out rare subpopulations.
+Also check out https://github.com/MarioniLab/MiscellaneousCode/tree/master/HVG2017 for simulation details used to get to the conclusions above.
 
 ## Biological interpretion of HVGs
 
