@@ -135,12 +135,15 @@ lines(comp$mean[o], comp$tech[o], col="red", pch=16, cex=0.5)
 ```
 
 Note that directly filtering on the log-means is _technically_ correct, in that it's independent of HVG detection.
-However, it's possible for genes to have very small log-means and very large variances, e.g., if you have a rare subpopulation with a very strongly expressed gene.
-Filtering on the log-means would discard such genes, which we don't want to do.
+That probably doesn't matter much, though, given that we filter on the means in `voom` prior to _limma_ anyway.
 
-Note that `technicalCV2` can reject the null at any average count.
-This is because it is possible to obtain arbitrarily large CV^2^ values for infintesimally small means.
-However, this mainly picks up genes with outlier expression profiles, which probably aren't interesting in most applications.
+The critical mean point for `technicalCV2` is dependent on the shape of the technical trend.
+The CV^2^ is capped and -- at some point, as the mean decreases -- the trend will pass the cap, preventing detection of genes with lower means.
+Here, the choice of mean filter is directly independent of any test against the trend.
+
+Finally, if you consider the "at least _n_" filter, it is possible to get arbitrarily significant HVGs in either method if you pump up the counts in _n-1_ cells.
+Conversely, the genes expressed below the mean filter are constrained in how significant they can be (see above).
+The choice between the two, then, seems obvious if you want to detect HVGs (i.e., "uninteresting" genes are those driven by technical noise).
 
 ## Justification on other grounds
 
@@ -165,12 +168,6 @@ In the deconvolution method, you can consider the threshold multiplied by the mi
 This gives us pooled counts of around `20*1` for read data, which should be large enough to avoid the above problems for NB dispersions below 0.5.
 For UMI data, we get pooled counts of `20*0.1` -- however, the variability is near-Poisson anyway, so variability and bias in the ratio should be okay.
 In general, the maximum bias seems to be about 20%, which is probably tolerable if the data set is dominated by genes in the the high-abundance peak.
-
-## More comments on the "at least _n_" filter
-
-Another consideration is that the expected number of zeros is a function of both the mean and the dispersion.
-If you're just interested in abundance, then you want to filter directly on the mean, without getting interference from the dispersion.
-That said, I don't think it really matters, the only purpose is to prune out some genes before HVG detection.
 
 ## Saving the original data
 
