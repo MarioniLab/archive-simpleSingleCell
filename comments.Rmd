@@ -43,7 +43,14 @@ This reduces the resolution for where the threshold would usually be.
 There's an implicit assumption that these technical metrics are homogeneous across cells.
 That won't be true for extreme cases like erythrocytes, where the "outliers" would just be a genuine biological clustering.
 It also won't be true for batches with known differences in experimental processing, e.g., sequencing at different depth or had different amounts of spike-in added.
-This can be handled to some extent using the `block` argument in the `isOutlier` function.
+
+Systematic differences in QC metrics can be handled to some extent using the `batch` argument in the `isOutlier` function.
+This is obviously useful for technical batch effects; it may also be useful if a cell type has systematically fewer expressed genes or lower RNA content.
+Analyzing all cell types together would inflate the MAD and compromise QC at best, or lead to the entire loss of one cell type at worst.
+
+I'm not sure there's a good automatic way to distinguish between low quality cells and those from a different cell type when heterogeneous QC metrics are observed.
+This also extends to the expression profiles, because the whole point is that poor sample preparation affects the observed expression in ways that are difficult to normalize.
+The only solution is to set some hard absolute threshold (to distinguish between relatively poor and absolutely poor), and this requires a _lot_ of context.
 
 # Cell cycle classification comments
 
@@ -158,6 +165,12 @@ In the deconvolution method, you can consider the threshold multiplied by the mi
 This gives us pooled counts of around `20*1` for read data, which should be large enough to avoid the above problems for NB dispersions below 0.5.
 For UMI data, we get pooled counts of `20*0.1` -- however, the variability is near-Poisson anyway, so variability and bias in the ratio should be okay.
 In general, the maximum bias seems to be about 20%, which is probably tolerable if the data set is dominated by genes in the the high-abundance peak.
+
+## More comments on the "at least _n_" filter
+
+Another consideration is that the expected number of zeros is a function of both the mean and the dispersion.
+If you're just interested in abundance, then you want to filter directly on the mean, without getting interference from the dispersion.
+That said, I don't think it really matters, the only purpose is to prune out some genes before HVG detection.
 
 ## Saving the original data
 
