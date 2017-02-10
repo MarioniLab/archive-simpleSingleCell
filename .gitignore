@@ -10,7 +10,6 @@ counttable_es.csv
 expression_mRNA_17-Aug-2014.txt
 expression_mito_17-Aug-2014.txt
 expression_spikes_17-Aug-2014.txt
-figure/
 hsc_cor.tsv
 hsc_data.rds
 hsc_hvg.tsv
@@ -19,7 +18,6 @@ nbt.3102-S7.xlsx
 old.md
 th2_data.rds
 workflow.html
-workflow.md
 workflow.Rmd
 existing/
 

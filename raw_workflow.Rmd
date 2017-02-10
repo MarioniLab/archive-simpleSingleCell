@@ -971,7 +971,7 @@ for (block in c("1", "-1")) {
     var.out <- collected[[block]]
     plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression", 
         ylab="Variance of log-expression", main=ifelse(block=="1", "Male", "Female"))
-    points(var.out$mean[iSpike(sce)], var.out$total[isSpike(sce)], col="red", pch=16)
+    points(var.out$mean[isSpike(sce)], var.out$total[isSpike(sce)], col="red", pch=16)
     o <- order(var.out$mean)
     lines(var.out$mean[o], var.out$tech[o], col="red", lwd=2)
 }
