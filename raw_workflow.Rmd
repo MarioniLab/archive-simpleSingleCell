@@ -937,7 +937,16 @@ Blocking on these factors may be necessary to account for batch effects that are
 We identify HVGs that may be involved in driving population heterogeneity.
 This is done by fitting a trend to the technical variances for the spike-in transcripts.
 We compute the biological component of the variance for each endogenous gene by subtracting the fitted value of the trend from the total variance.
-To account for uninteresting factors, we can supply `design` to `trendVar` to regress out any technical differences due to sex.
+To account for uninteresting factors, we supply `design` to `trendVar` to regress out any technical differences due to sex.
+HVGs are then detected in the same manner as described in the HSC data analysis.
+
+```{r}
+var.fit.des <- trendVar(cur.sce, trend="loess", span=0.4, design=design)
+var.out.des <- decomposeVar(cur.sce, var.fit.des)
+hvg.out.des <- var.out.des[which(var.out.des$FDR <= 0.05 & var.out.des$bio >= 0.5),]
+nrow(hvg.out.des)
+```
+
 Alternatively, for data sets containing multiple batches, a more robust strategy is to perform trend fitting and variance decomposition separately for each batch.
 This accommodates differences in the mean-variance trends between batches, especially if a different amount of spike-in RNA was added to the cells in each batch.
 We demonstrate the second approach below by treating each sex as a different "batch".
@@ -957,7 +966,7 @@ rm(cur.sce)
 gc()
 ```
 
-Figure ((hvgplotbrain)) suggests that the trend is fitted accurately to the technical variances.
+Figure ((hvgplotbrain)) suggests that the trend is fitted accurately to the technical variances for each sex.
 Errors in fitting are negligible due to the precision of the variance estimates in a large dataset containing thousands of cells.
 The technical and total variances are also much smaller than those in the HSC dataset.
 This is due to the use of UMIs which reduces the noise caused by variable PCR amplification.
