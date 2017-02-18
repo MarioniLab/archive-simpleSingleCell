@@ -941,8 +941,8 @@ To account for uninteresting factors, we supply `design` to `trendVar` to regres
 HVGs are then detected in the same manner as described in the HSC data analysis.
 
 ```{r}
-var.fit.des <- trendVar(cur.sce, trend="loess", span=0.4, design=design)
-var.out.des <- decomposeVar(cur.sce, var.fit.des)
+var.fit.des <- trendVar(sce, trend="loess", span=0.4, design=design)
+var.out.des <- decomposeVar(sce, var.fit.des)
 hvg.out.des <- var.out.des[which(var.out.des$FDR <= 0.05 & var.out.des$bio >= 0.5),]
 nrow(hvg.out.des)
 ```
