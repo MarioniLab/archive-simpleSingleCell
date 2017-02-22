@@ -62,6 +62,13 @@ Their lack of expression relative to other genes will make them informative pair
 
 ## Explaining poor performance on the brain data set
 
+The main reason for poor performance is probably because the training data is different from the test data.
+Consider the classifier trained on gene count data for one short gene A and one long gene B.
+In G1, B is silent and A is strongly expressed, while in all other phases, B's expression is non-zero (lower molarity than A, but higher CPM due to length).
+In read count data, this gene pair would be selected as A > B in G1 and B > A in all other phases.
+However, in UMI data, this gene pair would not be informative as A > B in terms of molecule counts in all phases.
+I use gene length as an example here but similar effects are observed with mappability, sequenceability, etc.
+
 Another possible contributor to poor performance is the difference in the cells used for training and those in the test data.
 If certain expression patterns are associated with the cell cycle in the training set (of mouse embryonic stem cells), these may be incorporated into the classifier.
 However, if those patterns are not associated with the cell cycle in the test data, their inclusion will add noise without providing any phase information.
@@ -273,8 +280,12 @@ These two components are independent of each other within each gene -- you can t
 If 'p' is decently large (>10%), we're likely to have problems, so the corresponding factor will be need to be regressed out.
 Of course, blocking on factors introduces more assumptions and points of failure to the analysis (e.g., linearity in the covariates).
 If the model is misspecified, you can end up with spurious patterns in the residuals - possibly larger than that caused by the technical bias in the first place.
-This is compounded by the presence of zeroes, non-normality and heteroskedasticity, etc.
-Thus, blocking should be performed sparingly, rather than being performed by default.
+This is compounded by the presence of zeroes, non-normality and heteroskedasticity, etc. when you use linear models.
+Thus, blocking should be performed sparingly, rather than by default.
+
+In fact, separating the data into batches, running analyses on each batch and combining them may be safer if the batches are likely to be very different.
+This avoids the misapplication of normalization assumptions in `removeBatchEffect` to these data.
+This approach is illustrated in the HVG detection section for the brain data, and is done by default for one-way layouts in `correlatePairs`.
 
 ## Misspecifying the model when running `removeBatchEffect`
 
@@ -300,8 +311,8 @@ Problems would only occur when you try to regress out uninteresting biological e
 
 The mean-variance trend for log-expression values is more complex and difficult to fit than that of other approaches.
 But we can do it, so it's a technical challenge rather than a philosophical one.
-
 The thin line to the left is a mathematical artifact when you have discrete counts.
+
 - the variance will increase as a concave quadratic when you can only choose between 0 and 1 (low 'p' increases with fixed 'n' in a binomial RV).
 - the variance will increase as a convex quadratic with the mean, if variance is driven by an outlier and everything else is 0.
 
@@ -314,17 +325,17 @@ So, if you set the standard error to 1/sqrt(2), the distance would become 1 (i.e
 Setting this threshold avoids selecting genes with high fold changes above the technical variance, but small absolute total variances.
 Such genes are more likely to be true positives but also less likely to be strongly variable and biologically interesting.
 
-(Of course, genes driving separation of rare subpopulations would have variances below 0.5.
+Of course, genes driving separation of rare subpopulations would have variances below 0.5.
 Even if the log-fold changes between subpopulations is strong, the average squared difference across all cells would be low.
-However, you've got to draw the line somewhere, otherwise you'll end up with lots of genes with really homogenous expression profiles, and irrelevant noise during PCA, etc.
-I guess this is just the price that needs to be paid before you can go on and do clustering to explicitly identify subpopulations.)
+However, without a threshold, you would select many genes with minor increases in variability that won't contribute to downstream analyses.
+This is particularly pertinent for UMIs where everything is generally above the trend; without a threshold, all genes may end up being selected.
 
 The threshold is a bit informal, but that's okay.
-The DM, for example, is no better, and Brennecke has that +0.25 value that isn't very interpretable).
+The DM, for example, is no better, and Brennecke has that +0.25 value that isn't very interpretable.
 In and of themselves, HVGs are not of interest -- rather, they prioritise genes for more interesting analyses, e.g., clustering, correlation and gene set analyses.
 If HVG detection is considered as a screen, it is better to focus on potentially interesting (but possibly false) genes rather than true and uninteresting ones.
 
-To this end, it is permissible to relax the FDR for detecting HVGs, especially if you didn't get anything interesting things with a low threshold.
+To this end, it is also permissible to relax the FDR for detecting HVGs, especially if you didn't get anything interesting things with a low threshold.
 Of course, this would also increase the amount of genes dominated by technical noise later on, so it's not preferable if you can avoid it.
 One could argue that this is not problematic if you just get more low-variability genes, as these don't contribute much to relative differences betwen cells.
 However, technical noise is still high (in absolute terms) and there are a lot more of them, so it would probably still mess up the results.
