@@ -40,8 +40,9 @@ This reduces the resolution for where the threshold would usually be.
 
 ## Assumptions of outlier identification
 
-There's an implicit assumption that these technical metrics are homogeneous across cells.
-That won't be true for extreme cases like erythrocytes, where the "outliers" would just be a genuine biological clustering.
+There's an implicit assumption that these technical metrics are homogeneous across cell subtypes and states.
+This ensures that outliers are not driven by biological differences and must represent aberrant libraries.
+However, this assumption won't be true for extreme cases like erythrocytes, where the "outliers" would just be a genuine biological clustering.
 It also won't be true for batches with known differences in experimental processing, e.g., sequencing at different depth or had different amounts of spike-in added.
 
 Systematic differences in QC metrics can be handled to some extent using the `batch` argument in the `isOutlier` function.
@@ -51,6 +52,11 @@ Analyzing all cell types together would inflate the MAD and compromise QC at bes
 I'm not sure there's a good automatic way to distinguish between low quality cells and those from a different cell type when heterogeneous QC metrics are observed.
 This also extends to the expression profiles, because the whole point is that poor sample preparation affects the observed expression in ways that are difficult to normalize.
 The only solution is to set some hard absolute threshold (to distinguish between relatively poor and absolutely poor), and this requires a _lot_ of context.
+
+In general, it seems better to block on more factors rather than fewer, to avoid MAD inflation and improve outlier identification.
+The risk is that you'll lose more cells within each batch because the MAD is smaller, such that an uncommon subset of (high-quality) cells end up being removed.
+However, you should never expect to encounter this situation under the homogeneity assumption.
+If that assumption fails, then the concept of low-quality cells being outliers is inherently invalid.
 
 # Cell cycle classification comments
 
@@ -175,6 +181,29 @@ In the deconvolution method, you can consider the threshold multiplied by the mi
 This gives us pooled counts of around `20*1` for read data, which should be large enough to avoid the above problems for NB dispersions below 0.5.
 For UMI data, we get pooled counts of `20*0.1` -- however, the variability is near-Poisson anyway, so variability and bias in the ratio should be okay.
 In general, the maximum bias seems to be about 20%, which is probably tolerable if the data set is dominated by genes in the the high-abundance peak.
+
+## Why use `calcAverage`?
+
+The mean can be calculated from the raw counts, or after adjustment for library size.
+The latter seems to be more precise as it avoids domination of the calculation by large cells, i.e., the amount of information contributed by each cell is more similar.
+An obvious question, though, is why we use the library size instead of the size factor.
+This is mainly a chicken-and-egg problem, because we need to filter before we normalize.
+
+In practice, it doesn't really matter whether the library sizes or size factors are used.
+Consider a gene with count $Y$, with library sizes $L$ and size factors $S$.
+Assume that $Y= uS + e$ for constant mean $u$ and gene-/library-specific error $e$, and that $L = MS$ for a library-specific modifier $M$.
+(In other words, the library sizes oscillate around the true size factors, which seems to be the case in most data sets.
+ We note that $E(M)=1$ as we have scaled the library sizes to have a mean of unity.)
+If we compute the library size-corrected average, we get:
+
+$$
+E(Y/L) = E((uS+e)/MS) = E(u/M) + 0 = uE(1/M)
+$$
+
+... given that $E(e)=0$ and assuming $e$ and $SM$ are independent (this holds even for the second-order Taylor expansion).
+In other words, the library size-corrected average should be proportional to the true average, where the scaling factor is constant for all genes.
+This means that you should recover more-or-less the same order of genes using either average as the filter statistic.
+At a fixed threshold, $E(1/M) > 1$ so more genes are probably retained than should be if filtering on $u$ - oh well.
 
 ## Saving the original data
 
