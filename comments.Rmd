@@ -212,7 +212,12 @@ At a fixed threshold, $E(1/M) > 1$ so more genes are probably retained than shou
 It's also good practice to save the full data set before filtering.
 This is because the filtered genes in one context (e.g., for the full data set) might not be of the greatest interest in another context (e.g., with a subset of the data).
 A prime example would be in iterative clustering, or when looking at subgroups.
-In such cases, it's useful to filter and process everything afresh.
+In such cases, it's useful to filter and process everything afresh for each cluster or subgroup.
+
+Of course, you could argue that you'd avoid these problems by not filtering at all.
+Instead, you could use the selected subset of genes in each step via `subset.row`.
+This is possible but it is tedious to specify when you have the same or similar set of genes passing through each step of the workflow.
+Obviously, not doing any filtering or selection would be troublesome, e.g., when low-count genes get standardized to large variances in PCA.
 
 # Normalization comments
 
@@ -738,12 +743,13 @@ head(ruv.out$W)
 ```
 
 In general, we prefer using the `cyclone`-based approach for phase identification and blocking.
-This is because the expression of cell cycle genes may be affected by other biological/experimental factors at the single-cell level.
+This is because the expression of some cell cycle genes may be affected by other biological/experimental factors at the single-cell level, 
+much like how the cell cycle affects the expression of non-cell cycle genes.
 As a result, the inferred factors of variation may include interesting differences between cells, such that blocking on those factors would result in loss of detection power.
 `cyclone` calls the phase for each cell separately and is more robust to systematic (non-cell-cycle-related) differences between cells.
 
 The obvious example would be if cells in the same phase had different amounts of expression for cell cycle genes, corresponding to some other factor (e.g., treatment).
 This would get picked up as a hidden factor of variation, leading to loss of power to detect that other factor.
 In contrast, cyclone wouldn't care as the relative amounts of expression within each cell would be the same for all cells, leading to correct calling of phase.
-
-
+Using `scLVM` would also work as this would learn the interesting factors of variation and block on them to avoid them getting regressed out with cell cycle phase.
+However, that kind of model is notoriously finicky due to the large numbers of moving parts.
