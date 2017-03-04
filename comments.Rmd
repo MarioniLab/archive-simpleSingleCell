@@ -95,70 +95,7 @@ This is because the HVG screen would throw out low-abundance genes, so you might
 The disadvantage is if the HVG screen depends on significance, in which case the low abundances would increase the severity of the MTC.
 This could be mild (~20% increase in the p-value) or quite severe (2-3-fold), depending on how many annotated genes are retained.
 The worst case occurs if you had mild contamination so that every gene had a count of one - you'd retain too many uninteresting genes if you just filtered on non-zero totals.
-
-To this end, the choice of filter is guided by the upper bound of the variance compared to the expected amount of technical noise.
-The variance is bounded as the counts must be non-negative, so a gene with a low mean count can only achieve a particular variance (of the logs).
-Below, we use linear programming to identify the maximum variance of logs at any specified mean of logs/mean of counts. 
-We optimize over the proportions of cells with counts from 0 to 200.
-
-```{r}
-library(lpSolve)
-counts <- 0:200
-lmeanfun <- log2(counts+1)
-meanfun <- counts
-
-sumfun <- rep(1, length(counts))
-sumval <- 1
-posfun <- diag(length(counts))
-
-collected <- list()
-for (meanval in 1:100/100) {
-    for (lmeanval in 1:100/100) {
-        lvarfun <- (log2(counts+1) - lmeanval)^2
-        out <- lp(direction="max", objective.in=lvarfun, 
-                const.mat=rbind(meanfun, lmeanfun, sumfun, posfun), 
-                const.dir=c("=", "=", "=", rep(">=", length(counts))),
-                const.rhs=c(meanval, lmeanval, sumval, rep(0, length(counts))))
-        if (out$objval==0) { next }
-        collected[[length(collected)+1]] <- c(lmeanval, meanval, out$objval)
-    }
-}
-collected <- do.call(rbind, collected)
-```
-
-In the HVG data set, an average count of 1 corresponds to a maximum variance of around 1.
-The technical noise is around about this much anyway, so it makes no sense to keep genes with lower average counts, because they just wouldn't be called as HVGs.
-We could be more stringent and require some minimum increase above the technical noise, but we won't do that.
-
-```{r}
-plot(collected[,1], collected[,3], xlim=c(0, 1), ylim=c(0, 1))
-comp <- read.table("hsc_hvg.tsv", header=TRUE)
-o <- order(comp$mean)
-lines(comp$mean[o], comp$tech[o], col="red", pch=16, cex=0.5)
-```
-
-Similar logic applies in the brain data set.
-Here, the technical noise is lower, so we set a smaller filter.
-It depends somewhat on whether you want to extrapolate the trend with `rule=2` or as a line passing through the origin.
-In both cases, though, it's safe to say that the maximum variances are comparable to the trend.
-
-```{r}
-plot(collected[,1], collected[,3],xlim=c(0, 1), ylim=c(0, 1), cex=ifelse(collected[,2] < 0.1, 1, 0))
-comp <- read.table("brain_hvg.tsv", header=TRUE)
-o <- order(comp$mean)
-lines(comp$mean[o], comp$tech[o], col="red", pch=16, cex=0.5)
-```
-
-Note that directly filtering on the log-means is _technically_ correct, in that it's independent of HVG detection.
-That probably doesn't matter much, though, given that we filter on the means in `voom` prior to _limma_ anyway.
-
-The critical mean point for `technicalCV2` is dependent on the shape of the technical trend.
-The CV^2^ is capped and -- at some point, as the mean decreases -- the trend will pass the cap, preventing detection of genes with lower means.
-Here, the choice of mean filter is directly independent of any test against the trend.
-
-Finally, if you consider the "at least _n_" filter, it is possible to get arbitrarily significant HVGs in either method if you pump up the counts in _n-1_ cells.
-Conversely, the genes expressed below the mean filter are constrained in how significant they can be (see above).
-The choice between the two, then, seems obvious if you want to detect HVGs (i.e., "uninteresting" genes are those driven by technical noise).
+See https://github.com/miscellaneousCode/filtering2017/justification.Rmd for a more detailed discussion.
 
 ## Justification on other grounds
 
@@ -167,22 +104,20 @@ This makes them uninteresting as they're unlikely to be related to any genuine b
 One could even go so far as to say that genes that aren't expressed much are likely to be irrelevant to the phenotype.
 Of course, there's likely to be a couple of low-abundance genes that (a) are important and (b) vary noticeably across cells.
 However, this is probably the exception rather than the rule; getting hammered by the MTC and other statistical problems to squeeze these genes out seems suboptimal.
+Genes that are low-abundance due to being expressed in rare populations are best handled with iterative clustering.
 
 Note that this reasoning has nothing to do with the rectangular component on the plot.
 That component just represents the bunch of genes with near-zero expression, as the log-transform spreads them out across a larger range for greater resolution. 
 Thus, if you want to get rid of low-abundance genes, you should be setting your filter threshold somewhere within this component.
 Otherwise, if it's too high, you might end up removing the bulk of moderately-expressed genes.
+The rectangular component also represents the lower-density part of the (log-)abundance interval, which reduces the senstivity of the analysis to the threshold choice.
+Minor changes in the threshold will not retain/remove as many genes as one would have if the threshold was set in the moderate-to-high-abundance peak.
 
-An additional motivation is to protect the normalization machinery from low-abundance genes.
+Filtering also protects the normalization machinery from low-abundance genes (see https://github.com/miscellaneousCode/filtering2017/justification.Rmd for details).
 Most ratio-based normalization methods will be messed up by low counts, because the count:mean ratios for low-abundance genes will be more variable (CV^2^ is higher).
 Many methods also use a robust average like the median to approximate the mean count.
 The median of the count:mean ratio should thus be near the true size factor, but this is only accurate for NB distributions with large means.
 It could also be argued that you should do the analysis using only the genes used for normalization, lest there be other biases in the filtered genes.
-
-In the deconvolution method, you can consider the threshold multiplied by the minimum pool size (20 cells by default) as the minimum pooled count.
-This gives us pooled counts of around `20*1` for read data, which should be large enough to avoid the above problems for NB dispersions below 0.5.
-For UMI data, we get pooled counts of `20*0.1` -- however, the variability is near-Poisson anyway, so variability and bias in the ratio should be okay.
-In general, the maximum bias seems to be about 20%, which is probably tolerable if the data set is dominated by genes in the the high-abundance peak.
 
 ## Why use `calcAverage`?
 
