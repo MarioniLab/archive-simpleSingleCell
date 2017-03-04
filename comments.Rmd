@@ -345,26 +345,27 @@ This is harder to do with PCs, which are more abstract analytical entities.
 
 ## Pros and cons of using log-count variances over CV^2^
 
-Log-count variances are also more consistent with downstream applications.
+Log-count variances are more consistent with downstream applications.
 For example, PCA and t-SNE are applied on the log-values, as is visualization of expression with boxplots or violin plots.
 Making the latter with genes identified as HVGs from CV2 would give outliers that get shrunk upon log-transformation.
 Indeed, the variance of the log-values provides a measure of the log-fold change between cells, which is arguably more relevant than the absolute differences in expression.
 
-With CV^2^ you pick up a lot of genes expressed in few cells, which can be a pain for downstream analyses.
-Most directly, it means that the HVG list isn't easily interpretable if you have to manually weed out a lot of uninteresting genes.
-It also disrupts identification of trajectories, as well as clustering of large but subtle populations 
-(i.e., subpopulations consisting of many cells, which are poorly separated from neighbouring subpopulations). 
-This is because the relevant genes don't get picked up if the mean is decently large -- or, if they do get picked up, they get dominated by noise from outliers.
-Of course, this is all relative -- for strong trajectories or clear subpopulations, both methods should perform well.
+As mentioned, the CV^2^ is sensitive to high outlier expression in few cells, which are difficult to trust.
+This can be due to technical reasons, e.g., due to variable capture/amplification noise for that gene or low-quality cells that slip through QC.
+This may also be biological but uninteresting, e.g., due to transcriptional bursting whereby one cell has a lot more than others at that point in time.
+In any case, this can be a pain for downstream analyses as the HVG list isn't easily interpretable if you have to manually weed out a lot of uninteresting genes.
+It can also interfere with identification of trajectories and clustering if a lot of irrelevant outliers are picked up and used.
 
 On the other hand, as a result of the robustness to outliers, detection power of the log-based method is reduced for HVGs driven by rare subpopulations.
 It is difficult to detect these with the log-based method, given that uniquely expressed genes with a near-infinite fold-change are already hard to pick up. 
-CV^2^-based methods do better, thought they are also less effective at detecting HVGs for subpopulations characterised by a loss of expression.
+CV^2^-based methods do better, though they are also less effective at detecting HVGs for subpopulations characterised by a loss of expression.
 This is probably because the mean is already large, which limits the scale of the change in the CV^2^.
+(The point at which rare populations cease to be outliers is very blurry, though, and requires orthogonal techniques to validate.
+Increasing the number of cells demonstrates reproducibility but not relevance if the outlier generation rate is the same.)
 
 In short, the final recommendation is to use the log-based methods for initial exploration, because it's better at recovering major features in the data.
 You can then switch to `technicalCV2` when pulling out rare subpopulations.
-Also check out https://github.com/MarioniLab/MiscellaneousCode/tree/master/HVG2017 for simulation details used to get to the conclusions above.
+Check out https://github.com/MarioniLab/MiscellaneousCode/tree/master/HVG2017 for simulation details used to get to the conclusions above.
 
 ## Biological interpretion of HVGs
 
