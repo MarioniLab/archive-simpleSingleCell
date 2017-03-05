@@ -680,12 +680,12 @@ head(ruv.out$W)
 
 In general, we prefer using the `cyclone`-based approach for phase identification and blocking.
 This is because the expression of some cell cycle genes may be affected by other biological/experimental factors at the single-cell level, 
-much like how the cell cycle affects the expression of non-cell cycle genes.
+much like how the cell cycle affects the expression of non-cell cycle genes in the first place.
 As a result, the inferred factors of variation may include interesting differences between cells, such that blocking on those factors would result in loss of detection power.
 `cyclone` calls the phase for each cell separately and is more robust to systematic (non-cell-cycle-related) differences between cells.
 
 The obvious example would be if cells in the same phase had different amounts of expression for cell cycle genes, corresponding to some other factor (e.g., treatment).
 This would get picked up as a hidden factor of variation, leading to loss of power to detect that other factor.
-In contrast, cyclone wouldn't care as the relative amounts of expression within each cell would be the same for all cells, leading to correct calling of phase.
-Using `scLVM` would also work as this would learn the interesting factors of variation and block on them to avoid them getting regressed out with cell cycle phase.
+In contrast, `cyclone` wouldn't care as long as the relative amounts of expression of cell cycle genes (or more robustly, their ranked expression) within each cell are unchanged.
+Using `scLVM` would also work as it would learn the interesting factors of variation and block on them to avoid them getting regressed out with cell cycle phase.
 However, that kind of model is notoriously finicky due to the large numbers of moving parts.
