@@ -211,6 +211,11 @@ The log-transformation provides some measure of variance stabilization for NB-di
 This seems better than square-rooting it, which is the VST for the Poisson only.
 I guess you could play around with various Box-Cox transformations, but the mean-variance trend is pretty extreme and probably won't go away just by changing lambda.
 
+I also considered scaling the log-expression to downweight genes with high technical noise.
+The problem is that this implicitly upweights genes with low technical noise but also low total variance.
+As a result, your scaled log-expression values might be dominated by biological variability that was originally minor.
+While you could also scale based on the biological component, this would downweight interesting genes with high genuine variance.
+
 ## Dealing with dropouts 
 
 The difficulty with dealing with dropouts is that you don't know whether a zero count is a true dropout or due to a genuine lack of expression.
@@ -276,6 +281,13 @@ With all that being said, correction is probably the lesser of two evils if you 
 It shouldn't matter for technical effects that are largely orthogonal to population structure (e.g., balanced designs).
 Problems would only occur when you try to regress out uninteresting biological effects that might have some composition differences.
 
+## Sparse matrices for high dropout data
+
+This is immediately appealing as it could save a lot of space.
+The problem is that corrected data will not be sparse.
+The log-transformation can be sparse if the pseudo-count is 1, but if batch correction needs to be performed, that's no longer possible.
+In any case, PCA in its true form doesn't work for sparse matrices because you need to centre (though if you only use HVGs, that should be few enough to densify).
+
 # HVG detection comments
 
 ## Trend fitting to variances of the log-counts
@@ -321,16 +333,20 @@ This will immediately summarize genes into correlated _and_ highly variable axes
 The problem is that it doesn't properly model technical noise.
 The expression profile of every gene gets scaled to a unit variance, even if they are fully driven by technical noise.
 Sure, noise should be random but it will still affect the quality of the PCs that you pull out.
-(If you don't scale, then the selection of genes will be dominated by the mean-variance relationship.)
+(On th other hand, if you don't scale, then the selection of genes will be dominated by the mean-variance relationship.)
+
+Detecting significant correlations beforehand is also useful for minimizing error in the identified loading vector.
+The example below considers a small subset of correlated genes in the midst of uncorrelated noise (biological or technical).
+Clearly, the correct placing is more accurately recovered when only the correlated genes are used.
 
 ```{r}
 par(mfrow=c(1,2))
-loc <- 1:100/100 # True placement of cells
-a1 <- matrix(jitter(rep(loc, 50)), nrow=50, byrow=TRUE) # Correlated genes
-x1 <- prcomp(t(a1))
+loc <- 1:100/10 # True placement of cells
+a1 <- matrix(jitter(rep(loc, 10)), nrow=10, byrow=TRUE) # Correlated genes
+x1 <- prcomp(t(a1), scale=TRUE)
 plot(x1$x[,1]) # Should be on the diagonal
-a2 <- rbind(a1, matrix(rnorm(100000), ncol=100)) # Adding uncorrelated noise
-x2 <- prcomp(t(a2))
+a2 <- rbind(a1, matrix(runif(100000), ncol=100)) # Adding uncorrelated noise
+x2 <- prcomp(t(a2), scale=TRUE)
 plot(x2$x[,1]) # Correct placing is disrupted
 ```
 
