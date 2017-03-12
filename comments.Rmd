@@ -329,35 +329,29 @@ Log-expression values are a lot more normal-looking than the raw counts, due to 
 ## Why not use PCA?
 
 An alternative to feature selection by detecting correlated HVGs is to simply take the first set of PCs.
-This will immediately summarize genes into correlated _and_ highly variable axes.
-The problem is that it doesn't properly model technical noise.
-The expression profile of every gene gets scaled to a unit variance, even if they are fully driven by technical noise.
-Sure, noise should be random but it will still affect the quality of the PCs that you pull out.
-(On th other hand, if you don't scale, then the selection of genes will be dominated by the mean-variance relationship.)
+This will immediately summarize genes into correlated _and_ highly variable axes, which is more direct than our approach.
+There are, however, several problems with just using PCA by itself:
 
-Detecting significant correlations beforehand is also useful for minimizing error in the identified loading vector.
-The example below considers a small subset of correlated genes in the midst of uncorrelated noise (biological or technical).
-Clearly, the correct placing is more accurately recovered when only the correlated genes are used.
+- Choosing the number of components to keep is not trivial.
+A choice of 20 might be good in some circumstances and insufficient in others, especially if you have lots of non-linearity.
+We have a decent stopping criterion based on the amount of technical noise, but this still requires HVG calling.
+- Another consideration is interpretability.
+The nature of HVGs and correlations is easy to understand and can be used in intermediate steps (e.g., to build regulatory networks, to compare heterogeneity).
+This is harder to do with PCs, which are more abstract analytical entities.
+- Lots of noise will cause some problems for PCA, even if that noise is random - see the simulation below.
+This is usually too subtle to affect the identities of the earliest PCs, as random noise should belong in later PCs in all but pathological scenarios.
+However, it can interfere with the choice of the number of PCs (see https://github.com/MarioniLab/MiscellaneousCode/tree/master/prePCA2017 for details).
 
 ```{r}
 par(mfrow=c(1,2))
-loc <- 1:100/10 # True placement of cells
-a1 <- matrix(jitter(rep(loc, 10)), nrow=10, byrow=TRUE) # Correlated genes
+loc <- 1:100 # True placement of cells
+a1 <- matrix(rep(loc, 10), nrow=10, byrow=TRUE) # A small subset of correlated genes
 x1 <- prcomp(t(a1), scale=TRUE)
 plot(x1$x[,1]) # Should be on the diagonal
-a2 <- rbind(a1, matrix(runif(100000), ncol=100)) # Adding uncorrelated noise
+a2 <- rbind(a1, matrix(runif(100000), ncol=100)) # Adding many genes with uncorrelated noise
 x2 <- prcomp(t(a2), scale=TRUE)
 plot(x2$x[,1]) # Correct placing is disrupted
 ```
-
-A related problem is if the technical noise is correlated between genes, e.g., due to incomplete normalization of biases.
-This would show up as an earlier PC if all genes are affected.
-Formal selection of HVGs should reduce this problem by enriching for genes with biological variation.
-The PCs are also less robust to outliers compared to the use of Spearman's rho.
-
-Another consideration is interpretability.
-The nature of HVGs and correlations is easy to understand and can be used in intermediate steps (e.g., to build regulatory networks, to compare heterogeneity).
-This is harder to do with PCs, which are more abstract analytical entities.
 
 ## Pros and cons of using log-count variances over CV^2^
 
