@@ -7,7 +7,7 @@ author:
       affiliation: EMBL European Bioinformatics Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SD, United Kingdom; St Vincent's Institute of Medical Research, 41 Victoria Parade, Fitzroy, Victoria 3065, Australia
     - name: John C. Marioni
       affiliation: Cancer Research UK Cambridge Institute, Li Ka Shing Centre, Robinson Way, Cambridge CB2 0RE, United Kingdom; EMBL European Bioinformatics Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SD, United Kingdom; Wellcome Trust Sanger Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SA, United Kingdom
-date: 20 January 2017
+date: 14 March 2017
 vignette: >
     %\VignetteIndexEntry{A worfklow for low-level analyses of single-cell RNA-seq data}
     %\VignetteEngine{knitr::rmarkdown}
@@ -1055,10 +1055,10 @@ gc()
 ```
 
 The PCA plot is less effective at separating cells into many different clusters (Figure ((pcaplotbrain))).
-This is because the first two principal components are driven by strong differences between specific subpopulations, which reduces the resolution of more subtle differences between some of the other subpopulations.
+This is because the first two principal components (PCs) are driven by strong differences between specific subpopulations, which reduces the resolution of more subtle differences between some of the other subpopulations.
 Nonetheless, some substructure is still visible.
 
-```{r pcaplotbrain, fig.cap="PCA plots constructed from the normalized and corrected log-expression values of correlated HVGs for cells in the brain dataset. Each point          represents a cell and is coloured according to its expression of the top HVG (left) or _Mog_ (right).", fig.width=15, fig.height=6}
+```{r pcaplotbrain, fig.cap="PCA plots constructed from the normalized and corrected log-expression values of correlated HVGs for cells in the brain dataset. Each point represents a cell and is coloured according to its expression of the top HVG (left) or _Mog_ (right).", fig.width=15, fig.height=6}
 pca1 <- plotPCA(sce, exprs_values="norm_exprs", colour_by=top.hvg) + fontsize
 pca2 <- plotPCA(sce, exprs_values="norm_exprs", colour_by="Mog") + fontsize
 multiplot(pca1, pca2, cols=2)
@@ -1104,6 +1104,8 @@ heatmap.2(heat.vals, col=bluered, symbreak=TRUE, trace='none', cexRow=0.3,
 ```
 
 This heatmap can be stored at a greater resolution for detailed inspection later.
+It is advisable to verify the separatedness of the clusters using metrics such as the silhouette width or gap statistic (see the `r CRANpkg("cluster")` package for details).
+The same statistics can also be used to gauge the optimal parameter values (e.g., cut height, number of clusters) that maximize the separation between clusters.
 
 ```{r, results='hide'}
 pdf("brain_heat.pdf", width=10, height=100) # Large 'height' to show all gene names.
@@ -1118,6 +1120,17 @@ dev.off()
 Use Acrobat reader or zathura for linux (selecting gene names and looking a copied text works better than continually zooming in/out).
 -->
 
+A complementary approach is to perform PCA on the log-expression values for correlated HVGs and cluster on the first few PCs.
+This assumes that random technical noise in each gene will be represented by later PCs, while biological substructure involving coregulated groups of genes will contribute more variance and be represented by earlier PCs.
+The `denoisePCA` function will remove later PCs until the total discard variance is equal to the sum of technical components for all genes used in the PCA.
+This eliminates technical noise and enriches for biological signal in the remaining PCs, allowing for improved resolution during clustering.
+
+```{r}
+# Using the technical components computed with a design matrix.
+pcs <- denoisePCA(chosen.exprs, design=design, technical=var.out.des$trend) 
+dim(pcs) # Cluster on this instead of t(chosen.exprs)
+```
+
 When examining very heterogeneous datasets, it can be useful to repeat the HVG detection and clustering using only the cells within a particular cluster.
 This can be achieved by subsetting `sce` according to a particular level of `my.clusters`, and applying the same functions that were previously described.
 Doing so may identify a different set of correlated HVGs that define heterogeneity within the cluster, as opposed to those that define differences between clusters.
@@ -1127,6 +1140,7 @@ For simplicity, though, we will only use the broad clusters corresponding to cle
 ```{r echo=FALSE, results='hide'}
 gc()
 ```
+
 
 ## Detecting marker genes between subpopulations
 
