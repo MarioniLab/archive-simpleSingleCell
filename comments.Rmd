@@ -601,15 +601,12 @@ This means that the variance needs to be modelled across cells.
 For DE genes, any change will do, even if it only appears in a small percentage of cells of the subpopulation.
 This requires modelling of the variance across replicate instances of the entire subpopulation.
 
-That being said, testing for differential expression is not the best approach to identify marker genes.
-This is because marker genes are defined not just by a change in mean expression, but also low variability.
-Just testing for the former doesn't guarantee that it's not variable -- if the difference is strong enough, the null hypothesis will be rejected.
-The reasoning above only favours the rejection of genes with low variability across the population, which may or may not improve the ranking of candidate markers.
-
-Simultaneously testing for both criterions might seem like the solution.
-However, this raises the question of how much variability is too much, and the desirable trade-off with strong DE.
-In the most extreme case, you would look for genes that have the lowest variability.
-This would favour genes with weak DE that are poor marker candidates, especially for high-abundance genes expressed in both groups.
+In short, testing for differential expression is not the best approach to identify marker genes.
+If the difference is strong enough, the null hypothesis will be rejected, regardless of how variable the expression values might be.
+One might expect that DE analyses would at least rank good markers more highly if they have, e.g., strong log-fold changes and low variability.
+However, the implicit balance between variability and log-fold change is not well defined.
+A DE analysis will happily favour low-variability genes with weak DE - usually high-abundance genes expressed in both groups - that wouldn't be good markers.
+Conversely, good candidates that are heavily affected by technical noise may be triaged out.
 
 ```r
 set.seed(100)
@@ -637,8 +634,10 @@ LR1
 LR2
 ```
 
-In short, whether you sum across cells or model cell-to-cell variability directly, you'll still get bad candidate markers in the rankings.
-Strong markers should appear at the top no matter what you do, so perhaps that's reassuring.
+A rigorous test for markers would need to consider the variability explicitly, e.g., set a maximum overlap between the group-specific expression distributions.
+This might be too conservative, though, due to high levels of technical noise.
+If one perseveres with DE analyses, the only way to prune out bad markers is to inspect the distributions.
+However, strong markers with large log-fold changes should appear at the top of the list, regardless of whether you do summation or model cell-to-cell variability.
 
 ### Using _limma_ instead of _edgeR_
 
