@@ -7,7 +7,7 @@ author:
       affiliation: EMBL European Bioinformatics Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SD, United Kingdom; St Vincent's Institute of Medical Research, 41 Victoria Parade, Fitzroy, Victoria 3065, Australia
     - name: John C. Marioni
       affiliation: Cancer Research UK Cambridge Institute, Li Ka Shing Centre, Robinson Way, Cambridge CB2 0RE, United Kingdom; EMBL European Bioinformatics Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SD, United Kingdom; Wellcome Trust Sanger Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SA, United Kingdom
-date: 20 January 2017
+date: 14 March 2017
 vignette: >
     %\VignetteIndexEntry{A worfklow for low-level analyses of single-cell RNA-seq data}
     %\VignetteEngine{knitr::rmarkdown}
@@ -1084,7 +1084,21 @@ Blocking on these factors may be necessary to account for batch effects that are
 We identify HVGs that may be involved in driving population heterogeneity.
 This is done by fitting a trend to the technical variances for the spike-in transcripts.
 We compute the biological component of the variance for each endogenous gene by subtracting the fitted value of the trend from the total variance.
-To account for uninteresting factors, we can supply `design` to `trendVar` to regress out any technical differences due to sex.
+To account for uninteresting factors, we supply `design` to `trendVar` to regress out any technical differences due to sex.
+HVGs are then detected in the same manner as described in the HSC data analysis.
+
+
+```r
+var.fit.des <- trendVar(sce, trend="loess", span=0.4, design=design)
+var.out.des <- decomposeVar(sce, var.fit.des)
+hvg.out.des <- var.out.des[which(var.out.des$FDR <= 0.05 & var.out.des$bio >= 0.5),]
+nrow(hvg.out.des)
+```
+
+```
+## [1] 1648
+```
+
 Alternatively, for data sets containing multiple batches, a more robust strategy is to perform trend fitting and variance decomposition separately for each batch.
 This accommodates differences in the mean-variance trends between batches, especially if a different amount of spike-in RNA was added to the cells in each batch.
 We demonstrate the second approach below by treating each sex as a different "batch".
@@ -1102,7 +1116,7 @@ for (block in levels(sce$sex)) {
 
 
 
-Figure 21 suggests that the trend is fitted accurately to the technical variances.
+Figure 21 suggests that the trend is fitted accurately to the technical variances for each sex.
 Errors in fitting are negligible due to the precision of the variance estimates in a large dataset containing thousands of cells.
 The technical and total variances are also much smaller than those in the HSC dataset.
 This is due to the use of UMIs which reduces the noise caused by variable PCR amplification.
@@ -1235,7 +1249,7 @@ multiplot(tsne1, tsne2, cols=2)
 
 
 The PCA plot is less effective at separating cells into many different clusters (Figure 24).
-This is because the first two principal components are driven by strong differences between specific subpopulations, which reduces the resolution of more subtle differences between some of the other subpopulations.
+This is because the first two principal components (PCs) are driven by strong differences between specific subpopulations, which reduces the resolution of more subtle differences between some of the other subpopulations.
 Nonetheless, some substructure is still visible.
 
 
@@ -1245,7 +1259,7 @@ pca2 <- plotPCA(sce, exprs_values="norm_exprs", colour_by="Mog") + fontsize
 multiplot(pca1, pca2, cols=2)
 ```
 
-![**Figure 24:** PCA plots constructed from the normalized and corrected log-expression values of correlated HVGs for cells in the brain dataset. Each point          represents a cell and is coloured according to its expression of the top HVG (left) or _Mog_ (right).](figure/pcaplotbrain-1.png)
+![**Figure 24:** PCA plots constructed from the normalized and corrected log-expression values of correlated HVGs for cells in the brain dataset. Each point represents a cell and is coloured according to its expression of the top HVG (left) or _Mog_ (right).](figure/pcaplotbrain-1.png)
 
 For both methods, we colour each cell based on the expression of a particular gene.
 This is a useful strategy for visualizing changes in expression across the lower-dimensional space.
@@ -1292,6 +1306,8 @@ heatmap.2(heat.vals, col=bluered, symbreak=TRUE, trace='none', cexRow=0.3,
 ![**Figure 25:** Heatmap of mean-centred normalized and corrected log-expression values for correlated HVGs in the brain dataset. Dendrograms are formed by hierarchical clustering on the Euclidean distances between genes (row) or cells (column). Column colours represent the cluster to which each cell is assigned after a dynamic tree cut. Heatmap colours are capped at a maximum absolute log-fold change of 5.](figure/heatmapbrain-1.png)
 
 This heatmap can be stored at a greater resolution for detailed inspection later.
+It is advisable to verify the separatedness of the clusters using metrics such as the silhouette width or gap statistic (see the *[cluster](http://cran.fhcrc.org/web/packages/cluster/index.html)* package for details).
+The same statistics can also be used to gauge the optimal parameter values (e.g., cut height, number of clusters) that maximize the separation between clusters.
 
 
 ```r
@@ -1307,11 +1323,28 @@ dev.off()
 Use Acrobat reader or zathura for linux (selecting gene names and looking a copied text works better than continually zooming in/out).
 -->
 
+A complementary approach is to perform PCA on the log-expression values for correlated HVGs and cluster on the first few PCs.
+This assumes that random technical noise in each gene will be represented by later PCs, while biological substructure involving coregulated groups of genes will contribute more variance and be represented by earlier PCs.
+The `denoisePCA` function will remove later PCs until the total discard variance is equal to the sum of technical components for all genes used in the PCA.
+This eliminates technical noise and enriches for biological signal in the remaining PCs, allowing for improved resolution during clustering.
+
+
+```r
+# Using the technical components computed with a design matrix.
+pcs <- denoisePCA(sce, design=design, technical=var.fit.des$trend) 
+dim(reducedDimension(pcs)) # Cluster on this instead of t(chosen.exprs)
+```
+
+```
+## [1] 2902  201
+```
+
 When examining very heterogeneous datasets, it can be useful to repeat the HVG detection and clustering using only the cells within a particular cluster.
 This can be achieved by subsetting `sce` according to a particular level of `my.clusters`, and applying the same functions that were previously described.
 Doing so may identify a different set of correlated HVGs that define heterogeneity within the cluster, as opposed to those that define differences between clusters.
 This would allow fine-scale structure within each cluster to be explored at greater resolution. 
 For simplicity, though, we will only use the broad clusters corresponding to clear subpopulations in this workflow.
+
 
 
 
@@ -1738,16 +1771,16 @@ sessionInfo()
 ## [1] stats4    parallel  stats     graphics  grDevices utils     datasets  methods   base     
 ## 
 ## other attached packages:
-##  [1] TxDb.Mmusculus.UCSC.mm10.ensGene_3.4.0 GenomicFeatures_1.27.6                
-##  [3] GenomicRanges_1.27.22                  GenomeInfoDb_1.11.9                   
+##  [1] TxDb.Mmusculus.UCSC.mm10.ensGene_3.4.0 GenomicFeatures_1.27.9                
+##  [3] GenomicRanges_1.27.23                  GenomeInfoDb_1.11.9                   
 ##  [5] openxlsx_4.0.0                         edgeR_3.17.6                          
-##  [7] dynamicTreeCut_1.63-1                  limma_3.31.13                         
+##  [7] dynamicTreeCut_1.63-1                  limma_3.31.19                         
 ##  [9] gplots_3.0.1                           RBGL_1.51.0                           
 ## [11] graph_1.53.0                           org.Mm.eg.db_3.4.0                    
-## [13] AnnotationDbi_1.37.3                   IRanges_2.9.18                        
-## [15] S4Vectors_0.13.13                      scran_1.3.9                           
+## [13] AnnotationDbi_1.37.4                   IRanges_2.9.18                        
+## [15] S4Vectors_0.13.15                      scran_1.3.12                          
 ## [17] scater_1.3.35                          ggplot2_2.2.1                         
-## [19] Biobase_2.35.0                         BiocGenerics_0.21.3                   
+## [19] Biobase_2.35.1                         BiocGenerics_0.21.3                   
 ## [21] gdata_2.17.0                           R.utils_2.5.0                         
 ## [23] R.oo_1.21.0                            R.methodsS3_1.7.1                     
 ## [25] destiny_2.1.0                          mvoutlier_2.0.8                       
@@ -1756,44 +1789,44 @@ sessionInfo()
 ## [31] BiocStyle_2.3.30                      
 ## 
 ## loaded via a namespace (and not attached):
-##   [1] backports_1.0.5            Hmisc_4.0-2                RcppEigen_0.3.2.9.0       
+##   [1] backports_1.0.5            Hmisc_4.0-2                RcppEigen_0.3.2.9.1       
 ##   [4] plyr_1.8.4                 igraph_1.0.1               lazyeval_0.2.0            
 ##   [7] sp_1.2-4                   shinydashboard_0.5.3       splines_3.4.0             
 ##  [10] digest_0.6.12              htmltools_0.3.5            viridis_0.3.4             
 ##  [13] magrittr_1.5               checkmate_1.8.2            memoise_1.0.0             
 ##  [16] cluster_2.0.5              Biostrings_2.43.4          matrixStats_0.51.0        
 ##  [19] xts_0.9-7                  colorspace_1.3-2           rrcov_1.4-3               
-##  [22] dplyr_0.5.0                tximport_1.3.6             RCurl_1.95-4.8            
+##  [22] dplyr_0.5.0                tximport_1.3.10            RCurl_1.95-4.8            
 ##  [25] lme4_1.1-12                survival_2.40-1            zoo_1.7-14                
 ##  [28] gtable_0.2.0               XVector_0.15.2             zlibbioc_1.21.0           
-##  [31] MatrixModels_0.4-1         DelayedArray_0.1.5         car_2.1-4                 
+##  [31] MatrixModels_0.4-1         DelayedArray_0.1.7         car_2.1-4                 
 ##  [34] kernlab_0.9-25             prabclus_2.2-6             DEoptimR_1.0-8            
-##  [37] SparseM_1.74               VIM_4.6.0                  scales_0.4.1              
-##  [40] mvtnorm_1.0-5              DBI_0.5-1                  GGally_1.3.0              
+##  [37] SparseM_1.76               VIM_4.6.0                  scales_0.4.1              
+##  [40] mvtnorm_1.0-6              DBI_0.6                    GGally_1.3.0              
 ##  [43] Rcpp_0.12.9                sROC_0.1-2                 xtable_1.8-2              
 ##  [46] laeken_0.4.6               htmlTable_1.9              foreign_0.8-67            
-##  [49] proxy_0.4-17               mclust_5.2.2               Formula_1.2-1             
+##  [49] proxy_0.4-17               mclust_5.2.3               Formula_1.2-1             
 ##  [52] vcd_1.4-3                  htmlwidgets_0.8            FNN_1.1                   
 ##  [55] RColorBrewer_1.1-2         fpc_2.1-10                 acepack_1.4.1             
 ##  [58] modeltools_0.2-21          reshape_0.8.6              XML_3.98-1.5              
 ##  [61] flexmix_2.3-13             nnet_7.3-12                locfit_1.5-9.1            
 ##  [64] labeling_0.3               reshape2_1.4.2             munsell_0.4.3             
 ##  [67] tools_3.4.0                RSQLite_1.1-2              pls_2.6-0                 
-##  [70] evaluate_0.10              stringr_1.1.0              cvTools_0.3.2             
+##  [70] evaluate_0.10              stringr_1.2.0              cvTools_0.3.2             
 ##  [73] yaml_2.1.14                robustbase_0.92-7          caTools_1.17.1            
 ##  [76] nlme_3.1-131               mime_0.5                   quantreg_5.29             
-##  [79] biomaRt_2.31.4             pbkrtest_0.4-6             beeswarm_0.2.3            
-##  [82] e1071_1.6-8                statmod_1.4.27             smoother_1.1              
+##  [79] biomaRt_2.31.4             pbkrtest_0.4-7             beeswarm_0.2.3            
+##  [82] e1071_1.6-8                statmod_1.4.29             smoother_1.1              
 ##  [85] tibble_1.2                 robCompositions_2.0.3      pcaPP_1.9-61              
 ##  [88] stringi_1.1.2              highr_0.6                  lattice_0.20-34           
 ##  [91] trimcluster_0.1-2          Matrix_1.2-8               nloptr_1.0.4              
-##  [94] lmtest_0.9-34              cowplot_0.7.0              data.table_1.10.4         
-##  [97] bitops_1.0-6               rtracklayer_1.35.5         httpuv_1.3.3              
+##  [94] lmtest_0.9-35              cowplot_0.7.0              data.table_1.10.4         
+##  [97] bitops_1.0-6               rtracklayer_1.35.6         httpuv_1.3.3              
 ## [100] R6_2.2.0                   latticeExtra_0.6-28        KernSmooth_2.23-15        
 ## [103] gridExtra_2.2.1            vipor_0.4.4                boot_1.3-18               
 ## [106] MASS_7.3-45                gtools_3.5.0               assertthat_0.1            
-## [109] SummarizedExperiment_1.5.5 rhdf5_2.19.0               rjson_0.2.15              
-## [112] rprojroot_1.2              GenomicAlignments_1.11.9   Rsamtools_1.27.12         
+## [109] SummarizedExperiment_1.5.7 rhdf5_2.19.0               rjson_0.2.15              
+## [112] rprojroot_1.2              GenomicAlignments_1.11.11  Rsamtools_1.27.13         
 ## [115] GenomeInfoDbData_0.99.0    diptest_0.75-7             mgcv_1.8-17               
 ## [118] grid_3.4.0                 rpart_4.1-10               class_7.3-14              
 ## [121] minqa_1.2.4                rmarkdown_1.3              TTR_0.23-1                
