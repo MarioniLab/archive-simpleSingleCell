@@ -604,7 +604,7 @@ This requires modelling of the variance across replicate instances of the entire
 In short, testing for differential expression is not the best approach to identify marker genes.
 If the difference is strong enough, the null hypothesis will be rejected, regardless of how variable the expression values might be.
 One might expect that DE analyses would at least rank good markers more highly if they have, e.g., strong log-fold changes and low variability.
-However, the implicit balance between variability and log-fold change is not well defined.
+This is true to some extent - however, the implicit balance between variability and log-fold change is not well defined.
 A DE analysis will happily favour low-variability genes with weak DE - usually high-abundance genes expressed in both groups - that wouldn't be good markers.
 Conversely, good candidates that are heavily affected by technical noise may be triaged out.
 

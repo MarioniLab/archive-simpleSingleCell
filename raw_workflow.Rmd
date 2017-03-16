@@ -1127,7 +1127,7 @@ This eliminates technical noise and enriches for biological signal in the remain
 
 ```{r}
 # Using the technical components computed with a design matrix.
-pcs <- denoisePCA(sce, design=design, technical=var.fit.des$trend) 
+pcs <- denoisePCA(sce, design=design, technical=var.fit.des$trend, subset.row=chosen) 
 dim(reducedDimension(pcs)) # Cluster on this instead of t(chosen.exprs)
 ```
 
