@@ -658,21 +658,22 @@ To do this, we take the log-expression values at face value and just use _limma_
 
 # When to use spike-in normalization
 
-Whether total RNA content is "interesting" or not depends on whether it is relevant to function.
-A global increase in transcriptional activity may not be biologically important if it just randomly fluctuates due to cell size, number of ribosomes, etc.
-In this case, retaining the effects of total RNA content would just increase the amount of biological noise in the data.
-On the other hand, it may be important if the phenotype of interest is associated with transcriptional activity.
-Functionally relevant genes may be co-regulated along with the majority of genes when total RNA content changes.
+Changes in total RNA content that affect the entire transcriptome are probably functional in some sense, e.g., to support changes in cell size.
+Whether this is interesting or not depends on how easily it can be interpreted with respect to the biology of interest.
+For example, changes in content between different cell types cannot be easily associated with their phenotypic differences.
+In contrast, changes in content upon some stimulus can be directly interpreted as a response to the stimulus. 
 
 Consider a situation involving two groups of cells, where there is an increase in total RNA content in the second group.
 Assume that there is a subset of genes with a constant level of absolute expression in both groups.
 This will manifest as "downregulation" in the second group if total RNA content is normalized out.
-While this seems obviously inappropriate, consider the following:
+While this seems intuitively inappropriate, consider the following:
 
 - Cells in the second group had some reason for keeping this subset constant while every other gene was allowed to increase.
 This may indicate some specific repression applied to these genes to counter a global increase in activity, in which case downregulation is a suitable interpretation.
 - The constant subset may contain housekeeping genes (e.g., that just couldn't be more upregulated), which would almost definitely be false positives if reported as DE.
 However, if changes in total RNA content are not interesting, better to have a small subset of false positives than a whole transcriptome's worth of false positives.
+- Retaining the effects of total RNA content would just increase the amount of biological noise in the data, if it wasn't interesting.
+This is because different cells in the same functional population will naturally differ in their RNA content.
 
 Incidentally, a common counter to "solve" the problem of whether total RNA content is interesting or not is to normalize based on housekeeping genes.
 If the housekeepers do not change with total RNA content, then it's interesting; if they do, then it's not.
