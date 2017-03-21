@@ -656,6 +656,30 @@ However, if we want to be conservative, then we look for genes that are expresse
 This favours DE genes in which we know that expression is consistent, at the expense of genes where we don't know either way due to dropouts/noise.
 To do this, we take the log-expression values at face value and just use _limma_ without weighting.
 
+# When to use spike-in normalization
+
+Whether total RNA content is "interesting" or not depends on whether it is relevant to function.
+A global increase in transcriptional activity may not be biologically important if it just randomly fluctuates due to cell size, number of ribosomes, etc.
+In this case, retaining the effects of total RNA content would just increase the amount of biological noise in the data.
+On the other hand, it may be important if the phenotype of interest is associated with transcriptional activity.
+Functionally relevant genes may be co-regulated along with the majority of genes when total RNA content changes.
+
+Consider a situation involving two groups of cells, where there is an increase in total RNA content in the second group.
+Assume that there is a subset of genes with a constant level of absolute expression in both groups.
+This will manifest as "downregulation" in the second group if total RNA content is normalized out.
+While this seems obviously inappropriate, consider the following:
+
+- Cells in the second group had some reason for keeping this subset constant while every other gene was allowed to increase.
+This may indicate some specific repression applied to these genes to counter a global increase in activity, in which case downregulation is a suitable interpretation.
+- The constant subset may contain housekeeping genes (e.g., that just couldn't be more upregulated), which would almost definitely be false positives if reported as DE.
+However, if changes in total RNA content are not interesting, better to have a small subset of false positives than a whole transcriptome's worth of false positives.
+
+Incidentally, a common counter to "solve" the problem of whether total RNA content is interesting or not is to normalize based on housekeeping genes.
+If the housekeepers do not change with total RNA content, then it's interesting; if they do, then it's not.
+However, a general housekeeping set is not easy to define for use in all experimental conditions (constitutive != constant).
+For example, GAPDH and B-actin are often used in qPCR but these are DE in activation, proliferation and differentiation (PMID: 12200519).
+Even with a small set, there's always the chance that the majority of its constituents are DE, which would break the normalization procedure.
+
 # Cell cycle phase correction comments
 
 An alternative approach uses genes that have annotated functions in cell cycling and division.
