@@ -1306,7 +1306,7 @@ heatmap.2(heat.vals, col=bluered, symbreak=TRUE, trace='none', cexRow=0.3,
 ![**Figure 25:** Heatmap of mean-centred normalized and corrected log-expression values for correlated HVGs in the brain dataset. Dendrograms are formed by hierarchical clustering on the Euclidean distances between genes (row) or cells (column). Column colours represent the cluster to which each cell is assigned after a dynamic tree cut. Heatmap colours are capped at a maximum absolute log-fold change of 5.](figure/heatmapbrain-1.png)
 
 This heatmap can be stored at a greater resolution for detailed inspection later.
-It is advisable to verify the separatedness of the clusters using metrics such as the silhouette width or gap statistic (see the *[cluster](http://cran.fhcrc.org/web/packages/cluster/index.html)* package for details).
+It is advisable to verify the separatedness of the clusters using metrics such as the silhouette width or gap statistic (see the *[cluster](https://CRAN.R-project.org/package=cluster)* package for details).
 The same statistics can also be used to gauge the optimal parameter values (e.g., cut height, number of clusters) that maximize the separation between clusters.
 
 
@@ -1331,12 +1331,12 @@ This eliminates technical noise and enriches for biological signal in the remain
 
 ```r
 # Using the technical components computed with a design matrix.
-pcs <- denoisePCA(sce, design=design, technical=var.fit.des$trend) 
+pcs <- denoisePCA(sce, design=design, technical=var.fit.des$trend, subset.row=chosen) 
 dim(reducedDimension(pcs)) # Cluster on this instead of t(chosen.exprs)
 ```
 
 ```
-## [1] 2902  201
+## [1] 2902  127
 ```
 
 When examining very heterogeneous datasets, it can be useful to repeat the HVG detection and clustering using only the cells within a particular cluster.
@@ -1771,13 +1771,13 @@ sessionInfo()
 ## [1] stats4    parallel  stats     graphics  grDevices utils     datasets  methods   base     
 ## 
 ## other attached packages:
-##  [1] TxDb.Mmusculus.UCSC.mm10.ensGene_3.4.0 GenomicFeatures_1.27.9                
+##  [1] TxDb.Mmusculus.UCSC.mm10.ensGene_3.4.0 GenomicFeatures_1.27.10               
 ##  [3] GenomicRanges_1.27.23                  GenomeInfoDb_1.11.9                   
 ##  [5] openxlsx_4.0.0                         edgeR_3.17.6                          
 ##  [7] dynamicTreeCut_1.63-1                  limma_3.31.19                         
 ##  [9] gplots_3.0.1                           RBGL_1.51.0                           
 ## [11] graph_1.53.0                           org.Mm.eg.db_3.4.0                    
-## [13] AnnotationDbi_1.37.4                   IRanges_2.9.18                        
+## [13] AnnotationDbi_1.37.4                   IRanges_2.9.19                        
 ## [15] S4Vectors_0.13.15                      scran_1.3.12                          
 ## [17] scater_1.3.35                          ggplot2_2.2.1                         
 ## [19] Biobase_2.35.1                         BiocGenerics_0.21.3                   
@@ -1786,7 +1786,7 @@ sessionInfo()
 ## [25] destiny_2.1.0                          mvoutlier_2.0.8                       
 ## [27] sgeostat_1.0-27                        Rtsne_0.11                            
 ## [29] BiocParallel_1.9.5                     knitr_1.15.1                          
-## [31] BiocStyle_2.3.30                      
+## [31] BiocStyle_2.3.31                      
 ## 
 ## loaded via a namespace (and not attached):
 ##   [1] backports_1.0.5            Hmisc_4.0-2                RcppEigen_0.3.2.9.1       
@@ -1794,16 +1794,16 @@ sessionInfo()
 ##   [7] sp_1.2-4                   shinydashboard_0.5.3       splines_3.4.0             
 ##  [10] digest_0.6.12              htmltools_0.3.5            viridis_0.3.4             
 ##  [13] magrittr_1.5               checkmate_1.8.2            memoise_1.0.0             
-##  [16] cluster_2.0.5              Biostrings_2.43.4          matrixStats_0.51.0        
+##  [16] cluster_2.0.6              Biostrings_2.43.5          matrixStats_0.51.0        
 ##  [19] xts_0.9-7                  colorspace_1.3-2           rrcov_1.4-3               
-##  [22] dplyr_0.5.0                tximport_1.3.10            RCurl_1.95-4.8            
-##  [25] lme4_1.1-12                survival_2.40-1            zoo_1.7-14                
+##  [22] dplyr_0.5.0                tximport_1.3.12            RCurl_1.95-4.8            
+##  [25] lme4_1.1-12                survival_2.41-2            zoo_1.7-14                
 ##  [28] gtable_0.2.0               XVector_0.15.2             zlibbioc_1.21.0           
 ##  [31] MatrixModels_0.4-1         DelayedArray_0.1.7         car_2.1-4                 
 ##  [34] kernlab_0.9-25             prabclus_2.2-6             DEoptimR_1.0-8            
 ##  [37] SparseM_1.76               VIM_4.6.0                  scales_0.4.1              
 ##  [40] mvtnorm_1.0-6              DBI_0.6                    GGally_1.3.0              
-##  [43] Rcpp_0.12.9                sROC_0.1-2                 xtable_1.8-2              
+##  [43] Rcpp_0.12.10               sROC_0.1-2                 xtable_1.8-2              
 ##  [46] laeken_0.4.6               htmlTable_1.9              foreign_0.8-67            
 ##  [49] proxy_0.4-17               mclust_5.2.3               Formula_1.2-1             
 ##  [52] vcd_1.4-3                  htmlwidgets_0.8            FNN_1.1                   
@@ -1818,15 +1818,15 @@ sessionInfo()
 ##  [79] biomaRt_2.31.4             pbkrtest_0.4-7             beeswarm_0.2.3            
 ##  [82] e1071_1.6-8                statmod_1.4.29             smoother_1.1              
 ##  [85] tibble_1.2                 robCompositions_2.0.3      pcaPP_1.9-61              
-##  [88] stringi_1.1.2              highr_0.6                  lattice_0.20-34           
+##  [88] stringi_1.1.3              highr_0.6                  lattice_0.20-34           
 ##  [91] trimcluster_0.1-2          Matrix_1.2-8               nloptr_1.0.4              
 ##  [94] lmtest_0.9-35              cowplot_0.7.0              data.table_1.10.4         
-##  [97] bitops_1.0-6               rtracklayer_1.35.6         httpuv_1.3.3              
+##  [97] bitops_1.0-6               rtracklayer_1.35.9         httpuv_1.3.3              
 ## [100] R6_2.2.0                   latticeExtra_0.6-28        KernSmooth_2.23-15        
 ## [103] gridExtra_2.2.1            vipor_0.4.4                boot_1.3-18               
 ## [106] MASS_7.3-45                gtools_3.5.0               assertthat_0.1            
-## [109] SummarizedExperiment_1.5.7 rhdf5_2.19.0               rjson_0.2.15              
-## [112] rprojroot_1.2              GenomicAlignments_1.11.11  Rsamtools_1.27.13         
+## [109] SummarizedExperiment_1.5.7 rhdf5_2.19.1               rjson_0.2.15              
+## [112] rprojroot_1.2              GenomicAlignments_1.11.12  Rsamtools_1.27.13         
 ## [115] GenomeInfoDbData_0.99.0    diptest_0.75-7             mgcv_1.8-17               
 ## [118] grid_3.4.0                 rpart_4.1-10               class_7.3-14              
 ## [121] minqa_1.2.4                rmarkdown_1.3              TTR_0.23-1                

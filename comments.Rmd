@@ -571,7 +571,7 @@ and if only a few cells in other clusters have negative widths and have the targ
 o <- order(sil[,1], sil[,3])
 osil <- sil[o,]
 ocol <- c("black", "red", "blue")[ifelse(osil[,3] > 0, osil[,1], osil[,2])]
-barplot(osil[,3], horiz=TRUE, col=ocol, border=NA)
+barplot(osil[,3], horiz=TRUE, col=ocol, border=ocol)
 ```
 
 Of course, the gap statistic, silhouette, etc. only check for the separatedness of the clusters.
