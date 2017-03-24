@@ -642,8 +642,8 @@ However, strong markers with large log-fold changes should appear at the top of 
 ### Using _limma_ instead of _edgeR_
 
 Much like in detecting HVGs, applying _limma_ on the log-transformed counts seems to do better than using _edgeR_ on the raw counts.
-This is because _edgeR_ puts too much weight on a few highly-expressing cells, which end up driving the DE calls.
-(As long as the change in expression is large enough, then it can offset the increase in variability and be detected as strongly DE.)
+This is because _edgeR_'s dispersion estimates are bounded by the grid search and can't fully account for the variability. 
+As a result, a few cells with large outlier expression end up driving the top DE calls.
 The log-transformation protects against outliers and seems to yield better rankings, at least for read count data where amplification biases are most prevalent.
 
 Interestingly, direct application of _limma_ seems to be better than `voom` for this purpose.

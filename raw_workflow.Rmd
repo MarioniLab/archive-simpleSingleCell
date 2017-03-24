@@ -112,8 +112,10 @@ For convenience, the counts for spike-in transcripts and endogenous genes are st
 ```{r}
 library(R.utils)
 gunzip("GSE61533_HTSEQ_count_results.xls.gz", remove=FALSE, overwrite=TRUE)
-library(gdata)
-all.counts <- read.xls('GSE61533_HTSEQ_count_results.xls', sheet=1, header=TRUE, row.names=1)
+library(readxl)
+all.counts <- as.data.frame(read_excel('GSE61533_HTSEQ_count_results.xls', sheet=1))
+rownames(all.counts) <- all.counts$ID
+all.counts <- all.counts[,-1]
 library(scater)
 sce <- newSCESet(countData=all.counts)
 dim(sce)
@@ -1141,74 +1143,24 @@ For simplicity, though, we will only use the broad clusters corresponding to cle
 gc()
 ```
 
-
 ## Detecting marker genes between subpopulations
 
-Once putative subpopulations are identified, we can identify marker genes for specific subpopulations of interest.
-This is done by identifying genes that are consistently DE in one subpopulation compared to the others.
-DE testing can be performed using a number of packages, but for this workflow, we will use the `r Biocpkg("edgeR")` package [@robinson2010edgeR].
-First, we set up a design matrix specifying which cells belong to each cluster.
-Each `cluster*` coefficient represents the average log-expression of all cells in the corresponding cluster.
-We also block on uninteresting factors such as sex.
+Once putative subpopulations are identified by clustering, we can identify marker genes for each cluster using the `findMarkers` function.
+This fits a linear model to the log-expression values for each gene, using methods in the `r Biocpkg("limma")` package [@law2014voom; @ritchie2015limma].
+The aim is to test for DE in each cluster compared to the others while blocking on uninteresting factors in `design`.
+The top DE genes are likely to be good candidate markers as they can effectively distinguish between cells in different clusters.
 
 ```{r}
-cluster <- factor(my.clusters)
-de.design <- model.matrix(~0 + cluster + sce$sex)
-head(colnames(de.design))
+markers <- findMarkers(sce, my.clusters, block=design)
 ```
 
-We set up a `DGEList` object for entry into the `r Biocpkg("edgeR")` analysis.
-This new object contains all relevant information from the original `SCESet` object, including the counts and (library size-adjusted) size factors.
+For each cluster, the DE results of the relevant comparisons are consolidated into a single output table.
+This allows a set of marker genes to be easily defined by taking the top DE genes from each pairwise comparison between clusters.
+For example, to construct a marker set for cluster 1 from the top 10 genes of each comparison, one would filter `marker.set` to retain rows with `Top` less than or equal to 10.
+Other statistics are also reported for each gene, including the adjusted p-values (see below) and the log-fold changes relative to every other cluster.
 
 ```{r}
-library(edgeR)
-y <- convertTo(sce, type="edgeR")
-```
-
-`r Biocpkg("edgeR")` uses negative binomial (NB) distributions to model the read/UMI counts for each sample.
-We estimate the NB dispersion parameter that quantifies the biological variability in expression across cells in the same cluster.
-Large dispersion estimates above 0.5 are often observed in scRNA-seq data due to technical noise, in contrast to bulk data where values of 0.05-0.2 are more typical.
-We then use the design matrix to fit a NB GLM to the counts for each gene [@mccarthy2012differential].
-
-```{r}
-y <- estimateDisp(y, de.design)
-fit <- glmFit(y, de.design)
-summary(y$tagwise.dispersion)
-```
-
-```{r echo=FALSE, results='hide'}
-gc()
-```
-
-We assume that one of the clusters corresponds to our subpopulation of interest.
-Each gene is tested for DE between the chosen cluster and every other cluster in the dataset.
-We demonstrate this below for cluster 1, though the same process can be applied to any other cluster by changing `chosen.clust`.
-
-```{r}
-result.logFC <- result.PValue <- list()
-chosen.clust <- which(levels(cluster)=="1") # character, as 'cluster' is a factor.
-for (clust in seq_len(nlevels(cluster))) {
-    if (clust==chosen.clust) { next }
-    contrast <- numeric(ncol(de.design))
-    contrast[chosen.clust] <- 1
-    contrast[clust] <- -1
-    res <- glmLRT(fit, contrast=contrast)
-    con.name <- paste0('vs.', levels(cluster)[clust])
-    result.logFC[[con.name]] <- res$table$logFC
-    result.PValue[[con.name]] <- res$table$PValue
-}
-```
-
-Potential marker genes are identified by taking the top set of DE genes from each pairwise comparison between clusters.
-We arrange the results into a single output table that allows a marker set to be easily defined for a user-specified size of the top set.
-For example, to construct a marker set from the top 10 genes of each comparison, one would filter `marker.set` to retain rows with `Top` less than or equal to 10.
-
-```{r}
-collected.ranks <- lapply(result.PValue, rank, ties="first")
-min.rank <- do.call(pmin, collected.ranks)
-marker.set <- data.frame(Top=min.rank, Gene=rownames(y), 
-    logFC=do.call(cbind, result.logFC), stringsAsFactors=FALSE)
-marker.set <- marker.set[order(marker.set$Top),]
+marker.set <- markers[["1"]]
 head(marker.set, 10)
 ```
 
@@ -1233,12 +1185,20 @@ For example, in a mixed population of CD4^+^-only, CD8^+^-only, double-positive 
 With our approach, both of these genes will be picked up as candidate markers as they will be DE between at least one pair of subpopulations.
 A combination of markers can then be chosen to characterize a subpopulation, which is more flexible than trying to find uniquely DE genes.
 
-It must be stressed that the _p_-values computed here cannot be interpreted as measures of significance.
+It must be stressed that the (adjusted) _p_-values computed here cannot be properly interpreted as measures of significance.
 This is because the clusters have been empirically identified from the data.
-`r Biocpkg("edgeR")` does not account for the uncertainty and stochasticity in clustering, which means that the _p_-values are much lower than they should be. 
-As such, these _p_-values should only be used for ranking candidate markers for follow-up studies.
+`r Biocpkg("limma")` does not account for the uncertainty of clustering, which means that the _p_-values are much lower than they should be. 
 However, this is not a concern in other analyses where the groups are pre-defined.
 For such analyses, the FDR-adjusted _p_-value can be directly used to define significant genes for each DE comparison, though some care may be required to deal with plate effects [@hicks2015widespread; @tung2016batch].
+
+The `SCESet` object can also be easily transformed for use in other DE analysis methods.
+For example, the `convertTo` function can be used to construct a `DGEList` for input into the `r Biocpkg("edgeR")` pipeline [@robinson2010edgeR].
+This allows users to construct their own marker detection pipeline, though we find that direct use of `findMarkers` is usually sufficient.
+
+```{r}
+library(edgeR)
+y <- convertTo(sce, type="edgeR")
+```
 
 ## Additional comments
 
@@ -1333,8 +1293,9 @@ Rather, more sophisticated strategies are required, one of which is demonstrated
 @buettner2015computational have already applied quality control and normalized the data, so we can use them directly as log-expression values (accessible as Supplementary Data 1 of https://dx.doi.org/10.1038/nbt.3102).
 
 ```{r}
-library(openxlsx)
-incoming <- read.xlsx("nbt.3102-S7.xlsx", sheet=1, rowNames=TRUE)
+incoming <- as.data.frame(read_excel("nbt.3102-S7.xlsx", sheet=1))
+rownames(incoming) <- incoming[,1]
+incoming <- incoming[,-1]
 incoming <- incoming[,!duplicated(colnames(incoming))] # Remove duplicated genes.
 sce <- newSCESet(exprsData=t(incoming))
 ```
