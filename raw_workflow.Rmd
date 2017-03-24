@@ -1159,9 +1159,18 @@ This allows a set of marker genes to be easily defined by taking the top DE gene
 For example, to construct a marker set for cluster 1 from the top 10 genes of each comparison, one would filter `marker.set` to retain rows with `Top` less than or equal to 10.
 Other statistics are also reported for each gene, including the adjusted p-values (see below) and the log-fold changes relative to every other cluster.
 
+```{r, echo=FALSE, results="hide"}
+old.digits <- options()$digits
+options(digits=3)
+```
+
 ```{r}
 marker.set <- markers[["1"]]
 head(marker.set, 10)
+```
+
+```{r, echo=FALSE, results="hide"}
+options(digits=old.digits)
 ```
 
 We save the list of candidate marker genes for further examination.

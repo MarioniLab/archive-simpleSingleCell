@@ -77,8 +77,10 @@ For convenience, the counts for spike-in transcripts and endogenous genes are st
 ```r
 library(R.utils)
 gunzip("GSE61533_HTSEQ_count_results.xls.gz", remove=FALSE, overwrite=TRUE)
-library(gdata)
-all.counts <- read.xls('GSE61533_HTSEQ_count_results.xls', sheet=1, header=TRUE, row.names=1)
+library(readxl)
+all.counts <- as.data.frame(read_excel('GSE61533_HTSEQ_count_results.xls', sheet=1))
+rownames(all.counts) <- all.counts$ID
+all.counts <- all.counts[,-1]
 library(scater)
 sce <- newSCESet(countData=all.counts)
 dim(sce)
@@ -1347,102 +1349,46 @@ For simplicity, though, we will only use the broad clusters corresponding to cle
 
 
 
-
 ## Detecting marker genes between subpopulations
 
-Once putative subpopulations are identified, we can identify marker genes for specific subpopulations of interest.
-This is done by identifying genes that are consistently DE in one subpopulation compared to the others.
-DE testing can be performed using a number of packages, but for this workflow, we will use the *[edgeR](http://bioconductor.org/packages/edgeR)* package [@robinson2010edgeR].
-First, we set up a design matrix specifying which cells belong to each cluster.
-Each `cluster*` coefficient represents the average log-expression of all cells in the corresponding cluster.
-We also block on uninteresting factors such as sex.
+Once putative subpopulations are identified by clustering, we can identify marker genes for each cluster using the `findMarkers` function.
+This fits a linear model to the log-expression values for each gene, using methods in the *[limma](http://bioconductor.org/packages/limma)* package [@law2014voom; @ritchie2015limma].
+The aim is to test for DE in each cluster compared to the others while blocking on uninteresting factors in `design`.
+The top DE genes are likely to be good candidate markers as they can effectively distinguish between cells in different clusters.
 
 
 ```r
-cluster <- factor(my.clusters)
-de.design <- model.matrix(~0 + cluster + sce$sex)
-head(colnames(de.design))
+markers <- findMarkers(sce, my.clusters, block=design)
 ```
 
-```
-## [1] "cluster1" "cluster2" "cluster3" "cluster4" "cluster5" "cluster6"
-```
+For each cluster, the DE results of the relevant comparisons are consolidated into a single output table.
+This allows a set of marker genes to be easily defined by taking the top DE genes from each pairwise comparison between clusters.
+For example, to construct a marker set for cluster 1 from the top 10 genes of each comparison, one would filter `marker.set` to retain rows with `Top` less than or equal to 10.
+Other statistics are also reported for each gene, including the adjusted p-values (see below) and the log-fold changes relative to every other cluster.
 
-We set up a `DGEList` object for entry into the *[edgeR](http://bioconductor.org/packages/edgeR)* analysis.
-This new object contains all relevant information from the original `SCESet` object, including the counts and (library size-adjusted) size factors.
+
 
 
 ```r
-library(edgeR)
-y <- convertTo(sce, type="edgeR")
-```
-
-*[edgeR](http://bioconductor.org/packages/edgeR)* uses negative binomial (NB) distributions to model the read/UMI counts for each sample.
-We estimate the NB dispersion parameter that quantifies the biological variability in expression across cells in the same cluster.
-Large dispersion estimates above 0.5 are often observed in scRNA-seq data due to technical noise, in contrast to bulk data where values of 0.05-0.2 are more typical.
-We then use the design matrix to fit a NB GLM to the counts for each gene [@mccarthy2012differential].
-
-
-```r
-y <- estimateDisp(y, de.design)
-fit <- glmFit(y, de.design)
-summary(y$tagwise.dispersion)
-```
-
-```
-##      Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
-##   0.04818   0.36474   0.75804   1.83633   1.74182 102.40000
-```
-
-
-
-We assume that one of the clusters corresponds to our subpopulation of interest.
-Each gene is tested for DE between the chosen cluster and every other cluster in the dataset.
-We demonstrate this below for cluster 1, though the same process can be applied to any other cluster by changing `chosen.clust`.
-
-
-```r
-result.logFC <- result.PValue <- list()
-chosen.clust <- which(levels(cluster)=="1") # character, as 'cluster' is a factor.
-for (clust in seq_len(nlevels(cluster))) {
-    if (clust==chosen.clust) { next }
-    contrast <- numeric(ncol(de.design))
-    contrast[chosen.clust] <- 1
-    contrast[clust] <- -1
-    res <- glmLRT(fit, contrast=contrast)
-    con.name <- paste0('vs.', levels(cluster)[clust])
-    result.logFC[[con.name]] <- res$table$logFC
-    result.PValue[[con.name]] <- res$table$PValue
-}
-```
-
-Potential marker genes are identified by taking the top set of DE genes from each pairwise comparison between clusters.
-We arrange the results into a single output table that allows a marker set to be easily defined for a user-specified size of the top set.
-For example, to construct a marker set from the top 10 genes of each comparison, one would filter `marker.set` to retain rows with `Top` less than or equal to 10.
-
-
-```r
-collected.ranks <- lapply(result.PValue, rank, ties="first")
-min.rank <- do.call(pmin, collected.ranks)
-marker.set <- data.frame(Top=min.rank, Gene=rownames(y), 
-    logFC=do.call(cbind, result.logFC), stringsAsFactors=FALSE)
-marker.set <- marker.set[order(marker.set$Top),]
+marker.set <- markers[["1"]]
 head(marker.set, 10)
 ```
 
 ```
-##      Top    Gene logFC.vs.2 logFC.vs.3 logFC.vs.4 logFC.vs.5 logFC.vs.6 logFC.vs.7 logFC.vs.8
-## 52     1    Cnr1 -1.7871178  -1.437829  -2.139859 -0.9178238  -6.040186 -1.4714426 -2.4892359
-## 261    1 Prkar1b -2.7443265  -3.445368  -2.912522 -1.1608480  -3.646499 -0.3282805 -2.5948350
-## 298    1  Mllt11 -2.9151367  -2.804519  -2.170975  0.3431925  -3.116426  1.3790003 -2.1712795
-## 336    1    Syt1 -2.4008169  -2.945897  -2.915966 -1.1279731  -3.562019 -0.6609952 -2.3225831
-## 614    1  Tspan7 -0.4824611  -1.812664  -1.159403  0.1031374  -1.814971 -3.3864049 -0.9806075
-## 652    1   Stmn3 -4.6032688  -4.310863  -3.316599 -0.2047676  -4.441581 -0.5618373 -3.7461560
-## 1888   1   Syt11  2.0499993   1.600859   1.271067  2.9597889   1.520194  1.7962366  1.2082822
-## 64     2    Gng2 -3.0155283  -3.022123  -2.481303 -1.8553565  -4.385191 -0.4180842 -2.7153264
-## 347    2   Ndrg4 -3.4774910  -3.806337  -3.341831 -0.8944274  -4.398334 -0.5483395 -3.0926722
-## 820    2   Stmn2 -4.2371013  -4.310193  -3.196093 -1.3543824  -4.310452  0.0366840 -3.8767507
+##    Top    Gene       FDR        2       3       4        5     6       7      8
+## 1    1   Htr3a  0.00e+00  0.00946 -0.0949 -0.0167 -0.03944 -3.19 -0.1200 -0.162
+## 2    1 Prkar1b  0.00e+00 -2.12466 -2.6106 -2.1648 -0.23133 -2.91 -0.0465 -1.884
+## 3    1  Mllt11  6.01e-99 -2.69088 -2.4910 -1.8804  0.13868 -2.87  0.3589 -1.733
+## 4    1    Syt1 4.23e-307 -3.08566 -3.5034 -3.5481 -0.73261 -4.10 -0.2287 -2.890
+## 5    1   Stmn3  0.00e+00 -4.42010 -4.0226 -2.9896  0.07845 -4.16 -0.0340 -3.276
+## 6    1     Clu  0.00e+00 -0.33316 -1.3890 -0.4827 -0.17342 -1.71 -5.5034 -0.647
+## 7    1   Gpm6b  0.00e+00  1.22472  1.3894  1.5755  3.49525  3.29  0.0830  0.736
+## 8    2  Kcnip1  0.00e+00  0.01789 -0.0369 -0.0116  0.00168 -1.44 -0.0294 -0.152
+## 9    2   Ndrg4 1.17e-230 -3.05239 -3.3451 -2.8611 -0.16575 -3.90 -0.2400 -2.618
+## 10   2  Snap25  0.00e+00 -3.81108 -4.5051 -3.0332 -0.44152 -4.24 -0.0256 -3.691
 ```
+
+
 
 We save the list of candidate marker genes for further examination.
 We also examine their expression profiles to verify that the DE signature is robust.
@@ -1468,12 +1414,21 @@ For example, in a mixed population of CD4^+^-only, CD8^+^-only, double-positive 
 With our approach, both of these genes will be picked up as candidate markers as they will be DE between at least one pair of subpopulations.
 A combination of markers can then be chosen to characterize a subpopulation, which is more flexible than trying to find uniquely DE genes.
 
-It must be stressed that the _p_-values computed here cannot be interpreted as measures of significance.
+It must be stressed that the (adjusted) _p_-values computed here cannot be properly interpreted as measures of significance.
 This is because the clusters have been empirically identified from the data.
-*[edgeR](http://bioconductor.org/packages/edgeR)* does not account for the uncertainty and stochasticity in clustering, which means that the _p_-values are much lower than they should be. 
-As such, these _p_-values should only be used for ranking candidate markers for follow-up studies.
+*[limma](http://bioconductor.org/packages/limma)* does not account for the uncertainty of clustering, which means that the _p_-values are much lower than they should be. 
 However, this is not a concern in other analyses where the groups are pre-defined.
 For such analyses, the FDR-adjusted _p_-value can be directly used to define significant genes for each DE comparison, though some care may be required to deal with plate effects [@hicks2015widespread; @tung2016batch].
+
+The `SCESet` object can also be easily transformed for use in other DE analysis methods.
+For example, the `convertTo` function can be used to construct a `DGEList` for input into the *[edgeR](http://bioconductor.org/packages/edgeR)* pipeline [@robinson2010edgeR].
+This allows users to construct their own marker detection pipeline, though we find that direct use of `findMarkers` is usually sufficient.
+
+
+```r
+library(edgeR)
+y <- convertTo(sce, type="edgeR")
+```
 
 ## Additional comments
 
@@ -1574,8 +1529,9 @@ Rather, more sophisticated strategies are required, one of which is demonstrated
 
 
 ```r
-library(openxlsx)
-incoming <- read.xlsx("nbt.3102-S7.xlsx", sheet=1, rowNames=TRUE)
+incoming <- as.data.frame(read_excel("nbt.3102-S7.xlsx", sheet=1))
+rownames(incoming) <- incoming[,1]
+incoming <- incoming[,-1]
 incoming <- incoming[,!duplicated(colnames(incoming))] # Remove duplicated genes.
 sce <- newSCESet(exprsData=t(incoming))
 ```
@@ -1773,65 +1729,64 @@ sessionInfo()
 ## other attached packages:
 ##  [1] TxDb.Mmusculus.UCSC.mm10.ensGene_3.4.0 GenomicFeatures_1.27.10               
 ##  [3] GenomicRanges_1.27.23                  GenomeInfoDb_1.11.9                   
-##  [5] openxlsx_4.0.0                         edgeR_3.17.6                          
-##  [7] dynamicTreeCut_1.63-1                  limma_3.31.19                         
-##  [9] gplots_3.0.1                           RBGL_1.51.0                           
-## [11] graph_1.53.0                           org.Mm.eg.db_3.4.0                    
-## [13] AnnotationDbi_1.37.4                   IRanges_2.9.19                        
-## [15] S4Vectors_0.13.15                      scran_1.3.12                          
-## [17] scater_1.3.35                          ggplot2_2.2.1                         
-## [19] Biobase_2.35.1                         BiocGenerics_0.21.3                   
-## [21] gdata_2.17.0                           R.utils_2.5.0                         
-## [23] R.oo_1.21.0                            R.methodsS3_1.7.1                     
-## [25] destiny_2.1.0                          mvoutlier_2.0.8                       
-## [27] sgeostat_1.0-27                        Rtsne_0.11                            
-## [29] BiocParallel_1.9.5                     knitr_1.15.1                          
-## [31] BiocStyle_2.3.31                      
+##  [5] edgeR_3.17.6                           dynamicTreeCut_1.63-1                 
+##  [7] limma_3.31.19                          gplots_3.0.1                          
+##  [9] RBGL_1.51.0                            graph_1.53.0                          
+## [11] org.Mm.eg.db_3.4.0                     AnnotationDbi_1.37.4                  
+## [13] IRanges_2.9.19                         S4Vectors_0.13.15                     
+## [15] scran_1.3.12                           scater_1.3.35                         
+## [17] ggplot2_2.2.1                          Biobase_2.35.1                        
+## [19] BiocGenerics_0.21.3                    readxl_0.1.1                          
+## [21] R.utils_2.5.0                          R.oo_1.21.0                           
+## [23] R.methodsS3_1.7.1                      destiny_2.1.0                         
+## [25] mvoutlier_2.0.8                        sgeostat_1.0-27                       
+## [27] Rtsne_0.11                             BiocParallel_1.9.5                    
+## [29] knitr_1.15.1                           BiocStyle_2.3.31                      
 ## 
 ## loaded via a namespace (and not attached):
 ##   [1] backports_1.0.5            Hmisc_4.0-2                RcppEigen_0.3.2.9.1       
 ##   [4] plyr_1.8.4                 igraph_1.0.1               lazyeval_0.2.0            
 ##   [7] sp_1.2-4                   shinydashboard_0.5.3       splines_3.4.0             
 ##  [10] digest_0.6.12              htmltools_0.3.5            viridis_0.3.4             
-##  [13] magrittr_1.5               checkmate_1.8.2            memoise_1.0.0             
-##  [16] cluster_2.0.6              Biostrings_2.43.5          matrixStats_0.51.0        
-##  [19] xts_0.9-7                  colorspace_1.3-2           rrcov_1.4-3               
-##  [22] dplyr_0.5.0                tximport_1.3.12            RCurl_1.95-4.8            
-##  [25] lme4_1.1-12                survival_2.41-2            zoo_1.7-14                
-##  [28] gtable_0.2.0               XVector_0.15.2             zlibbioc_1.21.0           
-##  [31] MatrixModels_0.4-1         DelayedArray_0.1.7         car_2.1-4                 
-##  [34] kernlab_0.9-25             prabclus_2.2-6             DEoptimR_1.0-8            
-##  [37] SparseM_1.76               VIM_4.6.0                  scales_0.4.1              
-##  [40] mvtnorm_1.0-6              DBI_0.6                    GGally_1.3.0              
-##  [43] Rcpp_0.12.10               sROC_0.1-2                 xtable_1.8-2              
-##  [46] laeken_0.4.6               htmlTable_1.9              foreign_0.8-67            
-##  [49] proxy_0.4-17               mclust_5.2.3               Formula_1.2-1             
-##  [52] vcd_1.4-3                  htmlwidgets_0.8            FNN_1.1                   
-##  [55] RColorBrewer_1.1-2         fpc_2.1-10                 acepack_1.4.1             
-##  [58] modeltools_0.2-21          reshape_0.8.6              XML_3.98-1.5              
-##  [61] flexmix_2.3-13             nnet_7.3-12                locfit_1.5-9.1            
-##  [64] labeling_0.3               reshape2_1.4.2             munsell_0.4.3             
-##  [67] tools_3.4.0                RSQLite_1.1-2              pls_2.6-0                 
-##  [70] evaluate_0.10              stringr_1.2.0              cvTools_0.3.2             
-##  [73] yaml_2.1.14                robustbase_0.92-7          caTools_1.17.1            
-##  [76] nlme_3.1-131               mime_0.5                   quantreg_5.29             
-##  [79] biomaRt_2.31.4             pbkrtest_0.4-7             beeswarm_0.2.3            
-##  [82] e1071_1.6-8                statmod_1.4.29             smoother_1.1              
-##  [85] tibble_1.2                 robCompositions_2.0.3      pcaPP_1.9-61              
-##  [88] stringi_1.1.3              highr_0.6                  lattice_0.20-34           
-##  [91] trimcluster_0.1-2          Matrix_1.2-8               nloptr_1.0.4              
-##  [94] lmtest_0.9-35              cowplot_0.7.0              data.table_1.10.4         
-##  [97] bitops_1.0-6               rtracklayer_1.35.9         httpuv_1.3.3              
-## [100] R6_2.2.0                   latticeExtra_0.6-28        KernSmooth_2.23-15        
-## [103] gridExtra_2.2.1            vipor_0.4.4                boot_1.3-18               
-## [106] MASS_7.3-45                gtools_3.5.0               assertthat_0.1            
-## [109] SummarizedExperiment_1.5.7 rhdf5_2.19.1               rjson_0.2.15              
-## [112] rprojroot_1.2              GenomicAlignments_1.11.12  Rsamtools_1.27.13         
-## [115] GenomeInfoDbData_0.99.0    diptest_0.75-7             mgcv_1.8-17               
-## [118] grid_3.4.0                 rpart_4.1-10               class_7.3-14              
-## [121] minqa_1.2.4                rmarkdown_1.3              TTR_0.23-1                
-## [124] scatterplot3d_0.3-38       shiny_1.0.0                base64enc_0.1-3           
-## [127] ggbeeswarm_0.5.3
+##  [13] gdata_2.17.0               magrittr_1.5               checkmate_1.8.2           
+##  [16] memoise_1.0.0              cluster_2.0.6              Biostrings_2.43.5         
+##  [19] matrixStats_0.51.0         xts_0.9-7                  colorspace_1.3-2          
+##  [22] rrcov_1.4-3                dplyr_0.5.0                tximport_1.3.13           
+##  [25] RCurl_1.95-4.8             lme4_1.1-12                survival_2.41-2           
+##  [28] zoo_1.7-14                 gtable_0.2.0               XVector_0.15.2            
+##  [31] zlibbioc_1.21.0            MatrixModels_0.4-1         DelayedArray_0.1.7        
+##  [34] car_2.1-4                  kernlab_0.9-25             prabclus_2.2-6            
+##  [37] DEoptimR_1.0-8             SparseM_1.76               VIM_4.6.0                 
+##  [40] scales_0.4.1               mvtnorm_1.0-6              DBI_0.6                   
+##  [43] GGally_1.3.0               Rcpp_0.12.10               sROC_0.1-2                
+##  [46] xtable_1.8-2               laeken_0.4.6               htmlTable_1.9             
+##  [49] foreign_0.8-67             proxy_0.4-17               mclust_5.2.3              
+##  [52] Formula_1.2-1              vcd_1.4-3                  htmlwidgets_0.8           
+##  [55] FNN_1.1                    RColorBrewer_1.1-2         fpc_2.1-10                
+##  [58] acepack_1.4.1              modeltools_0.2-21          reshape_0.8.6             
+##  [61] XML_3.98-1.5               flexmix_2.3-13             nnet_7.3-12               
+##  [64] locfit_1.5-9.1             labeling_0.3               reshape2_1.4.2            
+##  [67] munsell_0.4.3              tools_3.4.0                RSQLite_1.1-2             
+##  [70] pls_2.6-0                  evaluate_0.10              stringr_1.2.0             
+##  [73] cvTools_0.3.2              yaml_2.1.14                robustbase_0.92-7         
+##  [76] caTools_1.17.1             nlme_3.1-131               mime_0.5                  
+##  [79] quantreg_5.29              biomaRt_2.31.4             pbkrtest_0.4-7            
+##  [82] beeswarm_0.2.3             e1071_1.6-8                statmod_1.4.29            
+##  [85] smoother_1.1               tibble_1.2                 robCompositions_2.0.3     
+##  [88] pcaPP_1.9-61               stringi_1.1.3              highr_0.6                 
+##  [91] lattice_0.20-34            trimcluster_0.1-2          Matrix_1.2-8              
+##  [94] nloptr_1.0.4               lmtest_0.9-35              cowplot_0.7.0             
+##  [97] data.table_1.10.4          bitops_1.0-6               rtracklayer_1.35.9        
+## [100] httpuv_1.3.3               R6_2.2.0                   latticeExtra_0.6-28       
+## [103] KernSmooth_2.23-15         gridExtra_2.2.1            vipor_0.4.5               
+## [106] gtools_3.5.0               boot_1.3-18                MASS_7.3-45               
+## [109] assertthat_0.1             SummarizedExperiment_1.5.7 rhdf5_2.19.1              
+## [112] rprojroot_1.2              rjson_0.2.15               GenomicAlignments_1.11.12 
+## [115] Rsamtools_1.27.13          GenomeInfoDbData_0.99.0    diptest_0.75-7            
+## [118] mgcv_1.8-17                grid_3.4.0                 rpart_4.1-10              
+## [121] class_7.3-14               minqa_1.2.4                rmarkdown_1.4             
+## [124] TTR_0.23-1                 scatterplot3d_0.3-38       shiny_1.0.0               
+## [127] base64enc_0.1-3            ggbeeswarm_0.5.3
 ```
 
 
