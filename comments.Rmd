@@ -8,6 +8,13 @@ This is because reads at different positions could be derived from amplified cop
 Duplicate removal based on genomic position only protects against PCR duplicates during library preparation.
 See https://doi.org/10.1038/srep25533 for further details.
 
+## Sparse matrices for high dropout data
+
+This is immediately appealing as it could save a lot of space.
+The problem is that corrected data will not be sparse.
+The log-transformation can be sparse if the pseudo-count is 1, but if batch correction needs to be performed, that's no longer possible.
+In any case, PCA in its true form doesn't work for sparse matrices because you need to centre (though if you only use HVGs, that should be few enough to densify).
+
 # Quality control comments
 
 ## Improving resolution with log-transformed QC metrics
@@ -223,19 +230,24 @@ It's possible to figure this out based on expression in other cells, e.g., a zer
 However, this makes some assumptions, e.g., that the true expression is sampled from the same distribution for all cells.
 Getting an actual value also requires that the true dropout rate for all genes follow the trend, which might not be true if you have gene-specific dropouts.
 
-Putting this issue aside, there are several ways of handling dropouts on a per-observation basis - imputation, censoring or downweighting.
-Imputing seems somewhat circular if you try to impute from the same data, rather than using some external data (e.g., in variant calling).
-Censoring suspected dropouts avoids the need to guess what the non-zero value would be, though it results in loss of a proportion of genuine zeroes.
-Downweighting seems most gradated but it depends on a sensible definition of the weights (which is not obvious) and the ability of downstream tools to use such weights.
+Putting this issue aside, there are several ways of handling dropouts on a per-observation basis:
+
+- Imputing seems somewhat circular if you try to impute from the same data, rather than using some external data (e.g., in variant calling).
+This is particularly true if you imput from similar cells - clustering on the imputed counts would just support the initial similarities.
+- Censoring suspected dropouts avoids the need to guess what the non-zero value would be.
+However, it's not clear exactly which observations to censor, and if you do it for all of them, it results in loss of a proportion of genuine zeroes.
+- Downweighting seems most gradated but it depends on a sensible definition of the weights.
+I would probably define the weights as the probability that an observation is not a dropout in a ZI model, but most downstream tools won't handle that.
 
 Our approach is to handle the drop-outs on a per-gene basis, by modelling the technical variability introduced by them.
-This is simpler but doesn't deal with situations where the dropout rate varies per cell due to changes in total RNA content.
-(Note, not due to changes in sequencing depth or amplification, because these should not affect the capture rate.)
-This is analogous to the difference between `voom` and _limma_-trend.
+This is simpler but will effectively disregard all observations associated with a noisy gene, which might be suboptimal.
 
-However, I guess that there mightn't be much to be concerned about.
-This is because you can get a natural sigmoidal curve without requiring an explicit zero inflation term in a distribution.
-Thus, scaling of the values would work just as well to account for changes in total RNA content.
+Also, what happens if each cell or gene has a different dropout rate?
+This should not affect scaling normalization, which only cares about equating the expected expression.
+The distribution of expression only matters insofar as the robust average estimators are accurate.
+In fact, it is not clear that there is a need to explicitly model trends in the dropout rates
+You can get a natural sigmoidal curve without requiring an explicit zero inflation term in a distribution.
+Here, scaling of the values would work just as well to account for changes in total RNA content.
 
 ```{r}
 means <- 1:1000/10
@@ -281,25 +293,24 @@ With all that being said, correction is probably the lesser of two evils if you 
 It shouldn't matter for technical effects that are largely orthogonal to population structure (e.g., balanced designs).
 Problems would only occur when you try to regress out uninteresting biological effects that might have some composition differences.
 
-## Sparse matrices for high dropout data
-
-This is immediately appealing as it could save a lot of space.
-The problem is that corrected data will not be sparse.
-The log-transformation can be sparse if the pseudo-count is 1, but if batch correction needs to be performed, that's no longer possible.
-In any case, PCA in its true form doesn't work for sparse matrices because you need to centre (though if you only use HVGs, that should be few enough to densify).
-
 # HVG detection comments
 
 ## Trend fitting to variances of the log-counts
 
 The mean-variance trend for log-expression values is more complex and difficult to fit than that of other approaches.
 But we can do it, so it's a technical challenge rather than a philosophical one.
-The thin line to the left is a mathematical artifact when you have discrete counts.
+The cause of the _shape_ of the trend is somewhat interesting:
 
-- the variance will increase as a concave quadratic when you can only choose between 0 and 1 (low 'p' increases with fixed 'n' in a binomial RV).
-- the variance will increase as a convex quadratic with the mean, if variance is driven by an outlier and everything else is 0.
+- At an abundance of zero, the variance must be zero, which is why you start from the origin.
+- As abundances increase, the variance also increases as you get more non-zero observations in each cell.
+With a log-transformation, this is primarily driven by the difference between zero and non-zero values (not so much the size of the non-zero values at low abundances).
+If you model this as a scaled binomial RV with low `p` and `n=1`, you'll see a linear increase with the mean with increasing `p`.
+- As abundances increase further, the variance starts to decrease as the law of large numbers comes into play.
+That is, the number of captured molecules per cell will converge to the mean in each cell when you have enough molecules to start with.
+- The peak is probably at the abundance where there are comparable numbers of zero and non-zero counts.
+- On a side note, the variance will increase as a convex quadratic with the mean, if variance is driven by an outlier and everything else is 0.
 
-I'm not sure how much effort it's worth to extract HVG information from this part of the plot, as low counts are dominated by Poisson sampling noise.
+I'm not sure how much effort it's worth to extract HVG information from the left side of the plot, as low counts are dominated by Poisson sampling noise.
 
 ## Motivating the threshold for significance
 
