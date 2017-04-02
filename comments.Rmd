@@ -225,28 +225,15 @@ While you could also scale based on the biological component, this would downwei
 
 ## Dealing with dropouts 
 
-The difficulty with dealing with dropouts is that you don't know whether a zero count is a true dropout or due to a genuine lack of expression.
-It's possible to figure this out based on expression in other cells, e.g., a zero is more likely to be a dropout if expression is low in other cells.
-However, this makes some assumptions, e.g., that the true expression is sampled from the same distribution for all cells.
-Getting an actual value also requires that the true dropout rate for all genes follow the trend, which might not be true if you have gene-specific dropouts.
-
-Putting this issue aside, there are several ways of handling dropouts on a per-observation basis:
-
-- Imputing seems somewhat circular if you try to impute from the same data, rather than using some external data (e.g., in variant calling).
-This is particularly true if you imput from similar cells - clustering on the imputed counts would just support the initial similarities.
-- Censoring suspected dropouts avoids the need to guess what the non-zero value would be.
-However, it's not clear exactly which observations to censor, and if you do it for all of them, it results in loss of a proportion of genuine zeroes.
-- Downweighting seems most gradated but it depends on a sensible definition of the weights.
-I would probably define the weights as the probability that an observation is not a dropout in a ZI model, but most downstream tools won't handle that.
-
-Our approach is to handle the drop-outs on a per-gene basis, by modelling the technical variability introduced by them.
-This is simpler but will effectively disregard all observations associated with a noisy gene, which might be suboptimal.
-
-Also, what happens if each cell or gene has a different dropout rate?
+What happens if each cell has a different dropout rate?
 This should not affect scaling normalization, which only cares about equating the expected expression.
+Whether technical differences in expression occur in the zero or non-zero components is irrelevant to the procedure.
 The distribution of expression only matters insofar as the robust average estimators are accurate.
-In fact, it is not clear that there is a need to explicitly model trends in the dropout rates
-You can get a natural sigmoidal curve without requiring an explicit zero inflation term in a distribution.
+It does, however, pose problems in how the size factor is to be split up in a ZI model; how much of it goes to the proportion term, and how much of it changes the non-zero mean?
+
+You could theoretically use the abundance-dependent trend to empirically determine how the size factor might change the proportion.
+However, I'm not convinced that this trend justifies the need to model the dropouts separately.
+You can get a natural sigmoidal curve without requiring an explicit zero inflation term in a NB distribution.
 Here, scaling of the values would work just as well to account for changes in total RNA content.
 
 ```{r}
@@ -256,6 +243,24 @@ y <- matrix(rnbinom(100000, mu=means, size=1), nrow=length(means))
 dropout <- rowSums(y==0)/ncol(y)
 plot(means, dropout, log="x")
 ```
+
+More generally, the difficulty with dealing with dropouts is that you don't know whether a zero count is a true dropout or due to a genuine lack of expression.
+It's possible to figure this out based on expression in other cells, e.g., a zero is more likely to be a dropout if expression is non-zero in other cells.
+This assumes that the true expression in each cell is sampled from the same distribution for each gene.
+The assumption can be weakened by only using "similar" cells to impute dropouts for each cell.
+However, this shifts the burden to how similarity is defined - the assumption would be sensitive to errors/uncertainty in the similarity metric.
+
+In any case, a variety of strategies can be used to actually handle the dropouts on a per-observation basis:
+
+- Imputing is most popular, but seems somewhat circular if you try to impute from the same data (rather than using external data, e.g., as in variant calling).
+This is particularly true if you impute from similar cells - downstream clustering on the imputed counts would just support the initial similarities.
+- Censoring suspected dropouts avoids the need to explicitly guess what the non-zero value would be.
+However, it requires a (fairly arbitrary) specification of the threshold at which a dropout is distinguished from a genuine zero.
+- Downweighting seems most gradated but it depends on a sensible definition of the weights.
+I would probably define the weights as the probability that an observation is not a dropout in a ZI model, but most downstream tools won't handle that.
+
+Our approach is to handle the drop-outs on a per-gene basis, by modelling the technical variability introduced by them.
+This is simpler but will effectively disregard all observations associated with a noisy gene, which might be suboptimal.
 
 ## Additional normalization for confounding effects
 
@@ -303,11 +308,11 @@ The cause of the _shape_ of the trend is somewhat interesting:
 
 - At an abundance of zero, the variance must be zero, which is why you start from the origin.
 - As abundances increase, the variance also increases as you get more non-zero observations in each cell.
-With a log-transformation, this is primarily driven by the difference between zero and non-zero values (not so much the size of the non-zero values at low abundances).
+This is primarily driven by the difference between zero and non-zero values (not so much the size of the non-zero values at low abundances, especially with a log-transformation).
 If you model this as a scaled binomial RV with low `p` and `n=1`, you'll see a linear increase with the mean with increasing `p`.
-- As abundances increase further, the variance starts to decrease as the law of large numbers comes into play.
-That is, the number of captured molecules per cell will converge to the mean in each cell when you have enough molecules to start with.
-- The peak is probably at the abundance where there are comparable numbers of zero and non-zero counts.
+- As abundances increase further, the variance stops increasing and instead starts to decrease towards a near-zero plateau.
+One can model a high-abundance gene by summing RVs for lower-abundance genes, e.g., if you were to pool the transcript molecules of the latter.
+It is easy to see that the CV^2^ will drop for the summed RV - this implies that the relative differences decrease, so the log-variance would also drop.
 - On a side note, the variance will increase as a convex quadratic with the mean, if variance is driven by an outlier and everything else is 0.
 
 I'm not sure how much effort it's worth to extract HVG information from the left side of the plot, as low counts are dominated by Poisson sampling noise.
