@@ -212,6 +212,12 @@ var(log10(sizeFactors(sce2))) # 0.1039
 # Obviously doesn't happen in the HSC data, which is too homogeneous to care.
 ```
 
+Note that library size normalization is usually sufficient for purposes of cell type identification.
+Separation of cell types is robust as the presence of differences in the expression profile is not affected by the scaling factor.
+However, the interpretation of these differences is sensitive to the choice of normalization strategy.
+For example, depending on whether you use spike-in or non-DE normalization, you can flip the sign of the log-fold changes.
+This could completely alter your determination of what the clusters actually represents.
+
 ## Why use log-transformed normalized counts?
 
 The log-transformation provides some measure of variance stabilization for NB-distributed counts with a constant dispersion but a variable mean. 
@@ -225,42 +231,10 @@ While you could also scale based on the biological component, this would downwei
 
 ## Dealing with dropouts 
 
-What happens if each cell has a different dropout rate?
-This should not affect scaling normalization, which only cares about equating the expected expression.
-Whether technical differences in expression occur in the zero or non-zero components is irrelevant to the procedure.
+Differences in dropout rates between cells should not affect scaling normalization.
+This is because scaling normalization concerns itself with systematic (technical) differences in the expected expression between cells.
+Whether such differences occur in the zero or non-zero components is irrelevant to the computed size factors. 
 The distribution of expression only matters insofar as the robust average estimators are accurate.
-It does, however, pose problems in how the size factor is to be split up in a ZI model; how much of it goes to the proportion term, and how much of it changes the non-zero mean?
-
-You could theoretically use the abundance-dependent trend to empirically determine how the size factor might change the proportion.
-However, I'm not convinced that this trend justifies the need to model the dropouts separately.
-You can get a natural sigmoidal curve without requiring an explicit zero inflation term in a NB distribution.
-Here, scaling of the values would work just as well to account for changes in total RNA content.
-
-```{r}
-means <- 1:1000/10
-disp <- 1
-y <- matrix(rnbinom(100000, mu=means, size=1), nrow=length(means))
-dropout <- rowSums(y==0)/ncol(y)
-plot(means, dropout, log="x")
-```
-
-More generally, the difficulty with dealing with dropouts is that you don't know whether a zero count is a true dropout or due to a genuine lack of expression.
-It's possible to figure this out based on expression in other cells, e.g., a zero is more likely to be a dropout if expression is non-zero in other cells.
-This assumes that the true expression in each cell is sampled from the same distribution for each gene.
-The assumption can be weakened by only using "similar" cells to impute dropouts for each cell.
-However, this shifts the burden to how similarity is defined - the assumption would be sensitive to errors/uncertainty in the similarity metric.
-
-In any case, a variety of strategies can be used to actually handle the dropouts on a per-observation basis:
-
-- Imputing is most popular, but seems somewhat circular if you try to impute from the same data (rather than using external data, e.g., as in variant calling).
-This is particularly true if you impute from similar cells - downstream clustering on the imputed counts would just support the initial similarities.
-- Censoring suspected dropouts avoids the need to explicitly guess what the non-zero value would be.
-However, it requires a (fairly arbitrary) specification of the threshold at which a dropout is distinguished from a genuine zero.
-- Downweighting seems most gradated but it depends on a sensible definition of the weights.
-I would probably define the weights as the probability that an observation is not a dropout in a ZI model, but most downstream tools won't handle that.
-
-Our approach is to handle the drop-outs on a per-gene basis, by modelling the technical variability introduced by them.
-This is simpler but will effectively disregard all observations associated with a noisy gene, which might be suboptimal.
 
 ## Additional normalization for confounding effects
 
@@ -739,3 +713,60 @@ This would get picked up as a hidden factor of variation, leading to loss of pow
 In contrast, `cyclone` wouldn't care as long as the relative amounts of expression of cell cycle genes (or more robustly, their ranked expression) within each cell are unchanged.
 Using `scLVM` would also work as it would learn the interesting factors of variation and block on them to avoid them getting regressed out with cell cycle phase.
 However, that kind of model is notoriously finicky due to the large numbers of moving parts.
+
+# Miscellaneous comments
+
+## Do we need zero inflation in our models?
+
+Not when you're concerned with the first two moments of the expression distribution, at least.
+For purposes of DE, linear models are fine when you have enough cells, as the coefficients will just converge to normality via the CLT.
+Even NB distributions work well as they have a substantial probability mass at zero with large dispersions.
+For detecting HVGs, a ZI term would have to be combined with the variance of the non-zero term to get a summary of the total variance.
+It would be simpler to estimate the variance directly from the expression values.
+
+The main argument for a ZI model is that it would separate zero and non-zero components, especially when testing for differences.
+This might be useful in cases where both the proportion of zeros and the non-zero mean increase in one condition compared to the other - 
+for example, if the cells in the first condition split into one silent subpopulation and one upregulated subpopulation.
+Here, a standard DE analysis would be underpowered as there would be no change in mean between conditions.
+However, the logical conclusion of this reasoning would be to look for differential distributions, e.g., via MW tests, which obviates the need for an explicit ZI model.
+
+(It's hard to interpret DD without clustering.
+Simple shifts in mean are preferred as top candidates for explaining differences between conditions.
+There is a possible role for DD if changes in structure between conditions are of interest, and shifts in location are not.
+That said, DV would probably do better here if you don't care about DE.
+The use case is also moderately contrived as strong substrcuture would be detected by detecting HVGs in each cluster.)
+
+As a side note, people often observe a trend in the proportion of zeros with increasing abundance.
+This is a natural consequence of the decreasing mass at zero with increasing mean, e.g., in a standard NB distribution.
+
+```{r}
+means <- 1:1000/10
+disp <- 1
+y <- matrix(rnbinom(100000, mu=means, size=1), nrow=length(means))
+dropout <- rowSums(y==0)/ncol(y)
+plot(means, dropout, log="x")
+```
+
+## Do we need imputation?
+
+The difficulty with dealing with dropouts is that you don't know whether a zero count is a true dropout or due to a genuine lack of expression.
+It's impossible to tell for any given observation - even for a gene, you can only estimate the proportion of dropouts, and that's if you have spike-ins.
+Current imputation schemes operate more like smoothers, by replacing zeroes with some (hopefully sensible) non-zero value.
+The problem is that they impute from the same data that are used downstream, rather than using external data, e.g., as in variant calling.
+For example, to impute zeroes from "similar" cells, some measure of similarity needs to be established from the expression data.
+Further clustering on the imputed counts would just support the initial similarities, misleadingly so in some instances.
+
+```{r}
+set.seed(100)
+counts <- matrix(rpois(100000, 10), ncol=100)
+sce <- newSCESet(countData = counts)
+mgc <- magic(sce)
+norm_exprs(sce) <- mgc
+pdf("blah.pdf")
+multiplot(plotPCA(sce, exprs_values="exprs"), # 2% explained by PC1
+          plotPCA(sce, exprs_values="norm_exprs")) # 100% explained!
+dev.off()          
+```
+
+Our approach is to handle the drop-outs on a per-gene basis, by modelling the technical variability introduced by them.
+This is simpler but will effectively disregard all observations associated with a noisy gene, which might be suboptimal.
