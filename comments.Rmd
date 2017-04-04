@@ -770,3 +770,26 @@ dev.off()
 
 Our approach is to handle the drop-outs on a per-gene basis, by modelling the technical variability introduced by them.
 This is simpler but will effectively disregard all observations associated with a noisy gene, which might be suboptimal.
+
+## Dealing with oscillatory behaviour
+
+We don't explicitly identify oscillatory behaviour between two genes.
+A perfectly circular oscillation would result in zero correlation between genes.
+Hopefully, however, if the oscillation is driving some biological process, it would be correlated with other genes that are oscillating in the same phase.
+This would allow such genes to be detected without explicitly looking for oscillations.
+Needless to say, the genes should also be highly variable, but this should be the case if there is a strong biological signal.
+
+## Limits of detection and bias
+
+Is scRNA-seq data linear? 
+One would expect so; the number of reads generated from each molecule is a random variable, and the count for each gene is the sum of these RVs.
+Doubling the number of molecules should result in a doubling of the expected count, even when there are correlations between RVs due to cell-specific biases.
+This remains true upon decreasing abundance; there is no hard "detection limit", just a linear decrease in the expected count so that you get more zeroes.
+
+A variety of dilution experiments in the literature also demonstrate linearity across the dynamic range. 
+This is done by either diluting a single transcript (e.g., Figure 3 in the CEL-seq paper), which shows a linear (expected) response with respect to transcript concentration;
+or by diluting and plotting the counts of the diluted sample against the original, which should only be linear if the dilution downscales the counts.
+
+Note that linearity will break if sequencing resources are saturated, such that you get the same counts at any abundance of transcript.
+This should be handled by normalization, which suggests that your dilution experiments should include enough genes to normalize with. 
+
