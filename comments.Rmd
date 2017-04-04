@@ -221,13 +221,16 @@ This could completely alter your determination of what the clusters actually rep
 ## Why use log-transformed normalized counts?
 
 The log-transformation provides some measure of variance stabilization for NB-distributed counts with a constant dispersion but a variable mean. 
-This seems better than square-rooting it, which is the VST for the Poisson only.
-I guess you could play around with various Box-Cox transformations, but the mean-variance trend is pretty extreme and probably won't go away just by changing lambda.
+Without it, the trend would be pretty extreme and difficult to fit reliably, especially as the precision of the variance estimate will change with the mean.
+Log-transformation seems better than square-rooting it, which is the VST for the Poisson only.
+You could play around with various Box-Cox transformations, but the mean-variance trend is pretty extreme and probably won't go away just by changing lambda.
 
 I also considered scaling the log-expression to downweight genes with high technical noise.
 The problem is that this implicitly upweights genes with low technical noise but also low total variance.
 As a result, your scaled log-expression values might be dominated by biological variability that was originally minor.
-While you could also scale based on the biological component, this would downweight interesting genes with high genuine variance.
+Obviously, scaling to equalize the biological components would be a bad idea as this would downweight interesting genes with high genuine variance.
+Leaving them unscaled avoids distorting the "true" biological distances between multiple subpopulations, at the cost of extra noise from genes with high technical variance.
+(Though there shouldn't be many of these to start with, if you only run this on HVGs.)
 
 ## Dealing with dropouts 
 
