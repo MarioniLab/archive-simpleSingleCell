@@ -229,8 +229,12 @@ I also considered scaling the log-expression to downweight genes with high techn
 The problem is that this implicitly upweights genes with low technical noise but also low total variance.
 As a result, your scaled log-expression values might be dominated by biological variability that was originally minor.
 Obviously, scaling to equalize the biological components would be a bad idea as this would downweight interesting genes with high genuine variance.
-Leaving them unscaled avoids distorting the "true" biological distances between multiple subpopulations, at the cost of extra noise from genes with high technical variance.
-(Though there shouldn't be many of these to start with, if you only run this on HVGs.)
+
+Leaving the log-expressions unscaled avoids distorting the "true" biological distances (i.e., log-fold changes) between subpopulations.
+While any single distance has no meaning, its value is pertinent if you want to accurately represent relative differences between three or more groups of cells.
+For example, is one group more related to another, compared to a third group (this is also relevant to subgroups)?
+Of course, using unscaled values will not mitigate noise from genes with high technical variance.
+However, this is random and not of too much concern - besides, you should have already enriched for biological signal by only using HVGs.
 
 ## Dealing with dropouts 
 
