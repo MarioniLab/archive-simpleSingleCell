@@ -376,13 +376,13 @@ Pool-based size factors are then "deconvolved" into cell-based factors for cell-
 
 
 ```r
-sce <- computeSumFactors(sce, sizes=c(20, 40, 60, 80))
+sce <- computeSumFactors(sce, sizes=seq(20, 80, 5))
 summary(sizeFactors(sce))
 ```
 
 ```
 ##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-##  0.4274  0.8099  0.9436  1.0000  1.1930  1.7931
+##  0.4142  0.8159  0.9316  1.0000  1.1827  1.9895
 ```
 
 In this case, the size factors are tightly correlated with the library sizes for all cells (Figure 8).
@@ -526,7 +526,7 @@ nrow(hvg.out)
 ```
 
 ```
-## [1] 147
+## [1] 145
 ```
 
 ```r
@@ -536,12 +536,12 @@ head(hvg.out)
 
 ```
 ##              mean     total       bio      tech      p.value          FDR
-## Fos      6.411042 20.159194 12.053456  8.105738 2.263339e-12 1.433105e-09
-## Rgs1     5.212595 20.249475  9.093784 11.155692 9.062415e-06 1.485170e-03
-## Dusp1    6.691463 16.050649  8.819687  7.230961 1.487462e-09 5.600092e-07
-## Ctla2a   8.652601  9.466255  7.302912  2.163343 2.725962e-36 5.424665e-33
-## Ppp1r15a 6.545141 14.958471  7.242650  7.715821 7.473044e-07 1.626555e-04
-## Sult1a1  5.612014 17.408274  7.041377 10.366896 1.157795e-04 1.290247e-02
+## Fos      6.411763 20.184481 12.080744  8.103738 2.060249e-12 1.304512e-09
+## Rgs1     5.214931 20.269800  9.118208 11.151592 8.631784e-06 1.431438e-03
+## Dusp1    6.694369 16.081746  8.860774  7.220972 1.252186e-09 4.714312e-07
+## Ctla2a   8.653032  9.508748  7.344402  2.164347 1.553494e-36 3.327867e-33
+## Ppp1r15a 6.544443 14.946762  7.229263  7.717498 7.781068e-07 1.642277e-04
+## Sult1a1  5.612108 17.383183  7.015586 10.367597 1.211462e-04 1.339339e-02
 ```
 
 We recommend checking the distribution of expression values for the top HVGs to ensure that the variance estimate is not being dominated by one or two outlier cells (Figure 11).
@@ -578,12 +578,12 @@ head(var.cor)
 
 ```
 ##      gene1   gene2       rho      p.value         FDR limited
-## 1   mt-Nd2 mt-Rnr1 0.6056421 1.999998e-06 0.003576996    TRUE
-## 2     Egr1     Jun 0.5267411 1.999998e-06 0.003576996    TRUE
-## 3    Pdia6   Hspa5 0.5095084 1.999998e-06 0.003576996    TRUE
-## 4      Fos    Egr1 0.5056463 1.999998e-06 0.003576996    TRUE
-## 5 Ppp1r15a   Zfp36 0.4991814 1.999998e-06 0.003576996    TRUE
-## 6   Hnrpdl  mt-Nd2 0.4956971 1.999998e-06 0.003576996    TRUE
+## 1   mt-Nd2 mt-Rnr1 0.6068805 1.999998e-06 0.002982854    TRUE
+## 2     Egr1     Jun 0.5304143 1.999998e-06 0.002982854    TRUE
+## 3    Pdia6   Hspa5 0.5177365 1.999998e-06 0.002982854    TRUE
+## 4      Fos    Egr1 0.5107468 1.999998e-06 0.002982854    TRUE
+## 5 Ppp1r15a   Zfp36 0.4986357 1.999998e-06 0.002982854    TRUE
+## 6    Zfp36    Ier2 0.4929894 1.999998e-06 0.002982854    TRUE
 ```
 
 The significance of each correlation is determined using a permutation test.
@@ -600,7 +600,7 @@ summary(sig.cor)
 
 ```
 ##    Mode   FALSE    TRUE 
-## logical   10690      41
+## logical   10390      50
 ```
 
 Larger sets of correlated genes are assembled by treating genes as nodes in a graph and each pair of genes with significantly large correlations as an edge.
@@ -620,7 +620,7 @@ head(cl)
 
 ```
 ## [[1]]
-## [1] "Pdia6"  "Hspd1"  "Tuba4a" "Hspa5"  "Tuba1b"
+## [1] "Pdia6"   "Hspd1"   "Phgdh"   "Pik3ip1" "Ncl"    
 ## 
 ## [[2]]
 ## [1] "Egr1"  "Fos"   "Zfp36" "Ier2" 
@@ -629,13 +629,13 @@ head(cl)
 ## [1] "mt-Nd2"  "Sh3bgrl" "mt-Rnr1"
 ## 
 ## [[4]]
-## [1] "Sqstm1" "Phgdh"  "Cct3"  
+## [1] "Vbp1"   "Cacybp" "Hnrnpu"
 ## 
 ## [[5]]
-## [1] "Ly6a"   "Shisa5" "Lsp1"  
+## [1] "Sqstm1" "Igfbp4" "Cct3"  
 ## 
 ## [[6]]
-## [1] "Cd164"   "Slc18a2"
+## [1] "Ppp1r15a" "Junb"
 ```
 
 Significant correlations provide evidence for substructure in the dataset, i.e., subpopulations of cells with systematic differences in their expression profiles.
@@ -657,12 +657,12 @@ head(var.cor)
 
 ```
 ##       gene        rho      p.value         FDR limited
-## 1      Fos  0.5043239 0.0005839994 0.008584791   FALSE
-## 2     Rgs1  0.3986189 0.0309519690 0.091857268   FALSE
-## 3    Dusp1  0.4512405 0.0043799956 0.033168512   FALSE
-## 4   Ctla2a -0.3909156 0.0467199533 0.122639877   FALSE
-## 5 Ppp1r15a  0.5129298 0.0005839994 0.008584791   FALSE
-## 6  Sult1a1  0.3825826 0.0627799372 0.148849206   FALSE
+## 1      Fos  0.5173376 0.0005759994 0.009279991   FALSE
+## 2     Rgs1  0.4236178 0.0129599870 0.059657083   FALSE
+## 3    Dusp1  0.4500231 0.0051839948 0.031319969   FALSE
+## 4   Ctla2a -0.3899920 0.0478079522 0.116380211   FALSE
+## 5 Ppp1r15a  0.5094035 0.0005759994 0.009279991   FALSE
+## 6  Sult1a1  0.4107930 0.0204479796 0.078025185   FALSE
 ```
 
 ```r
@@ -672,7 +672,7 @@ summary(sig.cor)
 
 ```
 ##    Mode   FALSE    TRUE 
-## logical     120      27
+## logical     116      29
 ```
 
 ## Using correlated HVGs for further data exploration
@@ -1018,6 +1018,12 @@ Scaling is then performed to ensure that size factors of cells in different clus
 ```r
 clusters <- quickCluster(sce)
 sce <- computeSumFactors(sce, cluster=clusters)
+summary(sizeFactors(sce))
+```
+
+```
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##  0.1288  0.4509  0.8223  1.0000  1.3495  4.9446
 ```
 
 
@@ -1098,7 +1104,7 @@ nrow(hvg.out.des)
 ```
 
 ```
-## [1] 1648
+## [1] 1647
 ```
 
 Alternatively, for data sets containing multiple batches, a more robust strategy is to perform trend fitting and variance decomposition separately for each batch.
@@ -1154,7 +1160,7 @@ nrow(hvg.out)
 ```
 
 ```
-## [1] 1724
+## [1] 1712
 ```
 
 ```r
@@ -1164,12 +1170,12 @@ head(hvg.out)
 
 ```
 ##          mean     total       bio      tech p.value FDR
-## Plp1 3.943195 16.294002 16.041809 0.2521927       0   0
-## Mal  2.287828 10.921206 10.331688 0.5895175       0   0
-## Trf  2.115908  9.975920  9.359481 0.6164385       0   0
-## Mbp  2.277495  7.996406  7.408212 0.5881935       0   0
-## Mog  1.814148  8.067186  7.390499 0.6766870       0   0
-## Apod 1.750493  7.863002  7.199157 0.6638445       0   0
+## Plp1 3.942784 16.268240 16.015984 0.2522561       0   0
+## Mal  2.287297 10.898808 10.309165 0.5896426       0   0
+## Trf  2.115009  9.958051  9.341630 0.6164211       0   0
+## Mbp  2.276203  7.977436  7.388900 0.5885360       0   0
+## Mog  1.813190  8.046103  7.369380 0.6767230       0   0
+## Apod 1.749638  7.844978  7.181341 0.6636372       0   0
 ```
 
 Again, we check the distribution of expression values for the top 10 HVGs to ensure that they are not being driven by outliers (Figure 22).
@@ -1196,12 +1202,12 @@ head(var.cor)
 
 ```
 ##   gene       rho      p.value          FDR limited
-## 1 Plp1 0.7471642 2.585144e-06 5.957866e-06    TRUE
-## 2  Mal 0.7471642 2.608627e-06 5.957866e-06    TRUE
-## 3  Trf 0.7052470 2.614565e-06 5.957866e-06    TRUE
-## 4  Mbp 0.7420629 2.632541e-06 5.957866e-06    TRUE
-## 5  Mog 0.7026398 2.614565e-06 5.957866e-06    TRUE
-## 6 Apod 0.6854753 2.642635e-06 5.957866e-06    TRUE
+## 1 Plp1 0.7489356 2.565215e-06 5.961472e-06    TRUE
+## 2  Mal 0.7489356 2.604259e-06 5.961472e-06    TRUE
+## 3  Trf 0.7161424 2.592422e-06 5.961472e-06    TRUE
+## 4  Mbp 0.7376700 2.618207e-06 5.961472e-06    TRUE
+## 5  Mog 0.7034789 2.594387e-06 5.961472e-06    TRUE
+## 6 Apod 0.6885070 2.654768e-06 5.961472e-06    TRUE
 ```
 
 ```r
@@ -1211,7 +1217,7 @@ summary(sig.cor)
 
 ```
 ##    Mode   FALSE    TRUE 
-## logical       1    1723
+## logical       1    1711
 ```
 
 ## Further data exploration with the correlated HVGs
@@ -1338,7 +1344,7 @@ dim(reducedDimension(pcs)) # Cluster on this instead of t(chosen.exprs)
 ```
 
 ```
-## [1] 2902  127
+## [1] 2902  126
 ```
 
 When examining very heterogeneous datasets, it can be useful to repeat the HVG detection and clustering using only the cells within a particular cluster.
@@ -1358,7 +1364,7 @@ The top DE genes are likely to be good candidate markers as they can effectively
 
 
 ```r
-markers <- findMarkers(sce, my.clusters, block=design)
+markers <- findMarkers(sce, my.clusters, design=design)
 ```
 
 For each cluster, the DE results of the relevant comparisons are consolidated into a single output table.
@@ -1375,29 +1381,35 @@ head(marker.set, 10)
 ```
 
 ```
-##    Top    Gene       FDR        2       3       4        5     6       7      8
-## 1    1   Htr3a  0.00e+00  0.00946 -0.0949 -0.0167 -0.03944 -3.19 -0.1200 -0.162
-## 2    1 Prkar1b  0.00e+00 -2.12466 -2.6106 -2.1648 -0.23133 -2.91 -0.0465 -1.884
-## 3    1  Mllt11  6.01e-99 -2.69088 -2.4910 -1.8804  0.13868 -2.87  0.3589 -1.733
-## 4    1    Syt1 4.23e-307 -3.08566 -3.5034 -3.5481 -0.73261 -4.10 -0.2287 -2.890
-## 5    1   Stmn3  0.00e+00 -4.42010 -4.0226 -2.9896  0.07845 -4.16 -0.0340 -3.276
-## 6    1     Clu  0.00e+00 -0.33316 -1.3890 -0.4827 -0.17342 -1.71 -5.5034 -0.647
-## 7    1   Gpm6b  0.00e+00  1.22472  1.3894  1.5755  3.49525  3.29  0.0830  0.736
-## 8    2  Kcnip1  0.00e+00  0.01789 -0.0369 -0.0116  0.00168 -1.44 -0.0294 -0.152
-## 9    2   Ndrg4 1.17e-230 -3.05239 -3.3451 -2.8611 -0.16575 -3.90 -0.2400 -2.618
-## 10   2  Snap25  0.00e+00 -3.81108 -4.5051 -3.0332 -0.44152 -4.24 -0.0256 -3.691
+##    Top    Gene       FDR       2       3        4       5     6      7       8
+## 1    1   Htr3a  0.00e+00 -0.0290 -0.1115  0.00569 -0.0570 -3.16 -0.143 -0.1055
+## 2    1 Prkar1b  0.00e+00 -2.2513 -2.6726 -2.17504 -0.3692 -2.99 -1.629 -0.1465
+## 3    1  Mllt11  1.61e-70 -2.0152 -2.5638 -2.76325  0.0386 -2.90 -1.387  0.3273
+## 4    1     Clu  1.15e-57 -0.4223 -1.3909 -0.41623 -0.2760 -1.72 -0.653 -5.5774
+## 5    1  Snap25  0.00e+00 -3.2625 -4.5989 -4.07239 -0.7159 -4.39 -3.328 -0.2371
+## 6    1   Syt11 1.13e-116  1.2548  1.5290  1.96805  3.6767  1.42  0.933  2.0607
+## 7    2  Kcnip1  0.00e+00 -0.0154 -0.0432  0.01007 -0.0044 -1.45 -0.154 -0.0393
+## 8    2    Syt1  0.00e+00 -3.6676 -3.6910 -3.24439 -0.9671 -4.30 -2.766 -0.4834
+## 9    2   Ndrg4 3.23e-205 -3.0066 -3.4408 -3.18016 -0.3828 -4.02 -2.298 -0.3495
+## 10   2  Snhg11  0.00e+00 -4.2695 -3.7370 -3.96395 -0.8919 -3.80 -3.435 -0.3993
 ```
 
 
 
 We save the list of candidate marker genes for further examination.
-We also examine their expression profiles to verify that the DE signature is robust.
+The `overlapExprs` function may also be useful here, to prioritize candidates where there is clear separation between the distributions of expression values of different clusters.
+
+
+```r
+write.table(marker.set, file="brain_marker_1.tsv", sep="\t", quote=FALSE, col.names=NA)
+```
+
+We visualize the expression profiles of the top candidates to verify that the DE signature is robust.
 Figure 26 indicates that most of the top markers have strong and consistent up- or downregulation in cells of cluster 1 compared to some or all of the other clusters.
 Thus, cells from the subpopulation of interest can be identified as those that express the upregulated markers and do not express the downregulated markers.
 
 
 ```r
-write.table(marker.set, file="brain_marker_1.tsv", sep="\t", quote=FALSE, col.names=NA)
 top.markers <- marker.set$Gene[marker.set$Top <= 10]
 top.exprs <- norm_exprs(sce)[top.markers,,drop=FALSE]
 heat.vals <- top.exprs - rowMeans(top.exprs)
@@ -1713,9 +1725,13 @@ sessionInfo()
 ```
 
 ```
-## R Under development (unstable) (2016-10-17 r71531)
+## R version 3.4.0 RC (2017-04-18 r72535)
 ## Platform: x86_64-pc-linux-gnu (64-bit)
 ## Running under: Ubuntu 14.04.5 LTS
+## 
+## Matrix products: default
+## BLAS: /home/cri.camres.org/lun01/Software/R/R-3-4-branch_devel/lib/libRblas.so
+## LAPACK: /home/cri.camres.org/lun01/Software/R/R-3-4-branch_devel/lib/libRlapack.so
 ## 
 ## locale:
 ##  [1] LC_CTYPE=en_GB.UTF-8       LC_NUMERIC=C               LC_TIME=en_GB.UTF-8       
@@ -1727,66 +1743,67 @@ sessionInfo()
 ## [1] stats4    parallel  stats     graphics  grDevices utils     datasets  methods   base     
 ## 
 ## other attached packages:
-##  [1] TxDb.Mmusculus.UCSC.mm10.ensGene_3.4.0 GenomicFeatures_1.27.10               
-##  [3] GenomicRanges_1.27.23                  GenomeInfoDb_1.11.9                   
-##  [5] edgeR_3.17.6                           dynamicTreeCut_1.63-1                 
-##  [7] limma_3.31.19                          gplots_3.0.1                          
+##  [1] TxDb.Mmusculus.UCSC.mm10.ensGene_3.4.0 GenomicFeatures_1.27.14               
+##  [3] GenomicRanges_1.27.23                  GenomeInfoDb_1.11.10                  
+##  [5] edgeR_3.17.9                           dynamicTreeCut_1.63-1                 
+##  [7] limma_3.31.21                          gplots_3.0.1                          
 ##  [9] RBGL_1.51.0                            graph_1.53.0                          
-## [11] org.Mm.eg.db_3.4.0                     AnnotationDbi_1.37.4                  
+## [11] org.Mm.eg.db_3.4.1                     AnnotationDbi_1.37.4                  
 ## [13] IRanges_2.9.19                         S4Vectors_0.13.15                     
-## [15] scran_1.3.12                           scater_1.3.35                         
+## [15] scran_1.3.16                           scater_1.3.45                         
 ## [17] ggplot2_2.2.1                          Biobase_2.35.1                        
-## [19] BiocGenerics_0.21.3                    readxl_0.1.1                          
+## [19] BiocGenerics_0.21.3                    readxl_1.0.0                          
 ## [21] R.utils_2.5.0                          R.oo_1.21.0                           
 ## [23] R.methodsS3_1.7.1                      destiny_2.1.0                         
 ## [25] mvoutlier_2.0.8                        sgeostat_1.0-27                       
-## [27] Rtsne_0.11                             BiocParallel_1.9.5                    
-## [29] knitr_1.15.1                           BiocStyle_2.3.31                      
+## [27] Rtsne_0.13                             BiocParallel_1.9.6                    
+## [29] knitr_1.15.1                           BiocStyle_2.3.32                      
 ## 
 ## loaded via a namespace (and not attached):
 ##   [1] backports_1.0.5            Hmisc_4.0-2                RcppEigen_0.3.2.9.1       
 ##   [4] plyr_1.8.4                 igraph_1.0.1               lazyeval_0.2.0            
 ##   [7] sp_1.2-4                   shinydashboard_0.5.3       splines_3.4.0             
-##  [10] digest_0.6.12              htmltools_0.3.5            viridis_0.3.4             
+##  [10] digest_0.6.12              htmltools_0.3.5            viridis_0.4.0             
 ##  [13] gdata_2.17.0               magrittr_1.5               checkmate_1.8.2           
-##  [16] memoise_1.0.0              cluster_2.0.6              Biostrings_2.43.5         
-##  [19] matrixStats_0.51.0         xts_0.9-7                  colorspace_1.3-2          
+##  [16] memoise_1.0.0              cluster_2.0.6              Biostrings_2.43.8         
+##  [19] matrixStats_0.52.2         xts_0.9-7                  colorspace_1.3-2          
 ##  [22] rrcov_1.4-3                dplyr_0.5.0                tximport_1.3.13           
-##  [25] RCurl_1.95-4.8             lme4_1.1-12                survival_2.41-2           
-##  [28] zoo_1.7-14                 gtable_0.2.0               XVector_0.15.2            
-##  [31] zlibbioc_1.21.0            MatrixModels_0.4-1         DelayedArray_0.1.7        
+##  [25] RCurl_1.95-4.8             lme4_1.1-12                survival_2.41-3           
+##  [28] zoo_1.8-0                  gtable_0.2.0               XVector_0.15.2            
+##  [31] zlibbioc_1.21.0            MatrixModels_0.4-1         DelayedArray_0.1.11       
 ##  [34] car_2.1-4                  kernlab_0.9-25             prabclus_2.2-6            
-##  [37] DEoptimR_1.0-8             SparseM_1.76               VIM_4.6.0                 
-##  [40] scales_0.4.1               mvtnorm_1.0-6              DBI_0.6                   
+##  [37] DEoptimR_1.0-8             SparseM_1.76               VIM_4.7.0                 
+##  [40] scales_0.4.1               mvtnorm_1.0-6              DBI_0.6-1                 
 ##  [43] GGally_1.3.0               Rcpp_0.12.10               sROC_0.1-2                
-##  [46] xtable_1.8-2               laeken_0.4.6               htmlTable_1.9             
-##  [49] foreign_0.8-67             proxy_0.4-17               mclust_5.2.3              
-##  [52] Formula_1.2-1              vcd_1.4-3                  htmlwidgets_0.8           
-##  [55] FNN_1.1                    RColorBrewer_1.1-2         fpc_2.1-10                
-##  [58] acepack_1.4.1              modeltools_0.2-21          reshape_0.8.6             
-##  [61] XML_3.98-1.5               flexmix_2.3-13             nnet_7.3-12               
-##  [64] locfit_1.5-9.1             labeling_0.3               reshape2_1.4.2            
-##  [67] munsell_0.4.3              tools_3.4.0                RSQLite_1.1-2             
-##  [70] pls_2.6-0                  evaluate_0.10              stringr_1.2.0             
-##  [73] cvTools_0.3.2              yaml_2.1.14                robustbase_0.92-7         
-##  [76] caTools_1.17.1             nlme_3.1-131               mime_0.5                  
-##  [79] quantreg_5.29              biomaRt_2.31.4             pbkrtest_0.4-7            
-##  [82] beeswarm_0.2.3             e1071_1.6-8                statmod_1.4.29            
-##  [85] smoother_1.1               tibble_1.2                 robCompositions_2.0.3     
-##  [88] pcaPP_1.9-61               stringi_1.1.3              highr_0.6                 
-##  [91] lattice_0.20-34            trimcluster_0.1-2          Matrix_1.2-8              
-##  [94] nloptr_1.0.4               lmtest_0.9-35              cowplot_0.7.0             
-##  [97] data.table_1.10.4          bitops_1.0-6               rtracklayer_1.35.9        
-## [100] httpuv_1.3.3               R6_2.2.0                   latticeExtra_0.6-28       
-## [103] KernSmooth_2.23-15         gridExtra_2.2.1            vipor_0.4.5               
-## [106] gtools_3.5.0               boot_1.3-18                MASS_7.3-45               
-## [109] assertthat_0.1             SummarizedExperiment_1.5.7 rhdf5_2.19.1              
-## [112] rprojroot_1.2              rjson_0.2.15               GenomicAlignments_1.11.12 
-## [115] Rsamtools_1.27.13          GenomeInfoDbData_0.99.0    diptest_0.75-7            
-## [118] mgcv_1.8-17                grid_3.4.0                 rpart_4.1-10              
-## [121] class_7.3-14               minqa_1.2.4                rmarkdown_1.4             
-## [124] TTR_0.23-1                 scatterplot3d_0.3-38       shiny_1.0.0               
-## [127] base64enc_0.1-3            ggbeeswarm_0.5.3
+##  [46] viridisLite_0.2.0          xtable_1.8-2               laeken_0.4.6              
+##  [49] htmlTable_1.9              foreign_0.8-67             proxy_0.4-17              
+##  [52] mclust_5.2.3               Formula_1.2-1              DT_0.2                    
+##  [55] vcd_1.4-3                  htmlwidgets_0.8            FNN_1.1                   
+##  [58] RColorBrewer_1.1-2         fpc_2.1-10                 acepack_1.4.1             
+##  [61] modeltools_0.2-21          reshape_0.8.6              XML_3.98-1.6              
+##  [64] flexmix_2.3-13             nnet_7.3-12                locfit_1.5-9.1            
+##  [67] labeling_0.3               reshape2_1.4.2             munsell_0.4.3             
+##  [70] cellranger_1.1.0           tools_3.4.0                RSQLite_1.1-2             
+##  [73] pls_2.6-0                  evaluate_0.10              stringr_1.2.0             
+##  [76] cvTools_0.3.2              yaml_2.1.14                robustbase_0.92-7         
+##  [79] caTools_1.17.1             nlme_3.1-131               mime_0.5                  
+##  [82] quantreg_5.33              biomaRt_2.31.10            compiler_3.4.0            
+##  [85] pbkrtest_0.4-7             beeswarm_0.2.3             e1071_1.6-8               
+##  [88] statmod_1.4.29             smoother_1.1               tibble_1.3.0              
+##  [91] robCompositions_2.0.3      pcaPP_1.9-61               stringi_1.1.5             
+##  [94] highr_0.6                  lattice_0.20-35            trimcluster_0.1-2         
+##  [97] Matrix_1.2-8               nloptr_1.0.4               lmtest_0.9-35             
+## [100] cowplot_0.7.0              data.table_1.10.4          bitops_1.0-6              
+## [103] rtracklayer_1.35.12        httpuv_1.3.3               R6_2.2.0                  
+## [106] latticeExtra_0.6-28        KernSmooth_2.23-15         gridExtra_2.2.1           
+## [109] vipor_0.4.5                gtools_3.5.0               boot_1.3-18               
+## [112] MASS_7.3-45                assertthat_0.2.0           SummarizedExperiment_1.5.9
+## [115] rhdf5_2.19.3               rjson_0.2.15               rprojroot_1.2             
+## [118] GenomicAlignments_1.11.12  Rsamtools_1.27.16          GenomeInfoDbData_0.99.0   
+## [121] diptest_0.75-7             mgcv_1.8-17                grid_3.4.0                
+## [124] rpart_4.1-10               class_7.3-14               minqa_1.2.4               
+## [127] rmarkdown_1.4              TTR_0.23-1                 scatterplot3d_0.3-39      
+## [130] shiny_1.0.1                base64enc_0.1-3            ggbeeswarm_0.5.3
 ```
 
 
