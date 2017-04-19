@@ -137,7 +137,7 @@ In practice, it doesn't really matter whether the library sizes or size factors 
 Consider a gene with count $Y$, with library sizes $L$ and size factors $S$.
 Assume that $Y= uS + e$ for constant mean $u$ and gene-/library-specific error $e$, and that $L = MS$ for a library-specific modifier $M$.
 (In other words, the library sizes oscillate around the true size factors, which seems to be the case in most data sets.
- We note that $E(M)=1$ as we have scaled the library sizes to have a mean of unity.)
+We note that $E(M)=1$ as we have scaled the library sizes to have a mean of unity.)
 If we compute the library size-corrected average, we get:
 
 $$
@@ -225,16 +225,22 @@ Without it, the trend would be pretty extreme and difficult to fit reliably, esp
 Log-transformation seems better than square-rooting it, which is the VST for the Poisson only.
 You could play around with various Box-Cox transformations, but the mean-variance trend is pretty extreme and probably won't go away just by changing lambda.
 
-I also considered scaling the log-expression to downweight genes with high technical noise.
-The problem is that this implicitly upweights genes with low technical noise but also low total variance.
-As a result, your scaled log-expression values might be dominated by biological variability that was originally minor.
-Obviously, scaling to equalize the biological components would be a bad idea as this would downweight interesting genes with high genuine variance.
+While we're talking about the transformation, should we standardize the log-expression values?
+This ensures that all genes contribute the same amount of variance, thereby eliminating the mean-variance relationship.
+Genes in the middle of the range with high technical variance will not dominate the variance of the data set.
+However, there are several drawbacks:
 
-Leaving the log-expressions unscaled avoids distorting the "true" biological distances (i.e., log-fold changes) between subpopulations.
-While any single distance has no meaning, its value is pertinent if you want to accurately represent relative differences between three or more groups of cells.
-For example, is one group more related to another, compared to a third group (this is also relevant to subgroups)?
-Of course, using unscaled values will not mitigate noise from genes with high technical variance.
-However, this is random and not of too much concern - besides, you should have already enriched for biological signal by only using HVGs.
+- Standardizing would downweight interesting genes with large total variances due to the biological component.
+This could conceivably reduce the resolution of biological differences between cells, especially if technical noise gets upweighted.
+- An alternative strategy is to scale the log-expression values so that all genes have the same technical component.
+This avoids the above issue, but it implicitly upweights HVGs with low technical noise and small (non-zero) biological components.
+As a result, the scaled values might be dominated by biological variability that was originally minor.
+- Any scaling would distort the true log-fold changes for genes between subpopulations, which has implications when using the transformed values for DE analyses.
+It also affects interpretation of relative distances between three or more groups of cells, e.g., are two groups more related than a third group?
+
+Scaling of the technical components will eliminate the mean-variance relationship most efficiently.
+This ensures that the distribution of variances of non-HVGs will be the same across abundances, but will distort the biological component for HVGs.
+A better and simpler approach is to enriched for biological signal by only using HVGs in clustering, dimensionality reduction, etc.
 
 ## Dealing with dropouts 
 
