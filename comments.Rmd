@@ -47,11 +47,25 @@ This reduces the resolution for where the threshold would usually be.
 
 ## Assumptions of outlier identification
 
+### Independence between QC metrics and biology
+
 There's an implicit assumption that these technical metrics are homogeneous across cell subtypes and states.
 This ensures that outliers are not driven by biological differences and must represent aberrant libraries.
 However, this assumption won't be true for extreme cases like erythrocytes, where the "outliers" would just be a genuine biological clustering.
 In such cases, cell types might be incorrectly removed, which would be unfortunate.
 Some heterogeneity is tolerated provided that the inter-state variance of the metric is smaller than the intra-state variance.
+
+I'm not sure there's a good automatic way to distinguish between low quality cells and those from a different cell type when heterogeneous QC metrics are observed.
+You might think to use the expression of endogenous genes to gauge whether the QC-outliers form a cluster and thus might be a genuine cell type.
+However, the point is that poor quality affects the observed expression in ways that are difficult to normalize [@ilicic2016classification].
+It would not be easy to tell whether a cluster was due to genuine biological separation or due to technical differences in quality.
+In the most obvious case, all the empty wells might cluster together, even though this is clearly not a cell type.
+
+If the assumption above is violated, the only solution is to set some hard absolute threshold (to distinguish between relatively poor and absolutely poor).
+This requires a _lot_ of context and/or experience to get right - at least, some fiddling with the threshold would be needed.
+Identifying outliers directly from the endogenous genes is not ideal, as this would just eliminate rare subpopulations and understate cellular heterogeneity.
+
+### Batch-by-batch quality control
 
 Systematic differences in QC metrics can be handled to some extent using the `batch` argument in the `isOutlier` function.
 This is obviously useful for batch effects caused by known differences in experimental processing, e.g., sequencing at different depth or had different amounts of spike-in added.
@@ -62,10 +76,6 @@ In general, it seems better to block on more factors rather than fewer, to avoid
 The risk is that you'll lose more cells within each batch because the MAD is smaller, such that an uncommon subset of (high-quality) cells end up being removed.
 However, you should never expect to encounter this situation under the homogeneity assumption.
 If that assumption fails, then the concept of low-quality cells being outliers is inherently invalid.
-
-I'm not sure there's a good automatic way to distinguish between low quality cells and those from a different cell type when heterogeneous QC metrics are observed.
-This also extends to the expression profiles, because the whole point is that poor sample preparation affects the observed expression in ways that are difficult to normalize.
-The only solution is to set some hard absolute threshold (to distinguish between relatively poor and absolutely poor), and this requires a _lot_ of context.
 
 # Cell cycle classification comments
 
