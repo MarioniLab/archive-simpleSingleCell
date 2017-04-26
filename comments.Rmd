@@ -61,9 +61,10 @@ However, the point is that poor quality affects the observed expression in ways 
 It would not be easy to tell whether a cluster was due to genuine biological separation or due to technical differences in quality.
 In the most obvious case, all the empty wells might cluster together, even though this is clearly not a cell type.
 
-If the assumption above is violated, the only solution is to set some hard absolute threshold (to distinguish between relatively poor and absolutely poor).
-This requires a _lot_ of context and/or experience to get right - at least, some fiddling with the threshold would be needed.
-Identifying outliers directly from the endogenous genes is not ideal, as this would just eliminate rare subpopulations and understate cellular heterogeneity.
+If the assumption above is violated, the only solution is to set some hard absolute threshold.
+This only removes cells that are "absolutely" poor for further work (normalization, etc.) while giving those that are "relatively" poor the benefit of the doubt.
+However, this requires a _lot_ of context and/or experience to get right.
+Identifying outliers directly from the endogenous genes is also not ideal, as this would just eliminate rare subpopulations and understate cellular heterogeneity.
 
 ### Batch-by-batch quality control
 
