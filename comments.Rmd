@@ -80,15 +80,16 @@ If that assumption fails, then the concept of low-quality cells being outliers i
 
 ## Cell filtering before gene filtering
 
-It is logical to remove low-quality cells before computing the averages, otherwise they would be distorted by empty cells or cells with 100% spike-ins.
-One _could_ argue that some cells become low quality after filtering on the genes.
+It is intuitively logical to remove low-quality cells before computing the average counts and performing gene filtering.
+Otherwise, the averages would be distorted by empty cells or cells with 100% spike-ins.
+However, one _could_ argue that some cells become low quality after filtering on the genes.
 In particular, cells might drop below the "number of expressed features" threshold after some genes are removed.
 This would indicate a need for repeated cycles of filtering on cells and genes, which would be rather laborious.
 
 In practice, this is unlikely to be a problem.
-Loss of an inordinate number of expressed features in some cells relative to others would only be observed for DE genes.
+Removal of an inordinate number of expressed features in some cells relative to other cells would only occur due to DE genes.
 If most genes are not DE, they should be filtered at an equal rate for all cells.
-This suggests that outliers for the number of expressed features are unlikely to be suddently generated after gene filtering.
+This suggests that filtering is unlikely to cause cells to suddenly become outliers with respect to the number of expressed features.
 Most cells surviving the initial round of QC are also likely to have diverse transcriptomes, so the total count should not suddenly drop either.
 (In any case, genes that are dominating the sequencing output of a cell would probably not get filtered.)
 
@@ -133,7 +134,7 @@ See https://github.com/miscellaneousCode/filtering2017/justification.Rmd for a m
 
 Genes with low counts may be due to transcriptional leakage, mapping/sequencing errors (especially pseudogenes) or contamination.
 This makes them uninteresting as they're unlikely to be related to any genuine biology.
-Modest/high-abundance genes with big changes in expression are also more likely to actually contribute to phenotypic differences, so it makes sense to focus on them.
+Even if they have large log-fold changes, genes with only small _absolute_ changes in expression are less likely to contribute to phenotypic differences.
 Of course, there are probably a few low-abundance genes that (a) are important and (b) vary noticeably across cells.
 However, this is probably the exception rather than the rule; getting hit by the MTC and other statistical problems to squeeze these genes out is suboptimal.
 Genes that are low-abundance due to being expressed in rare populations are best handled with iterative clustering.
