@@ -134,7 +134,6 @@ See https://github.com/miscellaneousCode/filtering2017/justification.Rmd for a m
 
 Genes with low counts may be due to transcriptional leakage, mapping/sequencing errors (especially pseudogenes) or contamination.
 This makes them uninteresting as they're unlikely to be related to any genuine biology.
-Even if they have large log-fold changes, genes with only small _absolute_ changes in expression are less likely to contribute to phenotypic differences.
 Of course, there are probably a few low-abundance genes that (a) are important and (b) vary noticeably across cells.
 However, this is probably the exception rather than the rule; getting hit by the MTC and other statistical problems to squeeze these genes out is suboptimal.
 Genes that are low-abundance due to being expressed in rare populations are best handled with iterative clustering.
@@ -184,7 +183,7 @@ In such cases, it's useful to filter and process everything afresh for each clus
 
 Of course, you could argue that you'd avoid these problems by not filtering at all.
 Instead, you could use the selected subset of genes in each step via `subset.row`.
-This is possible but it is tedious to specify when you have the same or similar set of genes passing through each step of the workflow.
+This is possible but it is tedious to specify (and easy to forget!) when you have the same or similar set of genes passing through each step of the workflow.
 Obviously, not doing any filtering or selection would be troublesome, e.g., when low-count genes get standardized to large variances in PCA.
 
 # Normalization comments
@@ -797,9 +796,10 @@ Further clustering on the imputed counts would just support the initial similari
 
 ```{r}
 set.seed(100)
+library(scater)
 counts <- matrix(rpois(100000, 10), ncol=100)
 sce <- newSCESet(countData = counts)
-mgc <- magic(sce)
+mgc <- scater:::magic(sce)
 norm_exprs(sce) <- mgc
 pdf("blah.pdf")
 multiplot(plotPCA(sce, exprs_values="exprs"), # 2% explained by PC1
