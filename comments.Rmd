@@ -290,7 +290,7 @@ The cause of the _shape_ of the trend is somewhat interesting:
 - At an abundance of zero, the variance must be zero, which is why you start from the origin.
 - As abundances increase, the variance also increases as you get more non-zero observations in each cell.
 This is primarily driven by the difference between zero and non-zero values (not so much the size of the non-zero values at low abundances, especially with a log-transformation).
-If you model this as a scaled binomial RV with low `p` and `n=1`, you'll see a linear increase with the mean with increasing `p`.
+If you model this as a scaled Bernoulli RV with low `p`, you'll see a linear increase with the mean with increasing `p`.
 - As abundances increase further, the variance stops increasing and instead starts to decrease towards a near-zero plateau.
 One can model a high-abundance gene by summing RVs for lower-abundance genes, e.g., if you were to pool the transcript molecules of the latter.
 It is easy to see that the CV^2^ will drop for the summed RV - this implies that the relative differences decrease, so the log-variance would also drop.
@@ -300,22 +300,23 @@ I'm not sure how much effort it's worth to extract HVG information from the left
 
 ## Motivating the threshold for significance
 
-Specifically, for a standard normal, the square root of the expected squared distance between two cells would be sqrt(2). 
-So, if you set the standard error to 1/sqrt(2), the distance would become 1 (i.e., 2-fold change).
+For a standard normal, the square root of the expected squared distance between two cells would be sqrt(2). 
+If you set the standard error to 1/sqrt(2), the distance would become 1 (i.e., 2-fold change).
 Setting this threshold avoids selecting genes with high fold changes above the technical variance, but small absolute total variances.
 Such genes are more likely to be true positives but also less likely to be strongly variable and biologically interesting.
 
-Of course, genes driving separation of rare subpopulations would have variances below 0.5.
-Even if the log-fold changes between subpopulations is strong, the average squared difference across all cells would be low.
-However, without a threshold, you would select many genes with minor increases in variability that won't contribute to downstream analyses.
+The threshold on the biological omponent avoids selecting many genes with minor increases in variability that won't contribute to downstream analyses.
 This is particularly pertinent for UMIs where everything is generally above the trend; without a threshold, all genes may end up being selected.
+This threshold is a bit informal by itself, but that's okay - the DM, for example, is no better, and Brennecke has that +0.25 value that isn't very interpretable.
+We also complement the threshold with proper hypothesis testing to avoid detecting lots of spurious HVGs due to estimation error.
 
-The threshold is a bit informal, but that's okay.
-The DM, for example, is no better, and Brennecke has that +0.25 value that isn't very interpretable.
-In and of themselves, HVGs are not of interest -- rather, they prioritise genes for more interesting analyses, e.g., clustering, correlation and gene set analyses.
-If HVG detection is considered as a screen, it is better to focus on potentially interesting (but possibly false) genes rather than true and uninteresting ones.
+Now, one may argue that HVGs are not of interest in themselves, but are only of use for downstream analyses.
+This would suggest that using the component threshold alone or taking the top X genes with the highest variance would be sufficient.
+Even so, controlling the FDR is important to reduce the number of non-HVGs that get selected in the feature set.
+This reduces technical noise in downstream processes and improves reproducibility in feature selection.
+Rigorous testing also provides a fall-back result to verify high-level analyses, e.g., clustering.
 
-To this end, it is also permissible to relax the FDR for detecting HVGs, especially if you didn't get anything interesting things with a low threshold.
+It is also permissible to relax the FDR for detecting HVGs, especially if you didn't get anything interesting things with a low threshold.
 Of course, this would also increase the amount of genes dominated by technical noise later on, so it's not preferable if you can avoid it.
 One could argue that this is not problematic if you just get more low-variability genes, as these don't contribute much to relative differences betwen cells.
 However, technical noise is still high (in absolute terms) and there are a lot more of them, so it would probably still mess up the results.
