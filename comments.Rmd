@@ -47,11 +47,26 @@ This reduces the resolution for where the threshold would usually be.
 
 ## Assumptions of outlier identification
 
+### Independence between QC metrics and biology
+
 There's an implicit assumption that these technical metrics are homogeneous across cell subtypes and states.
 This ensures that outliers are not driven by biological differences and must represent aberrant libraries.
 However, this assumption won't be true for extreme cases like erythrocytes, where the "outliers" would just be a genuine biological clustering.
 In such cases, cell types might be incorrectly removed, which would be unfortunate.
 Some heterogeneity is tolerated provided that the inter-state variance of the metric is smaller than the intra-state variance.
+
+I'm not sure there's a good automatic way to distinguish between low quality cells and those from a different cell type when heterogeneous QC metrics are observed.
+You might think to use the expression of endogenous genes to gauge whether the QC-outliers form a cluster and thus might be a genuine cell type.
+However, the point is that poor quality affects the observed expression in ways that are difficult to normalize [@ilicic2016classification].
+It would not be easy to tell whether a cluster was due to genuine biological separation or due to technical differences in quality.
+In the most obvious case, all the empty wells might cluster together, even though this is clearly not a cell type.
+
+If the assumption above is violated, the only solution is to set some hard absolute threshold.
+This only removes cells that are "absolutely" poor for further work (normalization, etc.) while giving those that are "relatively" poor the benefit of the doubt.
+However, this requires a _lot_ of context and/or experience to get right.
+Identifying outliers directly from the endogenous genes is also not ideal, as this would just eliminate rare subpopulations and understate cellular heterogeneity.
+
+### Batch-by-batch quality control
 
 Systematic differences in QC metrics can be handled to some extent using the `batch` argument in the `isOutlier` function.
 This is obviously useful for batch effects caused by known differences in experimental processing, e.g., sequencing at different depth or had different amounts of spike-in added.
@@ -63,9 +78,20 @@ The risk is that you'll lose more cells within each batch because the MAD is sma
 However, you should never expect to encounter this situation under the homogeneity assumption.
 If that assumption fails, then the concept of low-quality cells being outliers is inherently invalid.
 
-I'm not sure there's a good automatic way to distinguish between low quality cells and those from a different cell type when heterogeneous QC metrics are observed.
-This also extends to the expression profiles, because the whole point is that poor sample preparation affects the observed expression in ways that are difficult to normalize.
-The only solution is to set some hard absolute threshold (to distinguish between relatively poor and absolutely poor), and this requires a _lot_ of context.
+## Cell filtering before gene filtering
+
+It is intuitively logical to remove low-quality cells before computing the average counts and performing gene filtering.
+Otherwise, the averages would be distorted by empty cells or cells with 100% spike-ins.
+However, one _could_ argue that some cells become low quality after filtering on the genes.
+In particular, cells might drop below the "number of expressed features" threshold after some genes are removed.
+This would indicate a need for repeated cycles of filtering on cells and genes, which would be rather laborious.
+
+In practice, this is unlikely to be a problem.
+Removal of an inordinate number of expressed features in some cells relative to other cells would only occur due to DE genes.
+If most genes are not DE, they should be filtered at an equal rate for all cells.
+This suggests that filtering is unlikely to cause cells to suddenly become outliers with respect to the number of expressed features.
+Most cells surviving the initial round of QC are also likely to have diverse transcriptomes, so the total count should not suddenly drop either.
+(In any case, genes that are dominating the sequencing output of a cell would probably not get filtered.)
 
 # Cell cycle classification comments
 
@@ -106,11 +132,10 @@ See https://github.com/miscellaneousCode/filtering2017/justification.Rmd for a m
 
 ## Justification on other grounds
 
-Genes with low counts may be due to transcriptional leakage or mapping/sequencing errors (especially pseudogenes).
+Genes with low counts may be due to transcriptional leakage, mapping/sequencing errors (especially pseudogenes) or contamination.
 This makes them uninteresting as they're unlikely to be related to any genuine biology.
-One could even go so far as to say that genes that aren't expressed much are likely to be irrelevant to the phenotype.
-Of course, there's likely to be a couple of low-abundance genes that (a) are important and (b) vary noticeably across cells.
-However, this is probably the exception rather than the rule; getting hammered by the MTC and other statistical problems to squeeze these genes out seems suboptimal.
+Of course, there are probably a few low-abundance genes that (a) are important and (b) vary noticeably across cells.
+However, this is probably the exception rather than the rule; getting hit by the MTC and other statistical problems to squeeze these genes out is suboptimal.
 Genes that are low-abundance due to being expressed in rare populations are best handled with iterative clustering.
 
 Note that this reasoning has nothing to do with the rectangular component on the plot.
@@ -137,7 +162,7 @@ In practice, it doesn't really matter whether the library sizes or size factors 
 Consider a gene with count $Y$, with library sizes $L$ and size factors $S$.
 Assume that $Y= uS + e$ for constant mean $u$ and gene-/library-specific error $e$, and that $L = MS$ for a library-specific modifier $M$.
 (In other words, the library sizes oscillate around the true size factors, which seems to be the case in most data sets.
- We note that $E(M)=1$ as we have scaled the library sizes to have a mean of unity.)
+We note that $E(M)=1$ as we have scaled the library sizes to have a mean of unity.)
 If we compute the library size-corrected average, we get:
 
 $$
@@ -158,7 +183,7 @@ In such cases, it's useful to filter and process everything afresh for each clus
 
 Of course, you could argue that you'd avoid these problems by not filtering at all.
 Instead, you could use the selected subset of genes in each step via `subset.row`.
-This is possible but it is tedious to specify when you have the same or similar set of genes passing through each step of the workflow.
+This is possible but it is tedious to specify (and easy to forget!) when you have the same or similar set of genes passing through each step of the workflow.
 Obviously, not doing any filtering or selection would be troublesome, e.g., when low-count genes get standardized to large variances in PCA.
 
 # Normalization comments
@@ -225,16 +250,22 @@ Without it, the trend would be pretty extreme and difficult to fit reliably, esp
 Log-transformation seems better than square-rooting it, which is the VST for the Poisson only.
 You could play around with various Box-Cox transformations, but the mean-variance trend is pretty extreme and probably won't go away just by changing lambda.
 
-I also considered scaling the log-expression to downweight genes with high technical noise.
-The problem is that this implicitly upweights genes with low technical noise but also low total variance.
-As a result, your scaled log-expression values might be dominated by biological variability that was originally minor.
-Obviously, scaling to equalize the biological components would be a bad idea as this would downweight interesting genes with high genuine variance.
+While we're talking about the transformation, should we standardize the log-expression values?
+This ensures that all genes contribute the same amount of variance, thereby eliminating the mean-variance relationship.
+Genes in the middle of the range with high technical variance will not dominate the variance of the data set.
+However, there are several drawbacks:
 
-Leaving the log-expressions unscaled avoids distorting the "true" biological distances (i.e., log-fold changes) between subpopulations.
-While any single distance has no meaning, its value is pertinent if you want to accurately represent relative differences between three or more groups of cells.
-For example, is one group more related to another, compared to a third group (this is also relevant to subgroups)?
-Of course, using unscaled values will not mitigate noise from genes with high technical variance.
-However, this is random and not of too much concern - besides, you should have already enriched for biological signal by only using HVGs.
+- Standardizing would downweight interesting genes with large total variances due to the biological component.
+This could conceivably reduce the resolution of biological differences between cells, especially if technical noise gets upweighted.
+- An alternative strategy is to scale the log-expression values so that all genes have the same technical component.
+This avoids the above issue, but it implicitly upweights HVGs with low technical noise and small (non-zero) biological components.
+As a result, the scaled values might be dominated by biological variability that was originally minor.
+- Any scaling would distort the true log-fold changes for genes between subpopulations, which has implications when using the transformed values for DE analyses.
+It also affects interpretation of relative distances between three or more groups of cells, e.g., are two groups more related than a third group?
+
+Scaling of the technical components will eliminate the mean-variance relationship most efficiently.
+This ensures that the distribution of variances of non-HVGs will be the same across abundances, but will distort the biological component for HVGs.
+A better and simpler approach is to enriched for biological signal by only using HVGs in clustering, dimensionality reduction, etc.
 
 ## Dealing with dropouts 
 
@@ -766,9 +797,10 @@ Further clustering on the imputed counts would just support the initial similari
 
 ```{r}
 set.seed(100)
+library(scater)
 counts <- matrix(rpois(100000, 10), ncol=100)
 sce <- newSCESet(countData = counts)
-mgc <- magic(sce)
+mgc <- scater:::magic(sce)
 norm_exprs(sce) <- mgc
 pdf("blah.pdf")
 multiplot(plotPCA(sce, exprs_values="exprs"), # 2% explained by PC1
