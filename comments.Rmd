@@ -685,6 +685,11 @@ However, if we want to be conservative, then we look for genes that are expresse
 This favours DE genes in which we know that expression is consistent, at the expense of genes where we don't know either way due to dropouts/noise.
 To do this, we take the log-expression values at face value and just use _limma_ without weighting.
 
+Note that the direct use of log-transformed counts doesn't work if you're comparing log-fold changes, e.g., for allele-specific expression.
+This is because the prior count shrinks log-fold changes towards zero at different rates depending on the abundance.
+Thus, you could get a significant difference in log-fold changes if the abundances are different, even if the true log-fold changes are the same.
+This is avoided with `voom` where the precision weights ensure that low abundances (most affected by the prior count) are not considered with much weight.
+
 # When to use spike-in normalization
 
 Changes in total RNA content that affect the entire transcriptome are probably functional in some sense, e.g., to support changes in cell size.
