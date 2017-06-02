@@ -695,6 +695,7 @@ This is avoided with `voom` where the precision weights ensure that low abundanc
 Changes in total RNA content that affect the entire transcriptome are probably functional in some sense, e.g., to support changes in cell size.
 Whether this is interesting or not depends on how easily it can be interpreted with respect to the biology of interest.
 For example, changes in content between different cell types cannot be easily associated with their phenotypic differences.
+(Identifying highly/lowly expressed genes adjusted by total RNA content would be more informative, thus requiring non-DE normalization.)
 In contrast, changes in content upon some stimulus can be directly interpreted as a response to the stimulus. 
 
 Consider a situation involving two groups of cells, where there is an increase in total RNA content in the second group.
