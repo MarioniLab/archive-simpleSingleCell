@@ -565,47 +565,40 @@ Rather, the main utility of a consensus method is that it tells you which cluste
 These clusters can be considered conservative as you need everyone to detect them, resulting in some loss of power.
 However, if you assume that each method is affected by noise in different ways, then the consensus clusters are effectively denoised, which is nice.
 
+## Choice of clustering parameters
+
+The age-old question - how many clusters?
+Maximizing the average silhouette width seems to work pretty well, as it protects against too few and too many clusters.
+This is better than the gap statistic in that it allows you to see the quality of the clusters at the same time.
+In particular, you can colour the silhouette by its own colour if positive, and by the colour of its neighbour if negative.
+This tells you where the "wrong" cells _should_ have been assigned to.
+Thus, a cluster is only well-separated if most its cells have positive width;
+_and_ if only a few cells in other clusters have negative widths and have the target cluster as a closest neighbour.
+
+Of course, it is difficult to assess how "right" or "wrong" the clustering is, especially in the context of data exploration.
+For example, with underclustering, one might group CD4^+^ and CD8^+^ T cells together in one cluster, and B cells in another cluster.
+This is not wrong _per se_ - suboptimal, perhaps, as you're not discovering all the heterogeneity, but not wrong.
+Conversely, with overclustering, you would just end up splitting a cluster into multiple smaller clusters.
+This complicates interpretation as some clusters are probably redundant with each other - but it's not wrong either, just results in some extra work during annotation.
+Indeed, the smaller clusters probably have some differences, so it just comes down to the resolution that you want to use.
+
 ## Assessing the reliability of clustering
 
-I don't think bootstrapping is appropriate here.
+I don't think bootstrapping on genes is appropriate here.
 Standard bootstrapping requires IID genes in order to generate bootstrap replicates of the original data.
 This is not the case, which makes it difficult to interpret the bootstrap probabilities on an absolute scale.
 Doing it correctly would require block resampling to account for correlations -- hence the difficulty.
 
-Using silhouette profiles seems to work pretty well.
-The silhouette should be near zero for clusters formed from unstructured data in high dimensions.
-This is because the inside/outside distsance will increase with more dimensions, while the distance between adjacent subspaces will stay the same.
-As a result, the silhouette value will approach zero.
+One idea is to bootstrap across cells in a similar vein to _fpc_.
+This generates a new replicate experiment that can be clustered in a similar fashion as done in the original data.
+The aim is to determine if there exists a similar cluster (in terms of marker genes) in the bootstrap replicate compared to the original data.
+If so, it indicates that the cluster can be reproducibly recovered across multiple experiments.
 
-```{r}
-x <- matrix(rnorm(500000), ncol=500) # no real structure
-d <- dist(t(x))
-out <- kmeans(t(x), centers=3)
-require(cluster)
-sil <- silhouette(out$cluster, d)
-plot(sil)
-```
-
-In genomics data with thousands of dimensions, any value above 0.1 is probably fine.
-You can also maximize the average silhouette to get the best number of clusters.
-This is better than the gap statistic in that it allows you to see the quality of the clusters at the same time.
-It's actually advisable to do this, otherwise even well-clustered data will look crap if you overcluster and all the silhouette widths are low.
-
-Another visibility solution is to colour the silhouette by its own colour if positive, and by the colour of its neighbour if negative.
-This tells you where the "wrong" cells _should_ have been assigned to.
-Thus, a cluster is only well-separated if most its cells have positive width;
-and if only a few cells in other clusters have negative widths and have the target cluster as a closest neighbour.
-
-```r
-o <- order(sil[,1], sil[,3])
-osil <- sil[o,]
-ocol <- c("black", "red", "blue")[ifelse(osil[,3] > 0, osil[,1], osil[,2])]
-barplot(osil[,3], horiz=TRUE, col=ocol, border=ocol)
-```
-
-Of course, the gap statistic, silhouette, etc. only check for the separatedness of the clusters.
-It doesn't actually know how robust the clusters are to biological/experimental variability, in which case you'd need biological replicates.
-The assumption is that well-separated clusters would be more robust to noise, but this really depends on the extent of noise that you'd expect to see.
+(Note that I don't believe that _fpc_ does this correctly.
+It bootstraps across cells, but computes the Jaccard index between clusters in the bootstrap replicate and that in the original data.
+This doesn't make sense in the context of bootstrap theory, where a bootstrap replicate is meant to be an independent data set.
+There is no concept of having the same cell in two replicate data sets.
+They may have the same expression profile, but they are different cells/draws from the underlying distribution.)
 
 ## Using diffusion maps
 
