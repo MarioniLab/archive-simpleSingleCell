@@ -678,6 +678,11 @@ However, if we want to be conservative, then we look for genes that are expresse
 This favours DE genes in which we know that expression is consistent, at the expense of genes where we don't know either way due to dropouts/noise.
 To do this, we take the log-expression values at face value and just use _limma_ without weighting.
 
+More generally, it is just as valid to perform DE on the log-counts as it is on the counts.
+There's no reason to think that the comparison of mean counts is more meaningful than the comparison of mean log-counts.
+In any case, the two comparisons are equivalent when variances are low (or even if they're large and equal, under a second-order Taylor approximation).
+For large variances that differ between groups, the log-fold changes will differ but such genes are less likely to show up as strongly DE anyway.
+
 Note that the direct use of log-transformed counts doesn't work if you're comparing log-fold changes, e.g., for allele-specific expression.
 This is because the prior count shrinks log-fold changes towards zero at different rates depending on the abundance.
 Thus, you could get a significant difference in log-fold changes if the abundances are different, even if the true log-fold changes are the same.
