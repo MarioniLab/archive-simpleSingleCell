@@ -657,7 +657,7 @@ This favours DE genes in which we know that expression is consistent, at the exp
 To do this, we take the log-expression values at face value and just use _limma_ without weighting.
 
 More generally, it is just as valid to perform DE on the log-counts as it is on the counts.
-There's no reason to think that the comparison of mean counts is more meaningful than the comparison of mean log-counts.
+There's no reason to think that the comparison of arithmetic means is more meaningful than the comparison of (log-)geometric means.
 In any case, the two comparisons are equivalent when variances are low (or even if they're large and equal, under a second-order Taylor approximation).
 For large variances that differ between groups, the log-fold changes will differ but such genes are less likely to show up as strongly DE anyway.
 
