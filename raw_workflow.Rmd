@@ -7,7 +7,7 @@ author:
       affiliation: EMBL European Bioinformatics Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SD, United Kingdom; St Vincent's Institute of Medical Research, 41 Victoria Parade, Fitzroy, Victoria 3065, Australia
     - name: John C. Marioni
       affiliation: Cancer Research UK Cambridge Institute, Li Ka Shing Centre, Robinson Way, Cambridge CB2 0RE, United Kingdom; EMBL European Bioinformatics Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SD, United Kingdom; Wellcome Trust Sanger Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SA, United Kingdom
-date: 7 June 2017
+date: 16 July 2017
 vignette: >
     %\VignetteIndexEntry{A worfklow for low-level analyses of single-cell RNA-seq data}
     %\VignetteEngine{knitr::rmarkdown}
@@ -149,71 +149,100 @@ setSpike(sce) <- "ERCC"
 
 ## Quality control on the cells 
 
-Low-quality cells need to be removed to ensure that technical effects do not distort downstream analysis results.
-Two common measures of cell quality are the library size and the number of expressed features in each library.
-The library size is defined as the total sum of counts across all features, i.e., genes and spike-in transcripts.
-Cells with relatively small library sizes are considered to be of low quality as the RNA has not been efficiently captured (i.e., converted into cDNA and amplified) during library preparation.
-The number of expressed features in each cell is defined as the number of features with non-zero counts for that cell.
-Any cell with very few expressed genes is likely to be of poor quality as the diverse transcript population has not been successfully captured.
-The distributions of both of these metrics are shown in Figure ((libplothsc)).
+### Defining the quality control metrics
 
-```{r libplothsc, fig.height=6, fig.width=12, fig.cap="Histograms of library sizes (left) and number of expressed genes (right) for all cells in the HSC dataset."}
-par(mfrow=c(1,2))
+Low-quality cells need to be removed to ensure that technical effects do not distort downstream analysis results.
+We use several quality control (QC) metrics:
+
+- The library size is defined as the total sum of counts across all features, i.e., genes and spike-in transcripts.
+Cells with small library sizes are of low quality as the RNA has not been efficiently captured (i.e., converted into cDNA and amplified) during library preparation.
+- The number of expressed features in each cell is defined as the number of features with non-zero counts for that cell.
+Any cell with very few expressed genes is likely to be of poor quality as the diverse transcript population has not been successfully captured.
+- The proportion of reads mapped to spike-in transcripts is calculated relative to the library size for each cell.
+High proportions are indicative of poor-quality cells, where endogenous RNA has been lost during processing (e.g., due to cell lysis or RNA degradation).
+The same amount of spike-in RNA to each cell, so an enrichment in spike-in counts is symptomatic of loss of endogenous RNA.
+- In the absence of spike-in transcripts, the proportion of reads mapped to genes in the mitochondrial genome can also be used.
+High proportions are indicative of poor-quality cells [@islam2014quantitative;@ilicic2016classification], possibly because of loss of cytoplasmic RNA from perforated cells.
+The reasoning is that mitochondria are larger than individual transcript molecules and less likely to escape through tears in the cell membrane.
+
+The distributions of these metrics are shown in Figure ((qcplothsc)).
+The aim is to remove putative low-quality cells that have low library sizes, low numbers of expressed features, and high spike-in (or mitochondrial) proportions.
+
+```{r qcplothsc, fig.height=12, fig.width=12, fig.cap="Histograms of various QC metrics for all cells in the HSC data set. This includes the library sizes, number of expressed genes, and proportion of reads mapped to spike-in transcripts or mitochondrial genes."}
+par(mfrow=c(2,2))
 hist(sce$total_counts/1e6, xlab="Library sizes (millions)", main="", 
     breaks=20, col="grey80", ylab="Number of cells")
 hist(sce$total_features, xlab="Number of expressed genes", main="", 
     breaks=20, col="grey80", ylab="Number of cells")
+hist(sce$pct_counts_feature_controls_ERCC, xlab="ERCC proportion (%)", 
+    ylab="Number of cells", breaks=20, main="", col="grey80")
+hist(sce$pct_counts_feature_controls_Mt, xlab="Mitochondrial proportion (%)", 
+    ylab="Number of cells", breaks=20, main="", col="grey80")
 ```
 
-Picking a threshold for these metrics is not straightforward as their absolute values depend on the protocol and biological system.
-For example, sequencing to greater depth will lead to more reads, regardless of the quality of the cells.
-To obtain an adaptive threshold, we assume that most of the dataset consists of high-quality cells.
-We remove cells with log-library sizes that are more than 3 median absolute deviations (MADs) below the median log-library size.
-(A log-transformation improves resolution at small values, especially when the MAD of the raw values is comparable to or greater than the median.)
-We also remove cells where the log-transformed number of expressed genes is 3 MADs below the median.
+### Removing low-quality cells based on outliers
+
+Picking a threshold for these metrics is not straightforward as their absolute values depend on the experimental protocol.
+For example, sequencing to greater depth will lead to more reads and more expressed features, regardless of the quality of the cells.
+Similarly, using more spike-in RNA in the protocol will result in higher spike-in proportions.
+To obtain an adaptive threshold, we assume that most of the dataset consists of high-quality cells, and identify cells that are outliers for the various QC metrics.
+
+Outliers are defined based on the median absolute deviation (MADs) from the median value of each metric across all cells.
+We remove cells with log-library sizes that are more than 3 MADs below the median log-library size.
+A log-transformation improves resolution at small values, especially when the MAD of the raw values is comparable to or greater than the median.
+We also remove cells where the log-transformed number of expressed genes is 3 MADs below the median value.
 
 ```{r}
 libsize.drop <- isOutlier(sce$total_counts, nmads=3, type="lower", log=TRUE)
 feature.drop <- isOutlier(sce$total_features, nmads=3, type="lower", log=TRUE)
 ```
 
-Another measure of quality is the proportion of reads mapped to genes in the mitochondrial genome.
-High proportions are indicative of poor-quality cells [@islam2014quantitative;@ilicic2016classification], possibly because of increased apoptosis and/or loss of cytoplasmic RNA from lysed cells.
-Similar reasoning applies to the proportion of reads mapped to spike-in transcripts.
-The quantity of spike-in RNA added to each cell should be constant, which means that the proportion should increase upon loss of endogenous RNA in low-quality cells.
-The distributions of mitochondrial and spike-in proportions across all cells are shown in Figure ((controlplothsc)).
-
-```{r controlplothsc, fig.width=12, fig.height=6, fig.cap="Histogram of the proportion of reads mapped to mitochondrial genes (left) or spike-in transcripts (right) across all cells in the HSC dataset."}
-par(mfrow=c(1,2))
-hist(sce$pct_counts_feature_controls_Mt, xlab="Mitochondrial proportion (%)", 
-    ylab="Number of cells", breaks=20, main="", col="grey80")
-hist(sce$pct_counts_feature_controls_ERCC, xlab="ERCC proportion (%)", 
-    ylab="Number of cells", breaks=20, main="", col="grey80")
-```
-
-Again, the ideal threshold for these proportions depends on the cell type and the experimental protocol.
-Cells with more mitochondria or more mitochondrial activity may naturally have larger mitochondrial proportions.
-Similarly, cells with more endogenous RNA or that are assayed with protocols using less spike-in RNA will have lower spike-in proportions.
-If we assume that most cells in the dataset are of high quality, then the threshold can be set to remove any large outliers from the distribution of proportions.
-We use the MAD-based definition of outliers to remove putative low-quality cells from the dataset.
+We identify outliers for the proportion-based metrics in a similar manner.
+Here, no transformation is required as we are identifying large outliers, for which the distinction should be fairly clear on the raw scale.
+We do not use the mitochondrial proportions as we already have the spike-in proportions for this data set.
 
 ```{r}
-mito.drop <- isOutlier(sce$pct_counts_feature_controls_Mt, nmads=3, type="higher")
 spike.drop <- isOutlier(sce$pct_counts_feature_controls_ERCC, nmads=3, type="higher")
 ```
 
 Subsetting by column will retain only the high-quality cells that pass each filter described above.
 We examine the number of cells removed by each filter as well as the total number of retained cells.
 Removal of a substantial proportion of cells (> 10%) may be indicative of an overall issue with data quality.
-It may also reflect genuine biology in extreme cases (e.g., low numbers of expressed genes in erythrocytes) for which the filters described here are inappropriate.
 
 ```{r}
-sce <- sce[,!(libsize.drop | feature.drop | mito.drop | spike.drop)]
+sce <- sce[,!(libsize.drop | feature.drop | spike.drop)]
 data.frame(ByLibSize=sum(libsize.drop), ByFeature=sum(feature.drop),
-    ByMito=sum(mito.drop), BySpike=sum(spike.drop), Remaining=ncol(sce))
+    BySpike=sum(spike.drop), Remaining=ncol(sce))
 ```
 
-An alternative approach to quality control is to perform a principal components analysis (PCA) based on the quality metrics for each cell, e.g., the total number of reads, the total number of features and the proportion of mitochondrial or spike-in reads.
+### Assumptions of outlier identification 
+
+We have already mentioned the assumption that most cells are of high quality.
+This is usually reasonable, and can be experimentally supported in some situations by visually checking that the cells are intact (e.g., on the microwell plate or in the microfluidics system).
+Another assumption is that the QC metrics are independent on the biological state of each cell.
+This ensures that the outlier values for these metrics are driven by technical factors rather than biological processes.
+Thus, removing cells based on the metrics will not misrepresent the biology in downstream analyses.
+
+The second assumption is most likely to be violated in highly heterogeneous cell populations.
+For example, some cell types may naturally have less RNA or express fewer genes than other cell types.
+Such cell types are more likely to be considered outliers and removed, even if they are of high quality.
+The use of the MAD mitigates this problem by accounting for biological variability in the QC metrics.
+A heterogeneous population should have higher variability in the metrics amongst high-quality cells, increasing the MAD and reducing the chance of incorrectly removing particular cell types.
+Nonetheless, our cell-filtering procedure may not be appropriate in extreme cases where one cell type is very different from the others.
+
+Systematic differences in the QC metrics can be handled to some extent using the `batch` argument in the `isOutlier` function.
+This is obviously useful for batch effects caused by known differences in experimental processing, e.g., sequencing at different depth or had different amounts of spike-in added.
+It may also be useful if an _a priori_ cell type has systematically fewer expressed genes or lower RNA content.
+Analyzing all cell types together would unnecessarily inflate the MAD and compromise the removal of low-quality cells, at best; or lead to the entire loss of one cell type, at worst.
+
+### Alternative approaches to quality control
+
+An alternative approach to quality control is to set pre-defined thresholds on each QC metric.
+For example, we might remove all cells with library sizes below 100000 and numbers of expressed genes below 4000.
+This generally requires a great deal of experience to determine appropriate thresholds for each experimental protocol and biological system.
+Indeed, even with the same protocol and system, the appropriate threshold can vary from run to run due to the vagaries of RNA capture and sequencing.
+
+Another strategy is to perform a principal components analysis (PCA) based on the quality metrics for each cell, e.g., the total number of reads, the total number of features and the proportion of mitochondrial or spike-in reads.
 Outliers on a PCA plot may be indicative of low-quality cells that have aberrant technical properties compared to the (presumed) majority of high-quality cells.
 In Figure ((pcaqualplothsc)), no obvious outliers are present, which is consistent with the removal of suspect cells in the preceding quality control steps.
 
@@ -227,6 +256,9 @@ This is because they are able to detect subtle patterns across many quality metr
 However, this comes at some cost to interpretability, as the reason for removing a given cell may not always be obvious.
 Thus, for this workflow, we will use the simple approach whereby each quality metric is considered separately.
 Users interested in the more sophisticated approaches are referred to the `r Biocpkg("scater")` and `r Biocpkg("cellity")` packages.
+
+For completeness, we note that outliers can also be identified based on the gene expression profiles, rather than QC metrics.
+We consider this to be risky as it can remove high-quality cells in rare populations.
 
 ## Classification of cell cycle phase 
 
