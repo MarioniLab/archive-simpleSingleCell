@@ -304,29 +304,9 @@ However, it will be less accurate for data that are substantially different from
 In such cases, users can construct a custom classifier from their own training data using the `sandbag` function.
 This will also be necessary for other model organisms where pre-trained classifiers are not available.
 
-## Filtering out low-abundance genes
+## Examining gene-level expression metrics
 
-Low-abundance genes are problematic as zero or near-zero counts do not contain enough information for reliable statistical inference [@bourgon2010independent].
-In addition, the discreteness of the counts may interfere with downstream statistical procedures, e.g., by compromising the accuracy of continuous approximations.
-Here, low-abundance genes are defined as those with an average count below a filter threshold of 1.
-These genes are likely to be dominated by drop-out events [@brennecke2013accounting], which limits their usefulness in later analyses.
-Removal of these genes mitigates discreteness and reduces the amount of computational work without major loss of information.
-
-```{r}
-ave.counts <- calcAverage(sce)
-keep <- ave.counts >= 1
-sum(keep)
-```
-
-To check whether the chosen threshold is suitable, we examine the distribution of log-means across all genes (Figure ((abhisthsc))).
-The peak represents the bulk of moderately expressed genes while the rectangular component corresponds to lowly expressed genes.
-The filter threshold should cut the distribution at some point along the rectangular component to remove the majority of low-abundance genes.
-
-```{r abhisthsc, fig.cap="Histogram of log-average counts for all genes in the HSC dataset. The filter threshold is represented by the blue line."}
-hist(log10(ave.counts), breaks=100, main="", col="grey80",
-    xlab=expression(Log[10]~"average count"))
-abline(v=log10(1), col="blue", lwd=2, lty=2)
-```
+### Inspecting the most highly expressed genes
 
 We also look at the identities of the most highly expressed genes (Figure ((topgenehsc))).
 This should generally be dominated by constitutively expressed transcripts, such as those for ribosomal or mitochondrial proteins.
@@ -337,42 +317,41 @@ For example, a top set containing many spike-in transcripts suggests that too mu
 plotQC(sce, type = "highest-expression", n=50) + fontsize
 ```
 
-An alternative approach to gene filtering is to select genes that have non-zero counts in at least _n_ cells. 
-This provides some more protection against genes with outlier expression patterns, i.e., strong expression in only one or two cells. 
-Such outliers are typically uninteresting as they can arise from amplification artifacts that are not replicable across cells.
-(The exception is for studies involving rare cells where the outliers may be biologically relevant.)
-An example of this filtering approach is shown below for _n_ set to 10, though smaller values may be necessary to retain genes expressed in rare cell types.
+### Filtering out low-abundance genes
 
-```{r}
-numcells <- nexprs(sce, byrow=TRUE)
-alt.keep <- numcells >= 10
-sum(alt.keep)
+Low-abundance genes are problematic as zero or near-zero counts do not contain much information for reliable statistical inference [@bourgon2010independent].
+In addition, the discreteness of the counts may interfere with downstream statistical procedures, e.g., by compromising the accuracy of continuous approximations.
+We define the abundance of each gene as the average count across all cells, with some adjustment for library size differences between cells (Figure ((abhisthsc))).
+
+```{r abhisthsc, fig.cap="Histogram of log-average counts for all genes in the HSC dataset."}
+ave.counts <- calcAverage(sce)
+hist(ave.counts, breaks=100, main="", col="grey80", log="x", xlab="Average count")
 ```
 
-The relationship between the number of expressing cells and the mean is shown in Figure ((geneplothsc)).
-The two statistics tend to be well-correlated so filtering on either should give roughly similar results.
+We also examine the number of cells that express each gene.
+This is closely related to the average count for most genes, as expression in many cells will result in a higher average (Figure ((nexprshisthsc))).
+Removing genes that are expressed in fewer than _n_ cells protects against genes with outlier expression patterns, i.e., strong expression in only one or two cells. 
+Such outliers are typically uninteresting as they can arise from amplification artifacts.
+That said, they can also arise from rare populations, which is more biologically relevant. 
 
-```{r geneplothsc, fig.cap="Number of expressing cells against the log-mean expression for each gene in the HSC dataset. Spike-in transcripts are highlighted in red."}
-smoothScatter(log10(ave.counts), numcells, xlab=expression(Log[10]~"average count"), 
-    ylab="Number of expressing cells")
-is.ercc <- isSpike(sce, type="ERCC")
-points(log10(ave.counts[is.ercc]), numcells[is.ercc], col="red", pch=16, cex=0.5)
+```{r nexprshisthsc, fig.cap="Histogram of the number of cells expressing each gene in the HSC data set."}
+num.cells <- nexprs(sce, byrow=TRUE)
+smoothScatter(ave.counts, num.cells, xlab="Average count", ylab="Number of cells", log="x")
+```
+
+Either of these metrics can be used to filter out low-abundance genes.
+Here, we consider genes with average counts below 1 to be of low abundance, the identities of which are saved into the `SCESet` object for future use.
+We _could_ also directly subset the `SCESet` object by row at this point to remove the low-abundance genes.
+However, at this point, we choose to retain all genes in case they are needed later (e.g., for visualization).
+
+```{r}
+sce$filter.ave <- ave.counts >= 1
+summary(sce$filter.ave)
 ```
 
 In general, we prefer the mean-based filter as it tends to be less aggressive.
 A gene will be retained as long as it has sufficient expression in any subset of cells.
-Genes expressed in fewer cells require higher levels of expression in those cells to be retained, but this is not undesirable as it avoids selecting uninformative genes (with low expression in few cells) that contribute little to downstream analyses, e.g., HVG detection or clustering.
-In contrast, the "at least _n_" filter depends heavily on the choice of _n_.
-With _n_ = 10, a gene expressed in a subset of 9 cells would be filtered out, regardless of the level of expression in those cells.
-This may result in the failure to detect rare subpopulations that are present at frequencies below _n_.
-While the mean-based filter will retain more outlier-driven genes, this can be handled by choosing methods that are robust to outliers in the downstream analyses.
-
-Thus, we apply the mean-based filter to the data by subsetting the `SCESet` object as shown below.
-This removes all rows corresponding to endogenous genes or spike-in transcripts with abundances below the specified threshold.
-
-```{r}
-sce <- sce[keep,] 
-```
+In contrast, the "at least _n_" filter depends heavily on the choice of _n_, possibly resulting in the failure to detect rare subpopulations that are present at frequencies below _n_.
 
 ## Normalization of cell-specific biases
 
@@ -390,7 +369,7 @@ To overcome this, we pool counts from many cells to increase the count size for 
 Pool-based size factors are then "deconvolved" into cell-based factors for cell-specific normalization.
 
 ```{r, warning=FALSE}
-sce <- computeSumFactors(sce, sizes=seq(20, 80, 5))
+sce <- computeSumFactors(sce, sizes=seq(20, 80, 5), subset.row=sce$filter.ave)
 summary(sizeFactors(sce))
 ```
 
@@ -403,6 +382,10 @@ This does not occur here as strong DE is unlikely to exist within a homogeneous 
 plot(sizeFactors(sce), sce$total_counts/1e6, log="xy",
     ylab="Library size (millions)", xlab="Size factor")
 ```
+
+Also note that we set `subset.row=sce$filter.ave` to remove the low-abundance genes prior to the calculation of size factors.
+`computeSumFactors` is robust to the high frequency of zeroes in scRNA-seq data, but it will eventually fail if too many counts are zero.
+Obviously, cell-based QC should always be performed prior to normalization, to remove cells with very low numbers of expressed genes.
 
 ### Computing separate size factors for spike-in transcripts
 
