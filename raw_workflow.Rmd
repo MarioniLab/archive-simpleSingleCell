@@ -335,9 +335,7 @@ hist(ave.counts, breaks=100, main="", col="grey80", log="x", xlab="Average count
 
 We also examine the number of cells that express each gene.
 This is closely related to the average count for most genes, as expression in many cells will result in a higher average (Figure \@ref(fig:nexprshisthsc)).
-Removing genes that are expressed in fewer than _n_ cells protects against genes with outlier expression patterns, i.e., strong expression in only one or two cells. 
-Such outliers are typically uninteresting as they can arise from amplification artifacts.
-That said, they can also arise from rare populations, which is more biologically relevant. 
+Genes expressed in very few cells are often uninteresting as they are driven by amplification artifacts (though they may also also arise from rare populations).
 
 ```{r nexprshisthsc, fig.cap="Histogram of the number of cells expressing each gene in the HSC data set."}
 num.cells <- nexprs(sce, byrow=TRUE)
@@ -345,18 +343,26 @@ smoothScatter(ave.counts, num.cells, xlab="Average count", ylab="Number of cells
 ```
 
 Either of these metrics can be used to filter out low-abundance genes.
-Here, we consider genes with average counts below 1 to be of low abundance, the identities of which are saved into the `SCESet` object for future use.
+The example below demonstrates how we might choose to only retain genes with average counts greater than or equal to 1.
+Alternatively, we could retain genes that are expressed in at least _n_ cells.
+
+```{r}
+to.keep <- ave.counts >= 1
+summary(to.keep)
+```
+
+We generally prefer the mean-based filter as it tends to be less aggressive.
+A gene will be retained as long as it has sufficient expression in any subset of cells.
+In contrast, the "at least _n_" filter depends heavily on the choice of _n_, possibly resulting in the failure to detect rare subpopulations that are present at frequencies below _n_.
+
+Here, we save the two abundance metrics into the `SCESet` object for future use.
 We _could_ also directly subset the `SCESet` object by row at this point to remove the low-abundance genes.
 However, at this point, we choose to retain all genes in case they are needed later (e.g., for visualization).
 
 ```{r}
-sce$filter.ave <- ave.counts >= 1
-summary(sce$filter.ave)
+fData(sce)$ave.count <- ave.count
+fData(sce)$num.cells <- num.cells
 ```
-
-In general, we prefer the mean-based filter as it tends to be less aggressive.
-A gene will be retained as long as it has sufficient expression in any subset of cells.
-In contrast, the "at least _n_" filter depends heavily on the choice of _n_, possibly resulting in the failure to detect rare subpopulations that are present at frequencies below _n_.
 
 ## Normalization of cell-specific biases
 
@@ -374,7 +380,7 @@ To overcome this, we pool counts from many cells to increase the count size for 
 Pool-based size factors are then "deconvolved" into cell-based factors for cell-specific normalization.
 
 ```{r, warning=FALSE}
-sce <- computeSumFactors(sce, sizes=seq(20, 80, 5), subset.row=sce$filter.ave)
+sce <- computeSumFactors(sce, subset.row=fData(sce)$ave.count >= 1)
 summary(sizeFactors(sce))
 ```
 
@@ -388,9 +394,22 @@ plot(sizeFactors(sce), sce$total_counts/1e6, log="xy",
     ylab="Library size (millions)", xlab="Size factor")
 ```
 
-Also note that we set `subset.row=sce$filter.ave` to remove the low-abundance genes prior to the calculation of size factors.
-`computeSumFactors` is robust to the high frequency of zeroes in scRNA-seq data, but it will eventually fail if too many counts are zero.
-Obviously, cell-based QC should always be performed prior to normalization, to remove cells with very low numbers of expressed genes.
+__Comments from Aaron:__
+
+- We set `subset.row` to remove the low-abundance genes prior to the calculation of size factors.
+`computeSumFactors` is robust to the high frequency of zeroes in scRNA-seq data, but it will eventually fail (yielding negative size factors) if too many counts are zero.
+A threshold of 1 is usually satisfactory for read count data, while for UMI data, the counts are universally lower so a threshold of 0.1 is used.
+- Cell-based QC should always be performed prior to normalization, to remove cells with very low numbers of expressed genes.
+If this is not done, the `computeSumFactors` function may yield negative size factors for low-quality cells.
+- The `sizes` argument can be used to specify the number of pool sizes to use to compute the size factors.
+More `sizes` yields more precise estimates at the cost of some computational time and memory.
+In general, `sizes` should not be below 20 cells, to ensure that there are sufficient non-zero expression values in each pool.
+We also recommend that the total number of cells should be at least 100 for effective pooling.
+- For highly heterogeneous data sets, it is advisable to perform a rough clustering of the cells.
+This can be done with the `quickCluster` function and the results passed to `computeSumFactors` via the `cluster` argument.
+Cells in each cluster are normalized separately, and the size factors are rescaled to be comparable across clusters.
+This avoids the need to assume that most genes are non-DE across the entire population - only a non-DE majority is required between pairs of clusters.
+We demonstrate this approach later with a larger data set.
 
 ### Computing separate size factors for spike-in transcripts
 
@@ -489,6 +508,15 @@ curve(var.fit$trend(x), col="dodgerblue", lwd=2, add=TRUE)
 cur.spike <- isSpike(sce)
 points(var.out$mean[cur.spike], var.out$total[cur.spike], col="red", pch=16)
 ```
+
+__Comments from Aaron:__
+
+- Trend fitting is complicated by the small number of spike-in transcripts, the uneven distribution of their abundances and (for low numbers of cells) the low precision of the variance estimates.
+Some tuning of trend parameters such as `span` may be required - see `?trendVar` for more details.
+- `trendVar` will automatically ignore genes with mean log-expression values below 0.1 when fitting the trend.
+This ensures that low-abundance genes dominated by discreteness do not interfere with the fit.
+The default threshold was chosen by assuming Poisson-distributed counts, but can also be manually specified by setting `mean.threshold`.
+In most cases, manual specification is not necessary, though lowering the threshold to 0.001-0.01 may improve the fit for very sparse data, e.g., from droplet-based protocols. 
 
 ### Detecting highly variable genes
 
