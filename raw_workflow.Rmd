@@ -170,7 +170,7 @@ The same amount of spike-in RNA to each cell, so an enrichment in spike-in count
 High proportions are indicative of poor-quality cells [@islam2014quantitative;@ilicic2016classification], possibly because of loss of cytoplasmic RNA from perforated cells.
 The reasoning is that mitochondria are larger than individual transcript molecules and less likely to escape through tears in the cell membrane.
 
-The distributions of these metrics are shown in Figure ((qcplothsc)).
+The distributions of these metrics are shown in Figure \@ref(fig:qcplothsc).
 The aim is to remove putative low-quality cells that have low library sizes, low numbers of expressed features, and high spike-in (or mitochondrial) proportions.
 
 ```{r qcplothsc, fig.height=12, fig.width=12, fig.cap="Histograms of various QC metrics for all cells in the HSC data set. This includes the library sizes, number of expressed genes, and proportion of reads mapped to spike-in transcripts or mitochondrial genes."}
@@ -249,7 +249,7 @@ Indeed, even with the same protocol and system, the appropriate threshold can va
 
 Another strategy is to perform a principal components analysis (PCA) based on the quality metrics for each cell, e.g., the total number of reads, the total number of features and the proportion of mitochondrial or spike-in reads.
 Outliers on a PCA plot may be indicative of low-quality cells that have aberrant technical properties compared to the (presumed) majority of high-quality cells.
-In Figure ((pcaqualplothsc)), no obvious outliers are present, which is consistent with the removal of suspect cells in the preceding quality control steps.
+In Figure \@ref(fig:pcaqualplothsc), no obvious outliers are present, which is consistent with the removal of suspect cells in the preceding quality control steps.
 
 ```{r pcaqualplothsc, fig.cap="PCA plot for cells in the HSC dataset, constructed using quality metrics. The first and second components are shown on each axis, along with the percentage of total variance explained by each component. Bars represent the coordinates of the cells on each axis."}
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
@@ -272,7 +272,7 @@ Using a training dataset, the sign of the difference in expression between two g
 Pairs with changes in the sign across cell cycle phases were chosen as markers.
 Cells in a test dataset can then be classified into the appropriate phase, based on whether the observed sign for each marker pair is consistent with one phase or another.
 This approach is implemented in the `cyclone` function using a pre-trained set of marker pairs for mouse data.
-The result of phase assignment for each cell in the HSC dataset is shown in Figure ((phaseplothsc)).
+The result of phase assignment for each cell in the HSC dataset is shown in Figure \@ref(fig:phaseplothsc).
 (Some additional work is necessary to match the gene symbols in the data to the Ensembl annotation in the pre-trained marker set.)
 
 ```{r, echo=FALSE, results="hide", message=FALSE}
@@ -313,7 +313,7 @@ This will also be necessary for other model organisms where pre-trained classifi
 
 ### Inspecting the most highly expressed genes
 
-We also look at the identities of the most highly expressed genes (Figure ((topgenehsc))).
+We also look at the identities of the most highly expressed genes (Figure \@ref(fig:topgenehsc)).
 This should generally be dominated by constitutively expressed transcripts, such as those for ribosomal or mitochondrial proteins.
 The presence of other classes of features may be cause for concern if they are not consistent with expected biology.
 For example, a top set containing many spike-in transcripts suggests that too much spike-in RNA was added during library preparation, while the absence of ribosomal proteins and/or the presence of their pseudogenes are indicative of suboptimal alignment.
@@ -326,7 +326,7 @@ plotQC(sce, type = "highest-expression", n=50) + fontsize
 
 Low-abundance genes are problematic as zero or near-zero counts do not contain much information for reliable statistical inference [@bourgon2010independent].
 In addition, the discreteness of the counts may interfere with downstream statistical procedures, e.g., by compromising the accuracy of continuous approximations.
-We define the abundance of each gene as the average count across all cells, with some adjustment for library size differences between cells (Figure ((abhisthsc))).
+We define the abundance of each gene as the average count across all cells, with some adjustment for library size differences between cells (Figure \@ref(fig:abhisthsc)).
 
 ```{r abhisthsc, fig.cap="Histogram of log-average counts for all genes in the HSC dataset."}
 ave.counts <- calcAverage(sce)
@@ -334,7 +334,7 @@ hist(ave.counts, breaks=100, main="", col="grey80", log="x", xlab="Average count
 ```
 
 We also examine the number of cells that express each gene.
-This is closely related to the average count for most genes, as expression in many cells will result in a higher average (Figure ((nexprshisthsc))).
+This is closely related to the average count for most genes, as expression in many cells will result in a higher average (Figure \@ref(fig:nexprshisthsc)).
 Removing genes that are expressed in fewer than _n_ cells protects against genes with outlier expression patterns, i.e., strong expression in only one or two cells. 
 Such outliers are typically uninteresting as they can arise from amplification artifacts.
 That said, they can also arise from rare populations, which is more biologically relevant. 
@@ -378,7 +378,7 @@ sce <- computeSumFactors(sce, sizes=seq(20, 80, 5), subset.row=sce$filter.ave)
 summary(sizeFactors(sce))
 ```
 
-In this case, the size factors are tightly correlated with the library sizes for all cells (Figure ((normplothsc))).
+In this case, the size factors are tightly correlated with the library sizes for all cells (Figure \@ref(fig:normplothsc)).
 This suggests that the systematic differences between cells are primarily driven by differences in capture efficiency or sequencing depth.
 Any DE between cells would yield a non-linear trend between the total count and size factor, and/or increased scatter around the trend.
 This does not occur here as strong DE is unlikely to exist within a homogeneous population of cells.
@@ -418,7 +418,7 @@ sce <- computeSpikeFactors(sce, type="ERCC", general.use=FALSE)
 ### Applying the size factors to normalize gene expression
 
 The count data are used to compute normalized log-expression values for use in downstream analyses.
-Each value is defined as the log-ratio of each count to the size factor for the corresponding cell, after adding a prior count of 1 to avoid undefined values at zero counts.
+Each value is defined as the log~2~-ratio of each count to the size factor for the corresponding cell, after adding a prior count of 1 to avoid undefined values at zero counts.
 Division by the size factor ensures that any cell-specific biases are removed.
 If spike-in-specific size factors are present in `sce`, they will be automatically applied to normalize the spike-in transcripts separately from the endogenous genes. 
 
@@ -426,19 +426,21 @@ If spike-in-specific size factors are present in `sce`, they will be automatical
 sce <- normalize(sce)
 ```
 
-The log-transformation provides some measure of variance stabilization [@law2014voom], so that high-abundance genes with large variances do not dominate downstream analyses.
+The log-transformation is useful as it means that any differences in the values directly represent log~2~-fold changes in expression between cells.
+This is usually more relevant than the absolute differences in coverage, which need to be interpreted in the context of the overall abundance.
+The log-transformation also provides some measure of variance stabilization [@law2014voom], so that high-abundance genes with large variances do not dominate downstream analyses.
 The computed values are stored as an `exprs` matrix in addition to the other assay elements.
 
-## Checking for important technical factors 
+## Checking for confounding technical factors 
 
 We check whether there are technical factors that contribute substantially to the heterogeneity of gene expression.
 If so, the factor may need to be regressed out to ensure that it does not inflate the variances or introduce spurious correlations.
 For this dataset, the simple experimental design means that there are no plate or batch effects to examine.
-Instead, we use the (log-transformed) total count for the spike-in transcripts as a proxy for the relative bias in each sample.
-This bias is purely technical in origin, given that the same amount of spike-in RNA should have been added to each cell.
+Instead, we use the (log-transformed) total count for the spike-in transcripts as a proxy for the technical bias in each sample.
+This is based on the fact that the same amount of spike-in RNA should have been added to each cell.
 Thus, any association of gene expression with this factor is not biologically interesting and should be removed.
 
-For each gene, we calculate the percentage of the variance of the expression values that is explained by the spike-in totals (Figure ((explvarplothsc))).
+For each gene, we calculate the percentage of the variance of the expression values that is explained by the spike-in totals (Figure \@ref(fig:explvarplothsc)).
 The percentages are generally small (1-3%), indicating that the expression profiles of most genes are not strongly associated with this factor.
 This result is consistent with successful removal of cell-specific biases by scaling normalization.
 Thus, the spike-in total does not need to be explicitly modelled in our downstream analyses.
@@ -448,74 +450,98 @@ plotExplanatoryVariables(sce, variables=c("counts_feature_controls_ERCC",
     "log10_counts_feature_controls_ERCC")) + fontsize
 ```
 
-Note that the use of the spike-in total as an accurate proxy for the relative technical bias assumes that no library quantification is performed.
+Note that the use of the spike-in total as an accurate proxy for the relative technical bias assumes that no library quantification was performed.
 Otherwise, the coverage of the spike-in transcripts would be dependent on the total amount of endogenous RNA in each cell.
 (Specifically, if the same amount of cDNA is used for sequencing per cell, any increase in the amount of endogenous RNA will suppress the coverage of the spike-in transcripts.)
 This means that the spike-in totals could be confounded with genuine biological effects associated with changes in RNA content.
 
-## Identifying HVGs from the normalized log-expression 
+## Modelling the technical noise in gene expression
 
-We identify HVGs to focus on the genes that are driving heterogeneity across the population of cells.
-This requires estimation of the variance in expression for each gene, followed by decomposition of the variance into biological and technical components.
-HVGs are then identified as those genes with the largest biological components.
-This avoids prioritizing genes that are highly variable due to technical factors such as sampling noise during RNA capture and library preparation.
+### Fitting a trend to the spike-in variances
 
-Ideally, the technical component would be estimated by fitting a mean-variance trend to the spike-in transcripts using the `trendVar` function.
+Variability in the observed expression values across genes can be driven by genuine biological heterogeneity or uninteresting technical noise. 
+To distinguish between these two possibiltiies, we need to model the technical component of the variance of the expression values for each gene.
+We use the `trendVar` function to fit a mean-dependent trend to the variances of the log-expression values for the spike-in transcripts,
 Recall that the same set of spike-ins was added in the same quantity to each cell.
 This means that the spike-in transcripts should exhibit no biological variability, i.e., any variance in their counts should be technical in origin.
+
+```{r}
+var.fit <- trendVar(sce, span=0.2)
+```
+
 Given the mean abundance of a gene, the fitted value of the trend can be used as an estimate of the technical component for that gene.
 The biological component of the variance can then be calculated by subtracting the technical component from the total variance of each gene with the `decomposeVar` function.
 
-In practice, this strategy is compromised by the small number of spike-in transcripts, the uneven distribution of their abundances and (for low numbers of cells) the imprecision of their variance estimates.
-This makes it difficult to accurately fit a complex mean-dependent trend to the spike-in variances.
-An alternative approach is to fit the trend to the variance estimates of the endogenous genes, using the `use.spikes=FALSE` setting as shown below.
-This assumes that the majority of genes are not variably expressed, such that the technical component dominates the total variance for those genes.
-The fitted value of the trend is then used as an estimate of the technical component.
-Obviously, this is the only approach that can be used if no spike-ins were added in the experiment.
-
 ```{r}
-var.fit <- trendVar(sce, trend="loess", use.spikes=FALSE, span=0.2)
 var.out <- decomposeVar(sce, var.fit)
+head(var.out)
 ```
 
-We assess the suitability of the trend fitted to the endogenous variances by examining whether it is consistent with the spike-in variances (Figure ((hvgplothsc))). 
-The trend passes through or close to most of the spike-in variances, indicating that our assumption (that most genes have low levels of biological variability) is valid.
-This strategy exploits the large number of endogenous genes to obtain a stable trend, with the spike-in transcripts used as diagnostic features rather than in the trend fitting itself. 
-However, if our assumption did _not_ hold, we would instead fit the trend directly to the spike-in variances with the default `use.spikes=TRUE`.
-This sacrifices stability to reduce systematic errors in the estimate of the biological component for each gene.
-(In such cases, tinkering with the trend fitting parameters may yield a more stable curve -- see `?trendVar` for more details.)
+We visually inspect the trend to confirm that it corresponds to the spike-in variances (Figure \@ref(fig:hvgplothsc))). 
+The wave-like shape is typical of the mean-variance trend for log-expression values.
+A linear increase in the variance is observed as the mean increases from zero, as larger variances are possible when the counts increase.
+At very high abundances, the effect of sampling noise decreases due to the law of large numbers, resulting in a decrease in the variance.
 
-```{r hvgplothsc, fig.cap="Variance of normalized log-expression values for each gene in the HSC dataset, plotted against the mean log-expression. The blue line represents the mean-dependent trend fitted to the variances of the endogenous genes. Variance estimates for spike-in transcripts are highlighted in red."}
+```{r hvgplothsc, fig.cap="Variance of normalized log-expression values for each gene in the HSC dataset, plotted against the mean log-expression. The blue line represents the mean-dependent trend fitted to the variances of the spike-in transcripts (red)."}
 plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression", 
     ylab="Variance of log-expression")
-o <- order(var.out$mean)
-lines(var.out$mean[o], var.out$tech[o], col="dodgerblue", lwd=2)
+curve(var.fit$trend(x), col="dodgerblue", lwd=2, add=TRUE)
 cur.spike <- isSpike(sce)
 points(var.out$mean[cur.spike], var.out$total[cur.spike], col="red", pch=16)
 ```
 
+### Detecting highly variable genes
 
-HVGs are defined as genes with biological components that are significantly greater than zero at a false discovery rate (FDR) of 5%. 
+Highly variable genes (HVGs) are defined as genes with biological components that are significantly greater than zero.
 These genes are interesting as they drive differences in the expression profiles between cells, and should be prioritized for further investigation.
-In addition, we only consider a gene to be a HVG if it has a biological component greater than or equal to 0.5.
-For transformed expression values on the log~2~ scale, this means that the average difference in true expression between any two cells will be at least 2-fold.
-(This reasoning assumes that the true log-expression values are Normally distributed with variance of 0.5.
-The root-mean-square of the difference between two values is treated as the average log~2~-fold change between cells and is equal to unity.)
+We can identify HVGs based on the statistics reported by `decomposeVar`, as shown below.
+
+```{r}
+hvg.out <- var.out[which(var.out$FDR <= 0.05),]
+nrow(hvg.out)
+```
+
+HVGs are strong candidates for further study as they are responsible for the biological heterogeneity in the cell population.
+This avoids prioritizing genes that are highly variable due to technical factors such as sampling noise during RNA capture and library preparation.
 We rank the results by the biological component to focus on genes with larger biological variability.
 
 ```{r}
-hvg.out <- var.out[which(var.out$FDR <= 0.05 & var.out$bio >= 0.5),]
 hvg.out <- hvg.out[order(hvg.out$bio, decreasing=TRUE),] 
-nrow(hvg.out)
 write.table(file="hsc_hvg.tsv", hvg.out, sep="\t", quote=FALSE, col.names=NA)
 head(hvg.out)
 ```
 
-We recommend checking the distribution of expression values for the top HVGs to ensure that the variance estimate is not being dominated by one or two outlier cells (Figure ((hvgvioplothsc))).
+We check the distribution of expression values for the top HVGs to ensure that the variance estimate is not driven by one or two outlier cells (Figure \@ref(fig:hvgvioplothsc)).
 
 ```{r hvgvioplothsc, fig.cap="Violin plots of normalized log-expression values for the top 10 HVGs in the HSC dataset. Each point represents the log-expression value in a single cell."}
 plotExpression(sce, rownames(hvg.out)[1:10]) + fontsize
 ```
+
+### Trend fitting when spike-ins are unavailable
+
+If spike-in RNA has not been added in appropriate quantities, an alternative approach is to fit the trend to the variance estimates of the endogenous genes.
+This is done using the `use.spikes=FALSE` setting in `trendVar`, as shown below.
+
+```{r}
+var.fit.nospike <- trendVar(sce, use.spikes=FALSE, span=0.2)
+var.out.nospike <- decomposeVar(sce, var.fit.nospike)
+```
+
+This assumes that the majority of genes are not variably expressed, such that the technical component dominates the total variance for most genes.
+In Figure \@ref(fig:hvgplothsc2), the trend passes through or close to most of the spike-in variances, indicating that our assumption is valid.
+
+```{r hvgplothsc2, fig.cap="Variance of normalized log-expression values for each gene in the HSC dataset, plotted against the mean log-expression. The blue line represents the mean-dependent trend fitted to the variances of the endogenous genes (black), with spike-in transcripts shown in red."}
+plot(var.out.nospike$mean, var.out.nospike$total, pch=16, cex=0.6, 
+    xlab="Mean log-expression", ylab="Variance of log-expression")
+curve(var.fit.nospike$trend(x), col="dodgerblue", lwd=2, add=TRUE)
+points(var.out.nospike$mean[cur.spike], var.out.nospike$total[cur.spike], col="red", pch=16)
+```
+
+Even if our assumption does not hold, the use of `decomposeVar` may still be valid if we are willing to accept a change to the null hypothesis.
+Instead of testing whether the total variance is greater than the technical noise, we ask whether the total variance of each gene is greater than the average biological variance for the majority of other genes.
+This effectively identifies HVGs relative to other genes, which is still a useful result provided that most genes are not differentially expressed across the population.
+
+### Alternative methods for HVG detection
 
 There are many other strategies for defining HVGs, e.g., by using the coefficient of variation [@brennecke2013accounting;@kolod2015singlecell;@kim2015characterizing], with the dispersion parameter in the negative binomial distribution [@mccarthy2012differential], or as a proportion of total variability [@vallejos2015basics].
 Some of these methods are available in `r Biocpkg("scran")` -- for example, see `DM` or `technicalCV2` for calculations based on the coefficient of variation.
