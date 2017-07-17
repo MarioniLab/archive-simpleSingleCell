@@ -1,19 +1,24 @@
 ---
 title: "A step-by-step workflow for low-level analysis of single-cell RNA-seq data with Bioconductor"
 author: 
-    - name: Aaron T. L. Lun
-      affiliation: Cancer Research UK Cambridge Institute, Li Ka Shing Centre, Robinson Way, Cambridge CB2 0RE, United Kingdom
-    - name: Davis J. McCarthy
-      affiliation: EMBL European Bioinformatics Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SD, United Kingdom; St Vincent's Institute of Medical Research, 41 Victoria Parade, Fitzroy, Victoria 3065, Australia
-    - name: John C. Marioni
-      affiliation: Cancer Research UK Cambridge Institute, Li Ka Shing Centre, Robinson Way, Cambridge CB2 0RE, United Kingdom; EMBL European Bioinformatics Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SD, United Kingdom; Wellcome Trust Sanger Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SA, United Kingdom
+- name: Aaron T. L. Lun
+  affiliation: &CRUK Cancer Research UK Cambridge Institute, Li Ka Shing Centre, Robinson Way, Cambridge CB2 0RE, United Kingdom
+- name: Davis J. McCarthy
+  affiliation: 
+  - &EMBL EMBL European Bioinformatics Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SD, United Kingdom
+  - St Vincent's Institute of Medical Research, 41 Victoria Parade, Fitzroy, Victoria 3065, Australia
+- name: John C. Marioni
+  affiliation: 
+  - *CRUK
+  - *EMBL
+  - Wellcome Trust Sanger Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SA, United Kingdom
 date: 16 July 2017
 vignette: >
-    %\VignetteIndexEntry{A worfklow for low-level analyses of single-cell RNA-seq data}
-    %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteIndexEntry{A worfklow for low-level analyses of single-cell RNA-seq data
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}    
 output: 
-    BiocStyle::html_document:
-        fig_caption: yes
+    BiocStyle::html_document2
 bibliography: ref.bib
 ---
 
