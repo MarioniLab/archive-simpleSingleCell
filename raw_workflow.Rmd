@@ -511,8 +511,9 @@ points(var.out$mean[cur.spike], var.out$total[cur.spike], col="red", pch=16)
 
 __Comments from Aaron:__
 
-- Trend fitting is complicated by the small number of spike-in transcripts, the uneven distribution of their abundances and (for low numbers of cells) the low precision of the variance estimates.
-Some tuning of trend parameters such as `span` may be required - see `?trendVar` for more details.
+- In practice, trend fitting is complicated by the small number of spike-in transcripts and the uneven distribution of their abundances.
+For low numbers of cells, these issues are exacerbated by the low precision of the variance estimates.
+Some tuning of trend parameters such as `span` may be required to achieve a suitable fit - see `?trendVar` for more details.
 - `trendVar` will automatically ignore genes with mean log-expression values below 0.1 when fitting the trend.
 This ensures that low-abundance genes dominated by discreteness do not interfere with the fit.
 The default threshold was chosen by assuming Poisson-distributed counts, but can also be manually specified by setting `mean.threshold`.
@@ -545,6 +546,11 @@ We check the distribution of expression values for the top HVGs to ensure that t
 plotExpression(sce, rownames(hvg.out)[1:10]) + fontsize
 ```
 
+There are many other strategies for defining HVGs, e.g., by using the coefficient of variation [@brennecke2013accounting;@kolod2015singlecell;@kim2015characterizing], with the dispersion parameter in the negative binomial distribution [@mccarthy2012differential], or as a proportion of total variability [@vallejos2015basics].
+Some of these methods are available in `r Biocpkg("scran")` -- for example, see `DM` or `technicalCV2` for calculations based on the coefficient of variation.
+Here, we use the variance of the log-expression values because the log-transformation protects against genes with strong expression in only one or two cells.
+This ensures that the set of top HVGs is not dominated by genes with (mostly uninteresting) outlier expression patterns.
+
 ### Trend fitting when spike-ins are unavailable
 
 If spike-in RNA has not been added in appropriate quantities, an alternative approach is to fit the trend to the variance estimates of the endogenous genes.
@@ -569,72 +575,22 @@ Even if our assumption does not hold, the use of `decomposeVar` may still be val
 Instead of testing whether the total variance is greater than the technical noise, we ask whether the total variance of each gene is greater than the average biological variance for the majority of other genes.
 This effectively identifies HVGs relative to other genes, which is still a useful result provided that most genes are not differentially expressed across the population.
 
-### Alternative methods for HVG detection
+## Denoising expression values using PCA
 
-There are many other strategies for defining HVGs, e.g., by using the coefficient of variation [@brennecke2013accounting;@kolod2015singlecell;@kim2015characterizing], with the dispersion parameter in the negative binomial distribution [@mccarthy2012differential], or as a proportion of total variability [@vallejos2015basics].
-Some of these methods are available in `r Biocpkg("scran")` -- for example, see `DM` or `technicalCV2` for calculations based on the coefficient of variation.
-Here, we use the variance of the log-expression values because the log-transformation protects against genes with strong expression in only one or two cells.
-This ensures that the set of top HVGs is not dominated by genes with (mostly uninteresting) outlier expression patterns.
-
-## Identifying correlated gene pairs with Spearman's rho
-
-Another useful procedure is to identify the HVGs that are highly correlated with one another.
-This distinguishes between HVGs caused by random noise and those involved in driving systematic differences between subpopulations.
-Correlations between genes are quantified by computing Spearman's rho, which accommodates non-linear relationships in the expression values.
-Gene pairs with significantly large positive or negative values of rho are identified using the `correlatePairs` function.
-We only apply this function to the set of HVGs, because these genes have large biological components and are more likely to exhibit strong correlations driven by biology.
-In contrast, calculating correlations for all possible gene pairs would require too much computational time and increase the severity of the multiple testing correction.
-It may also prioritize uninteresting genes that have strong correlations but low variance, e.g., tightly co-regulated house-keeping genes.
+Once the technical noise is modelled, we can use principal components analysis (PCA) to remove random technical noise.
+We assume that biological processes involving coregulated groups of genes will account for the most variance in the data and be represented by earlier principal components (PCs).
+This means that random technical noise in each gene will be represented by later PCs.
+The `denoisePCA` function removes later PCs until the total discarded variance is equal to the sum of technical components for all genes used in the PCA.
 
 ```{r}
-set.seed(100)
-var.cor <- correlatePairs(sce, subset.row=rownames(hvg.out))
-write.table(file="hsc_cor.tsv", var.cor, sep="\t", quote=FALSE, row.names=FALSE)
-head(var.cor)
+to.keep <- var.out$bio > 0
+pcs <- denoisePCA(sce, technical=var.fit.des$trend, subset.row=to.keep) 
+dim(reducedDimension(pcs)) 
 ```
 
-The significance of each correlation is determined using a permutation test.
-For each pair of genes, the null hypothesis is that the expression profiles of two genes are independent.
-Shuffling the profiles and recalculating the correlation yields a null distribution that is used to obtain a _p_-value for each observed correlation value [@phipson2010permutation].
-Correction for multiple testing across many gene pairs is performed by controlling the FDR at 5%.
-Correlated gene pairs can be directly used for experimental validation with orthogonal techniques (e.g., fluorescence-activated cell sorting, immunohistochemistry or RNA fluorescence _in situ_ hybridization) to verify that these expression patterns are genuinely present across the cell population.
-
-```{r}
-sig.cor <- var.cor$FDR <= 0.05
-summary(sig.cor)
-```
-
-Larger sets of correlated genes are assembled by treating genes as nodes in a graph and each pair of genes with significantly large correlations as an edge.
-In particular, an undirected graph is constructed using methods in the `r Biocpkg("RBGL")` package.
-Highly connected subgraphs are then identified and defined as gene sets.
-This provides a convenient summary of the pairwise correlations between genes.
-
-```{r, message=FALSE}
-library(RBGL)
-g <- ftM2graphNEL(cbind(var.cor$gene1, var.cor$gene2)[sig.cor,], 
-    W=NULL, V=NULL, edgemode="undirected")
-cl <- highlyConnSG(g)$clusters
-cl <- cl[order(lengths(cl), decreasing=TRUE)]
-head(cl)
-```
-
-Significant correlations provide evidence for substructure in the dataset, i.e., subpopulations of cells with systematic differences in their expression profiles.
-The number of significantly correlated HVG pairs represents the strength of the substructure.
-If many pairs were significant, this would indicate that the subpopulations were clearly defined and distinct from one another.
-For this particular dataset, a relatively low number of HVGs exhibit significant correlations.
-This suggests that any substructure in the data will be modest, which is expected given that rigorous selection was performed to obtain a homogeneous population of HSCs [@wilson2015combined].
-
-The `correlatePairs` function can also return gene-centric output by setting `per.gene=TRUE`.
-This calculates a combined _p_-value [@simes1986improved] for each HVG that indicates whether it is significantly correlated to at least one other HVG.
-From a statistical perspective, this is a more natural approach to correcting for multiple testing when genes, rather than pairs of genes, are of interest.
-We define correlated HVGs as those that are detected here at a FDR of 5%.
-
-```{r}
-var.cor <- correlatePairs(sce, subset.row=rownames(hvg.out), per.gene=TRUE)
-head(var.cor)
-sig.cor <- var.cor$FDR <= 0.05
-summary(sig.cor)
-```
+The function returns a `SCESet` object containing the PC scores for each cell in the `reducedDimension` slot.
+The aim is to eliminate technical noise and enrich for biological signal in the retained PCs.
+This improves resolution of the underlying biology during downstream procedures such as clustering.
 
 ## Using correlated HVGs for further data exploration
 
@@ -1386,6 +1342,51 @@ This may not always be appropriate if total RNA is associated with a biological 
 For example, @islam2011characterization observe a 5-fold difference in total RNA between mESCs and MEFs.
 Similarly, the total RNA in a cell changes across phases of the cell cycle [@buettner2015computational].
 Spike-in normalization will preserve these differences in total RNA content such that the corresponding biological groups can be easily resolved in downstream analyses.
+
+## Identifying correlated gene pairs with Spearman's rho
+
+Another use of scRNA-seq data is to identify correlations between pairs of genes.
+This is quantified by computing Spearman's rho, which accommodates non-linear relationships in the expression values.
+Here, we use the `correlatePairs` function to identify significant correlations between the various histocompatability antigens in the HSC data set.
+
+```{r}
+sce <- readRDS("hsc_data.rds")
+set.seed(100)
+var.cor <- correlatePairs(sce, subset.row=grep("^H2-", rownames(sce)))
+head(var.cor)
+```
+
+The significance of each correlation is determined using a permutation test.
+For each pair of genes, the null hypothesis is that the expression profiles of two genes are independent.
+Shuffling the profiles and recalculating the correlation yields a null distribution that is used to obtain a _p_-value for each observed correlation value [@phipson2010permutation].
+Correction for multiple testing across many gene pairs is performed by controlling the FDR at 5%.
+
+```{r}
+sig.cor <- var.cor$FDR <= 0.05
+summary(sig.cor)
+```
+
+We can also compute correlations between specific pairs of genes, or between all pairs between two distinct sets of genes.
+The example below computes the correlation between _Fos_ and _Jun_, which dimerize to form the AP-1 transcription factor.
+
+```{r}
+correlatePairs(sce, subset.row=cbind("Fos", "Jun"))
+```
+
+Examination of the expression profiles in Figure \@ref(fig:fosjuncorplot) confirms the presence of a modest correlation between these two genes.
+
+```{r fosjuncorplot, fig.cap="Expression of _Fos_ plotted against the expression of _Jun_ for all cells in the HSC data set."}
+plotExpression(sce, features="Fos", x="Jun")
+```
+
+__Comments from Aaron:__
+
+- It is recommended to compute correlations between a subset of genes of interest, known either _a priori_ or empirically defined, e.g., as HVGs.
+Computing correlations across all genes will take too long; unnecessarily increase the severity of the multiple testing correction; 
+and may prioritize strong but uninteresting correlations, e.g., between tightly co-regulated house-keeping genes.
+- The `correlatePairs` function can also return gene-centric output by setting `per.gene=TRUE`.
+This calculates a combined _p_-value [@simes1986improved] for each gene that indicates whether it is significantly correlated to any other gene.
+From a statistical perspective, this is a more natural approach to correcting for multiple testing when genes, rather than pairs of genes, are of interest.
 
 ## Blocking on the cell cycle phase
 
