@@ -330,7 +330,8 @@ We define the abundance of each gene as the average count across all cells, with
 
 ```{r abhisthsc, fig.cap="Histogram of log-average counts for all genes in the HSC dataset."}
 ave.counts <- calcAverage(sce)
-hist(ave.counts, breaks=100, main="", col="grey80", log="x", xlab="Average count")
+hist(log10(ave.counts), breaks=100, main="", col="grey80", 
+    xlab=expression(Log[10]~"average count"))
 ```
 
 We also examine the number of cells that express each gene.
@@ -339,11 +340,12 @@ Genes expressed in very few cells are often uninteresting as they are driven by 
 
 ```{r nexprshisthsc, fig.cap="Histogram of the number of cells expressing each gene in the HSC data set."}
 num.cells <- nexprs(sce, byrow=TRUE)
-smoothScatter(ave.counts, num.cells, xlab="Average count", ylab="Number of cells", log="x")
+smoothScatter(log10(ave.counts), num.cells, ylab="Number of cells", 
+    xlab=expression(Log[10]~"average count"))
 ```
 
 Either of these metrics can be used to filter out low-abundance genes.
-The example below demonstrates how we might choose to only retain genes with average counts greater than or equal to 1.
+The example below demonstrates how we could only retain genes with average counts greater than or equal to 1.
 Alternatively, we could retain genes that are expressed in at least _n_ cells.
 
 ```{r}
@@ -356,11 +358,11 @@ A gene will be retained as long as it has sufficient expression in any subset of
 In contrast, the "at least _n_" filter depends heavily on the choice of _n_, possibly resulting in the failure to detect rare subpopulations that are present at frequencies below _n_.
 
 Here, we save the two abundance metrics into the `SCESet` object for future use.
-We _could_ also directly subset the `SCESet` object by row at this point to remove the low-abundance genes.
-However, at this point, we choose to retain all genes in case they are needed later (e.g., for visualization).
+We _could_ also directly subset the `SCESet` object by row to remove the low-abundance genes.
+However, at this point, we choose to retain all genes in case they are needed later, e.g., for visualization.
 
 ```{r}
-fData(sce)$ave.count <- ave.count
+fData(sce)$ave.counts <- ave.counts
 fData(sce)$num.cells <- num.cells
 ```
 
@@ -380,7 +382,7 @@ To overcome this, we pool counts from many cells to increase the count size for 
 Pool-based size factors are then "deconvolved" into cell-based factors for cell-specific normalization.
 
 ```{r, warning=FALSE}
-sce <- computeSumFactors(sce, subset.row=fData(sce)$ave.count >= 1)
+sce <- computeSumFactors(sce, subset.row=fData(sce)$ave.counts >= 1)
 summary(sizeFactors(sce))
 ```
 
@@ -396,7 +398,7 @@ plot(sizeFactors(sce), sce$total_counts/1e6, log="xy",
 
 __Comments from Aaron:__
 
-- We set `subset.row` to remove the low-abundance genes prior to the calculation of size factors.
+- We set `subset.row` in the code above to remove the low-abundance genes prior to the calculation of size factors.
 `computeSumFactors` is robust to the high frequency of zeroes in scRNA-seq data, but it will eventually fail (yielding negative size factors) if too many counts are zero.
 A threshold of 1 is usually satisfactory for read count data, while for UMI data, the counts are universally lower so a threshold of 0.1 is used.
 - Cell-based QC should always be performed prior to normalization, to remove cells with very low numbers of expressed genes.
@@ -465,7 +467,8 @@ This result is consistent with successful removal of cell-specific biases by sca
 Thus, the spike-in total does not need to be explicitly modelled in our downstream analyses.
 
 ```{r explvarplothsc, fig.cap="Density plot of the percentage of variance explained by the (log-transformed) total spike-in counts across all genes in the HSC dataset. For each gene, the percentage of the variance of the normalized log-expression values across cells that is explained by each factor is calculated. Each curve corresponds to one factor and represents the distribution of percentages across all genes."}
-plotExplanatoryVariables(sce, variables=c("counts_feature_controls_ERCC", 
+nzero.exprs <- fData(sce)$ave.count > 0
+plotExplanatoryVariables(sce[nzero.exprs,], variables=c("counts_feature_controls_ERCC", 
     "log10_counts_feature_controls_ERCC")) + fontsize
 ```
 
@@ -578,84 +581,90 @@ This effectively identifies HVGs relative to other genes, which is still a usefu
 ## Denoising expression values using PCA
 
 Once the technical noise is modelled, we can use principal components analysis (PCA) to remove random technical noise.
-We assume that biological processes involving coregulated groups of genes will account for the most variance in the data and be represented by earlier principal components (PCs).
-This means that random technical noise in each gene will be represented by later PCs.
+Consider that each cell represents a point in the high-dimensional expression space, where the spread of points represents the total variance.
+PCA identifies axes in this space that capture as much of this variance as possible.
+Each axis is a principal component (PC), where any early PC will explain more of the variance than a later PC.
+
+We assume that biological processes involving co-regulated groups of genes will account for the most variance in the data.
+If this is the case, this process should be represented by one or more of the earlier PCs.
+In contrast, random technical noise affects each gene independently and will be represented by later PCs.
 The `denoisePCA` function removes later PCs until the total discarded variance is equal to the sum of technical components for all genes used in the PCA.
 
 ```{r}
 to.keep <- var.out$bio > 0
-pcs <- denoisePCA(sce, technical=var.fit.des$trend, subset.row=to.keep) 
-dim(reducedDimension(pcs)) 
+sce <- denoisePCA(sce, technical=var.fit$trend, subset.row=to.keep) 
+dim(reducedDimension(sce)) 
 ```
 
 The function returns a `SCESet` object containing the PC scores for each cell in the `reducedDimension` slot.
 The aim is to eliminate technical noise and enrich for biological signal in the retained PCs.
 This improves resolution of the underlying biology during downstream procedures such as clustering.
 
-## Using correlated HVGs for further data exploration
+__Comments from Aaron:__
 
-We visualize the expression profiles of the correlated HVGs with a heatmap (Figure ((heatmaphsc))).
-All expression values are mean-centred for each gene to highlight the relative differences in expression between cells.
-If any subpopulations were present, they would manifest as rectangular "blocks" in the heatmap, corresponding to sets of genes that are systematically up- or down-regulated in specific groups of cells.
-This is not observed in Figure ((heatmaphsc)), consistent with the lack of strong substructure.
-There may be a subpopulation of _Fos_ and _Jun_-negative cells, but it is poorly defined given the small numbers of cells and genes involved.
+- We only use genes with positive biological components in `denoisePCA`.
+This guarantees that the total technical variance to be discarded will not be greater than the total variance in the data.
+- It is also possible to obtain a low-rank approximation of the original expression matrix, capturing the variance equivalent to the retained PCs.
+This is useful for denoising prior to downstream procedures that require a gene expression profile for each cell.
 
-```{r heatmaphsc, message=FALSE, fig.width=7, fig.height=7, fig.cap="Heatmap of mean-centred normalized log-expression values for correlated HVGs in the HSC dataset. Dendrograms are formed by hierarchical clustering on the Euclidean distances between genes (row) or cells (column)."}
-chosen <- var.cor$gene[sig.cor]
-norm.exprs <- exprs(sce)[chosen,,drop=FALSE]
-heat.vals <- norm.exprs - rowMeans(norm.exprs)
-library(gplots)
-heat.out <- heatmap.2(heat.vals, col=bluered, symbreak=TRUE, trace='none', cexRow=0.6)
+```{r}
+sce <- denoisePCA(sce, technical=var.fit$trend, subset.row=to.keep, value="lowrank") 
+assayDataElementNames(sce)
 ```
 
-We also apply dimensionality reduction techniques to visualize the relationships between cells.
-This is done by constructing a PCA plot from the normalized log-expression values of the correlated HVGs (Figure ((pcaplothsc))).
-Cells with similar expression profiles should be located close together in the plot, while dissimilar cells should be far apart.
-We only use the correlated HVGs in `plotPCA` because any substructure should be most pronounced in the expression profiles of these genes.
-Even so, no clear separation of cells into distinct subpopulations is observed.
+## Data exploration with dimensionality reduction 
 
-```{r pcaplothsc, fig.cap="PCA plot constructed from normalized log-expression values of correlated HVGs, where each point represents a cell in the HSC dataset. First and second components are shown, along with the percentage of variance explained. Bars represent the coordinates of the cells on each axis. Each cell is coloured according to its total number of expressed features."}
-plotPCA(sce, exprs_values="exprs", colour_by="total_features",
+We visualize the relationships between cells by constructing pairwise PCA plots for the first three components (Figure \@ref(fig:pcaplothsc)).
+Cells with similar expression profiles should be located close together in the plot, while dissimilar cells should be far apart.
+In this case, no clear separation of cells into distinct subpopulations is observed.
+This is consistent with the presence of a highly homogeneous population of HSCs [@wilson2015combined].
+
+```{r pcaplothsc, fig.cap="PCA plot constructed from normalized log-expression values of correlated HVGs, where each point represents a cell in the HSC dataset. First and second components are shown, along with the percentage of variance explained. Bars represent the coordinates of the cells on each axis. Each cell is coloured according to its total number of expressed features.", fig.height=9, fig.width=9}
+plotReducedDim(sce, ncomponents=3, colour_by="total_features",
     feature_set=chosen) + fontsize
 ```
 
-On a related note, we only show the first two components that contribute most to the variance in Figure ((pcaplothsc)).
-Additional components can be visualized by increasing the `ncomponents` argument in `plotPCA` to construct pairwise plots.
-The percentage of variance explained by each component can also be obtained by running `plotPCA` with `return_SCESet=TRUE`, and then calling `reducedDimension` on the returned object.
-This information may be useful for selecting high-variance components (possibly corresponding to interesting underlying factors) for further examination. 
-
 Another widely used approach is the _t_-stochastic neighbour embedding (_t_-SNE) method [@van2008visualizing].
 _t_-SNE tends to work better than PCA for separating cells in more diverse populations.
-This is because the former can directly capture non-linear relationships in high-dimensional space, whereas the latter must represent them (suboptimally) as linear components.
-However, this improvement comes at the cost of more computational effort and complexity.
-In particular, _t_-SNE is a stochastic method, so users should run the algorithm several times to ensure that the results are representative, and then set a seed to ensure that the chosen results are reproducible.
-It is also advisable to test different settings of the "perplexity" parameter as this will affect the distribution of points in the low-dimensional space.
-This is demonstrated below in Figure ((tsneplothsc)), though no consistent substructure is observed in all plots. 
+This is because the former can directly capture non-linear relationships in high-dimensional space, whereas the latter must represent them on linear axes.
+However, this improvement comes at the cost of more computational effort and requires the user to consider parameters such as the random seed and perplexity (see comments).
+We demonstrate the generation of _t_-SNE plots in Figure \@ref(fig:tsneplothsc), using the low-rank approximation of the data to take advantage of the denoising step.
+As with the PCA plots, no consistent substructure is observed.
 
 ```{r tsneplothsc, fig.cap="_t_-SNE plots constructed from normalized log-expression values of correlated HVGs, using a range of perplexity values. In each plot, each point represents a cell in the HSC dataset. Bars represent the coordinates of the cells on each axis. Each cell is coloured according to its total number of expressed features.", fig.width=12, fig.height=6}
-set.seed(100)
-out5 <- plotTSNE(sce, exprs_values="exprs", perplexity=5, colour_by="total_features", 
-    feature_set=chosen) + fontsize + ggtitle("Perplexity = 5")
-out10 <- plotTSNE(sce, exprs_values="exprs", perplexity=10, colour_by="total_features",
-    feature_set=chosen) + fontsize + ggtitle("Perplexity = 10")
-out20 <- plotTSNE(sce, exprs_values="exprs", perplexity=20, colour_by="total_features",
-    feature_set=chosen) + fontsize + ggtitle("Perplexity = 20")
+out5 <- plotTSNE(sce, exprs_values="lowrank", perplexity=5, colour_by="total_features", 
+    rand_seed=100, feature_set=chosen) + fontsize + ggtitle("Perplexity = 5")
+out10 <- plotTSNE(sce, exprs_values="lowrank", perplexity=10, colour_by="total_features",
+    rand_seed=100, feature_set=chosen) + fontsize + ggtitle("Perplexity = 10")
+out20 <- plotTSNE(sce, exprs_values="lowrank", perplexity=20, colour_by="total_features",
+    rand_seed=100, feature_set=chosen) + fontsize + ggtitle("Perplexity = 20")
 multiplot(out5, out10, out20, cols=3)
 ```
 
 There are many other dimensionality reduction techniques that we do not consider here but could also be used, e.g., multidimensional scaling, diffusion maps.
 These have their own advantages and disadvantages -- for example, diffusion maps (see `plotDiffusionMap`) place cells along a continuous trajectory and are suited for visualizing graduated processes like differentiation [@angerer2016destiny].
-For each visualization method, additional cell-specific information can be incorporated into the colour, size or shape of each point.
-Here, cells are coloured by the total number of expressed features to demonstrate that this metric does not drive any systematic differences across the population.
-The `selectorPlot` function from `r Biocpkg("scran")` can also be used to interactively select groups of cells in two-dimensional space.
-This facilitates data exploration as visually identified subpopulations can be directly selected for further examination.
 
-Finally, putative subpopulations can be computationally defined by cutting the dendrogram in `heat.out$colDendrogram` with `cutree` to form clusters.
-We do not attempt this here as the substructure is too weak for reliable clustering.
+<!--
 In fact, users should generally treat clustering results with some caution.
 If the differences between cells are subtle, the assignment of cells into clusters may not be robust.
 Moreover, different algorithms can yield substantially different clusters by focusing on different aspects of the data.
 Experimental validation of the clusters is critical to ensure that the putative subpopulations actually exist.
+-->
+
+__Comments from Aaron:__
+
+- For each visualization method, additional cell-specific information can be incorporated into the colour, size or shape of each point.
+Here, cells are coloured by the total number of expressed features to demonstrate that this metric does not drive any systematic differences across the population.
+- For PCA, more components can be shown but are usually less informative (and more difficult to interpret) as they explain less of the variance. 
+- _t_-SNE is a stochastic method, so users should run the algorithm several times to ensure that the results are representative.
+Scripts should set a seed (via the `rand_seed` argument) to ensure that the chosen results are reproducible.
+It is also advisable to test different settings of the "perplexity" parameter as this will affect the distribution of points in the low-dimensional space.
+A good guide on how to interpret _t_-SNE plots can be found at http://distill.pub/2016/misread-tsne/.
+- The `selectorPlot` function from `r Biocpkg("scran")` can also be used to interactively select groups of cells in two-dimensional space.
+This facilitates data exploration as visually identified subpopulations can be directly selected for further examination.
+The `exploreData` function can also be used to interactively visualize gene expression, dimensionality reduction results and other covariates simultaneously.
+- Putative subpopulations can be computationally defined by clustering, but we do not attempt this here due to the absence of strong substructure.
+We will discuss this in more detail for the next data set.
 
 ## Additional comments
 
