@@ -783,34 +783,28 @@ sce <- calculateQCMetrics(sce, feature_controls=list(Spike=is.spike, Mt=is.mito)
 setSpike(sce) <- "Spike"
 ```
 
-We examine the distribution of library sizes and numbers of expressed genes across cells (Figure ((libplotbrain))).
+We examine the distribution of library sizes and numbers of expressed genes across cells (Figure \@ref(fig:libplotbrain)).
+In particular, the spike-in proportions here are more variable than in the HSC dataset.
+This may reflect a greater variability in the total amount of endogenous RNA per cell when many cell types are present.
 
-```{r libplotbrain, fig.width=12, fig.height=6, fig.cap="Histograms of library sizes (left) and number of expressed genes (right) for all cells in the brain dataset."}
-par(mfrow=c(1,2))
+```{r libplotbrain, fig.width=12, fig.height=12 fig.cap="Histograms of QC metrics including the library sizes, number of expressed genes and proportion of UMIs assigned to spike-in transcripts or mitochondrial genes for all cells in the brain dataset."}
+par(mfrow=c(2,2))
 hist(sce$total_counts/1e3, xlab="Library sizes (thousands)", main="", 
     breaks=20, col="grey80", ylab="Number of cells")
 hist(sce$total_features, xlab="Number of expressed genes", main="", 
     breaks=20, col="grey80", ylab="Number of cells")
-```
-
-We also examine the distribution of the proportions of UMIs assigned to mitochondrial genes or spike-in transcripts (Figure ((controlplotbrain))).
-The spike-in proportions here are more variable than in the HSC dataset.
-This may reflect a greater variability in the total amount of endogenous RNA per cell when many cell types are present.
-
-```{r controlplotbrain, fig.width=12, fig.height=6, fig.cap="Histogram of the proportion of UMIs assigned to mitochondrial genes (left) or spike-in transcripts (right) across all cells in the brain dataset."}
-par(mfrow=c(1,2))
-hist(sce$pct_counts_feature_controls_Mt, xlab="Mitochondrial proportion (%)", 
-    ylab="Number of cells", breaks=20, main="", col="grey80")
 hist(sce$pct_counts_feature_controls_Spike, xlab="ERCC proportion (%)",
     ylab="Number of cells", breaks=20, main="", col="grey80")
+hist(sce$pct_counts_feature_controls_Mt, xlab="Mitochondrial proportion (%)", 
+    ylab="Number of cells", breaks=20, main="", col="grey80")
 ```
 
-We remove small outliers in Figure ((libplotbrain)) and large outliers in Figure ((controlplotbrain)), using a MAD-based threshold as previously described.
+We remove small outliers for the library size and the number of expressed features, and large outliers for the spike-in proportions.
+Again, the presence of spike-in transcripts means that we do not have to use the mitochondrial proportions.
 
 ```{r}
 libsize.drop <- isOutlier(sce$total_counts, nmads=3, type="lower", log=TRUE)
 feature.drop <- isOutlier(sce$total_features, nmads=3, type="lower", log=TRUE)
-mito.drop <- isOutlier(sce$pct_counts_feature_controls_Mt, nmads=3, type="higher")
 spike.drop <- isOutlier(sce$pct_counts_feature_controls_Spike, nmads=3, type="higher")
 ```
 
@@ -818,9 +812,9 @@ Removal of low-quality cells is then performed by combining the filters for all 
 The vast majority of cells are retained, which suggests that the original quality control procedures were generally adequate.
 
 ```{r}
-sce <- sce[,!(libsize.drop | feature.drop | spike.drop | mito.drop)]
+sce <- sce[,!(libsize.drop | feature.drop | spike.drop)]
 data.frame(ByLibSize=sum(libsize.drop), ByFeature=sum(feature.drop), 
-    ByMito=sum(mito.drop), BySpike=sum(spike.drop), Remaining=ncol(sce))
+    BySpike=sum(spike.drop), Remaining=ncol(sce))
 ```
 
 ```{r echo=FALSE, results='hide'}
@@ -829,7 +823,7 @@ gc()
 
 ## Cell cycle classification
 
-Application of `cyclone` to the brain dataset suggests that most of the cells are in G1 phase (Figure ((phaseplotbrain))).
+Application of `cyclone` to the brain dataset suggests that most of the cells are in G1 phase (Figure \@ref(fig:phaseplotbrain)).
 However, the intepretation of this result requires some caution due to the differences between the test and training datasets.
 The classifier was trained on C1 SMARTer data [@scialdone2015computational] and accounts for the biases in that protocol. 
 The brain dataset uses UMI counts, which has an entirely different set of biases, e.g., 3'-end coverage only, no length bias, no amplification noise.
@@ -850,55 +844,43 @@ plot(assignments$score$G1, assignments$score$G2M, xlab="G1 score", ylab="G2/M sc
 An additional complication is that many neuronal cell types are expected to lie in the G0 resting phase, which is distinct from the other phases of the cell cycle [@coller2006new].
 Application of `cyclone` to these cells may be suboptimal if each cell must be assigned into one of the G1, S or G2/M phases.
 To avoid problems from misclassification, we will not perform any processing of this dataset by cell cycle phase.
-This is unlikely to be problematic for this analysis, as the cell cycle effect will be relatively subtle compared to the obvious differences between cell types in a diverse population.
+This is unlikely to be problematic here, as the cell cycle effect will be relatively subtle compared to the obvious differences between cell types in a diverse population.
 Thus, the former is unlikely to distort the conclusions regarding the latter.
 
 ```{r echo=FALSE, results='hide'}
 gc()
 ```
 
-## Removing uninteresting genes
+## Examining gene-level metrics
 
-Low-abundance genes are removed by applying a simple mean-based filter.
-We use a lower threshold for UMI counts compared to that used for read counts.
-This is because the number of transcript molecules will always be lower than the number of reads generated from such molecules.
+Figure \@ref(fig:topgenebrain) shows the most highly expressed genes across the cell population in the brain data set.
+This is mostly occupied by spike-in transcripts, suggesting that too much spike-in RNA may be have been used.
+There are also a number of constitutively expressed genes, as expected.
+
+```{r topgenehsc, fig.height=9, fig.width=6, fig.cap="Percentage of total counts assigned to the top 50 most highly-abundant features in the brain dataset. For each feature, each bar represents the percentage assigned to that feature for a single cell, while the circle represents the average across all cells. Bars are coloured by the total number of expressed features in each cell, while circles are coloured according to whether the feature is labelled as a control feature."}
+plotQC(sce, type = "highest-expression", n=50) + fontsize
+```
+
+Gene abundance is quantified by computing the average count across all cells (Figure \@ref(fig:abhistbrain)).
+As previously mentioned, the number of transcript molecules will generally be lower than the number of reads generated from such molecules.
 While some information and power will be lost due to the decrease in the size of the counts, this is mitigated by a concomitant reduction in the variability of the counts.
 Specifically, the use of UMIs eliminates technical noise due to amplification biases [@islam2014quantitative].
 
-```{r}
-ave.counts <- calcAverage(sce)
-keep <- ave.counts >= 0.1
-```
-
-Figure ((abhistbrain)) suggests that our choice of threshold is appropriate.
-The filter removes the bulk of lowly expressed genes while preserving the peak of moderately expressed genes.
-
 ```{r abhistbrain, fig.cap="Histogram of log-average counts for all genes in the brain dataset. The filter threshold is represented by the blue line."}
+ave.counts <- calcAverage(sce)
 hist(log10(ave.counts), breaks=100, main="", col="grey",
     xlab=expression(Log[10]~"average count"))
 abline(v=log10(0.1), col="blue", lwd=2, lty=2)
 ```
 
-The mean-based filter is applied to the dataset by subsetting `sce` as previously described.
-Despite the reduced threshold, the number of retained genes is lower than that in the HSC dataset, simply because the library sizes are much smaller with UMI counts.
+We save the average counts into the `SCESet` object for later use.
+For example, we might filter out low-abundance genes by setting a minimum threshold of 0.1 on the average count.
+(Obviously, the chosen threshold here will be lower than the one recommended for average read counts.)
 
 ```{r}
-sce <- sce[keep,]
-nrow(sce)
-```
-
-```{r echo=FALSE, results='hide'}
-gc()
-```
-
-Some datasets also contain strong heterogeneity in mitochondrial RNA content, possibly due to differences in mitochondrial copy number or activity between cell types.
-This heterogeneity will cause mitochondrial genes to dominate the top set of results, e.g., for identification of correlated HVGs.
-However, these genes are largely uninteresting given that most studies focus on nuclear regulation.
-As such, we filter them out prior to further analysis.
-Other candidates for removal include pseudogenes or ribosome-associated genes, which might not be relevant for characterising cell types but can still interfere with the interpretation of the results.
-
-```{r}
-sce <- sce[!fData(sce)$is_feature_control_Mt,]
+fData(sce)$ave.count <- ave.counts
+keep.example <- ave.counts >= 0.1
+summary(keep.example)
 ```
 
 ```{r echo=FALSE, results='hide'}
@@ -907,14 +889,15 @@ gc()
 
 ## Normalization of cell-specific biases
 
-Normalization of cell-specific biases is performed using the deconvolution method in the `computeSumFactors` function.
+For endogenous genes, normalization is performed using the deconvolution method in the `computeSumFactors` function.
 Here, we cluster similar cells together and normalize the cells in each cluster using the deconvolution method.
 This improves normalization accuracy by reducing the number of DE genes between cells in the same cluster.
 Scaling is then performed to ensure that size factors of cells in different clusters are comparable.
 
 ```{r}
 clusters <- quickCluster(sce)
-sce <- computeSumFactors(sce, cluster=clusters)
+sce <- computeSumFactors(sce, cluster=clusters, 
+    subset.row=fData(sce)$ave.count >= 0.1)
 summary(sizeFactors(sce))
 ```
 
@@ -922,7 +905,7 @@ summary(sizeFactors(sce))
 gc()
 ```
 
-Compared to the HSC analysis, more scatter is observed around the trend between the total count and size factor for each cell (Figure ((normplotbrain))).
+Compared to the HSC analysis, more scatter is observed around the trend between the total count and size factor for each cell (Figure \@ref(fig:normplotbrain)).
 This is consistent with an increased amount of DE between cells of different types, which compromises the accuracy of library size normalization [@robinson2010scaling].
 In contrast, the size factors are estimated based on median ratios and are more robust to the presence of DE between cells.
 
@@ -943,11 +926,20 @@ Finally, normalized log-expression values are computed for each endogenous gene 
 sce <- normalize(sce)
 ```
 
+__Comments from Aaron:__
+
+- We specify high-abundance genes for normalization by using the `subset.row` argument.
+As previously mentioned, we use a lower threshold for abundance to reflect the fact that the counts are lower for UMI data.
+- Only a rough clustering is required, to avoid pooling together very different cell types in `computeSumFactors`.
+The function is robust to a moderate level of differential expression between cells in the same cluster.
+- For large data sets, consider using `method="igraph"` in `quickCluster` for faster clustering.
+This uses a graph-based clustering algorithm - see `?buildSNNGraph` for more details.
+
 ## Checking for important technical factors
 
 Larger experiments contain more technical factors that need to be investigated.
 In this dataset, factors include the sex of the animal from which the cells were extracted, the age of the animal, the tissue of origin for each cell, and the total spike-in count in each cell.
-Figure ((explvarplotbrain)) shows that the tissue of origin explains a substantial proportion of the variance for a subset of genes.
+Figure \@ref(fig:explvarplotbrain) shows that the tissue of origin explains a substantial proportion of the variance for a subset of genes.
 This is probably because each tissue contains a different composition of cell types, leading to systematic differences in gene expression between tissues.
 The other factors explain only a small proportion of the variance for most genes and do not need to be incorporated into our downstream analyses.
 
@@ -963,7 +955,7 @@ plotExplanatoryVariables(sce, variables=c("counts_feature_controls_Spike",
 Nonetheless, we demonstrate how to account for uninteresting technical factors by using sex as an example.
 We set up a design matrix with the sex of the animal as the explanatory factor for each cell.
 This ensures that any sex-specific changes in expression will be modelled in our downstream analyses.
-We do not block on the tissue of origin, despite the fact that it explains more of the variance than sex in Figure ((explvarplotbrain)).
+We do not block on the tissue of origin, despite the fact that it explains more of the variance than sex in Figure \@ref(explvarplotbrain).
 This is because the tissue factor is likely to be associated with genuine differences between cell types, so including it in the model might regress out interesting biological effects.
 
 ```{r}
@@ -973,25 +965,50 @@ design <- model.matrix(~sce$sex)
 Other relevant factors include the chip or plate on which the cells were processed and the batch in which the libraries were sequenced.
 Blocking on these factors may be necessary to account for batch effects that are often observed in scRNA-seq data [@hicks2015widespread; @tung2016batch].
 
+## Modelling and removing technical noise
 
-## Identifying correlated HVGs
-
-We identify HVGs that may be involved in driving population heterogeneity.
-This is done by fitting a trend to the technical variances for the spike-in transcripts.
-We compute the biological component of the variance for each endogenous gene by subtracting the fitted value of the trend from the total variance.
+We model the technical noise by fitting a mean-variance trend to the spike-in transcripts, as previously described.
 To account for uninteresting factors, we supply `design` to `trendVar` to regress out any technical differences due to sex.
-HVGs are then detected in the same manner as described in the HSC data analysis.
 
 ```{r}
-var.fit.des <- trendVar(sce, trend="loess", span=0.4, design=design)
-var.out.des <- decomposeVar(sce, var.fit.des)
-hvg.out.des <- var.out.des[which(var.out.des$FDR <= 0.05 & var.out.des$bio >= 0.5),]
-nrow(hvg.out.des)
+var.fit <- trendVar(sce, span=0.4, design=design)
+var.out <- decomposeVar(sce, var.fit)
 ```
 
-Alternatively, for data sets containing multiple batches, a more robust strategy is to perform trend fitting and variance decomposition separately for each batch.
+Figure \@ref(fig:hvgplotbrain) indicates that the trend is fitted accurately to the technical variances.
+The technical and total variances are also much smaller than those in the HSC dataset.
+This is due to the use of UMIs which reduces the noise caused by variable PCR amplification.
+Furthermore, the spike-in trend is consistently lower than the variances of the endogenous genes.
+This reflects the heterogeneity in gene expression across cells of different types.
+(It also provides an example where most genes _are_ highly variable, such that fitting a trend to their variances will not recover the technical component.)
+
+```{r hvgplotbrain, fig.cap="Variance of normalized log-expression values against the mean for each gene, calculated across all cells in the brain data set after blocking on the sex effect. The blue line represents the mean-dependent trend in the technical variance of the spike-in transcripts (also highlighted as red points)."}
+plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression", 
+    ylab="Variance of log-expression")
+points(var.out$mean[isSpike(sce)], var.out$total[isSpike(sce)], col="red", pch=16)
+curve(var.fit$trend(x), col="dodgerblue", add=TRUE, lwd=2)
+```
+
+Again, we check the distribution of expression values for the top 10 HVGs to ensure that they are not being driven by outliers (Figure \@(fig:hvgvioplotbrain)).
+Some tweaking of the `plotExpression` parameters is necessary to visualize a large number of cells.
+
+```{r hvgvioplotbrain, fig.cap="Violin plots of normalized log-expression values for the top 10 HVGs in the brain dataset. For each gene, each point represents the log-expression value for an individual cell."}
+plotExpression(sce, rownames(hvg.out)[1:10], alpha=0.05, jitter="jitter") + fontsize
+```
+
+Finally, we denoise the expression values using our PCA-based approach, using only the genes with positive biological components.
+This yields a low-rank approximation where the technical noise has been removed.
+
+```{r}
+sce <- denoisePCA(sce, value="lowrank", subset.row=var.out$bio > 0)
+```
+
+__Comments from Aaron:__
+
+- For data sets containing multiple batches, an alternative strategy is to perform trend fitting and variance decomposition separately for each batch.
 This accommodates differences in the mean-variance trends between batches, especially if a different amount of spike-in RNA was added to the cells in each batch.
 We demonstrate the second approach below by treating each sex as a different "batch".
+Statistics are combined across multiple batches using the `combineVar` function.
 
 ```{r}
 collected <- list()
@@ -1001,64 +1018,12 @@ for (block in levels(sce$sex)) {
     var.fit <- trendVar(cur.sce, trend="loess", span=0.4)
     collected[[block]] <- decomposeVar(cur.sce, var.fit)
 }
+var.out <- do.call(combineVar, collected)
 ```
 
 ```{r, echo=FALSE, results='hide', message=FALSE}
 rm(cur.sce)
 gc()
-```
-
-Figure ((hvgplotbrain)) suggests that the trend is fitted accurately to the technical variances for each sex.
-Errors in fitting are negligible due to the precision of the variance estimates in a large dataset containing thousands of cells.
-The technical and total variances are also much smaller than those in the HSC dataset.
-This is due to the use of UMIs which reduces the noise caused by variable PCR amplification.
-Furthermore, the spike-in trend is consistently lower than the variances of the endogenous genes.
-This reflects the heterogeneity in gene expression across cells of different types.
-It also means the previous strategy of fitting a trend to the endogenous variances would not be appropriate here (or necessary, given the quality of the spike-in trend). 
-
-```{r hvgplotbrain, fig.width=12, fig.height=6, fig.cap="Variance of normalized log-expression values against the mean for each gene, calculated across all cells from male (left) or female mice (right). In each plot, the red line represents the mean-dependent trend in the technical variance of the spike-in transcripts (also highlighted as red points)."}
-par(mfrow=c(1,2))
-for (block in c("1", "-1")) { 
-    var.out <- collected[[block]]
-    plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression", 
-        ylab="Variance of log-expression", main=ifelse(block=="1", "Male", "Female"))
-    points(var.out$mean[isSpike(sce)], var.out$total[isSpike(sce)], col="red", pch=16)
-    o <- order(var.out$mean)
-    lines(var.out$mean[o], var.out$tech[o], col="red", lwd=2)
-}
-```
-
-Statistics are combined across the two sexes using the `combineVar` function.
-HVGs are identified as genes with large positive biological components, and are saved to file for future reference.
-Note that some of the p-values are reported as zero due to numerical imprecision.
-
-```{r}
-var.out <- do.call(combineVar, collected)
-hvg.out <- var.out[which(var.out$FDR <= 0.05 & var.out$bio >= 0.5),]
-hvg.out <- hvg.out[order(hvg.out$bio, decreasing=TRUE),] 
-nrow(hvg.out)
-write.table(file="brain_hvg.tsv", hvg.out, sep="\t", quote=FALSE, col.names=NA)
-head(hvg.out)
-```
-
-Again, we check the distribution of expression values for the top 10 HVGs to ensure that they are not being driven by outliers (Figure ((hvgvioplotbrain))).
-Some tweaking of the `plotExpression` parameters is necessary to visualize a large number of cells.
-
-```{r hvgvioplotbrain, fig.cap="Violin plots of normalized log-expression values for the top 10 HVGs in the brain dataset. For each gene, each point represents the log-expression value for an individual cell."}
-plotExpression(sce, rownames(hvg.out)[1:10], alpha=0.05, jitter="jitter") + fontsize
-```
-
-To identify genes involved in defining subpopulations, correlations in the expression profiles are calculated between pairs of HVGs.
-Correlated HVGs are defined as those with significant correlations to one or more other HVGs at a FDR of 5%.
-Here, the proportion of HVGs with significant correlations is much higher than in the HSC dataset, indicating that strong substructure is present.
-
-```{r}
-set.seed(100)
-var.cor <- correlatePairs(sce, design=design, subset.row=rownames(hvg.out), per.gene=TRUE)
-write.table(file="brain_cor.tsv", var.cor, sep="\t", quote=FALSE, row.names=FALSE)
-head(var.cor)
-sig.cor <- var.cor$FDR <= 0.05
-summary(sig.cor)
 ```
 
 ## Further data exploration with the correlated HVGs
