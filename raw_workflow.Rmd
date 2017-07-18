@@ -996,11 +996,12 @@ Some tweaking of the `plotExpression` parameters is necessary to visualize a lar
 plotExpression(sce, rownames(hvg.out)[1:10], alpha=0.05, jitter="jitter") + fontsize
 ```
 
-Finally, we denoise the expression values using our PCA-based approach, using only the genes with positive biological components.
+Finally, we denoise the expression values using our PCA-based approach.
+We supply `design` to regress out uninteresting factors, and we use only the genes with positive biological components, 
 This yields a low-rank approximation where the technical noise has been removed.
 
 ```{r}
-sce <- denoisePCA(sce, value="lowrank", subset.row=var.out$bio > 0)
+sce <- denoisePCA(sce, design=design, value="lowrank", subset.row=var.out$bio > 0)
 ```
 
 __Comments from Aaron:__
@@ -1021,19 +1022,12 @@ for (block in levels(sce$sex)) {
 var.out <- do.call(combineVar, collected)
 ```
 
-```{r, echo=FALSE, results='hide', message=FALSE}
-rm(cur.sce)
-gc()
-```
-
-## Further data exploration with the correlated HVGs
-
-We first remove the sex effect using the `removeBatchEffect` function from the `r Biocpkg("limma")` package [@ritchie2015limma].
-This ensures that any sex-specific differences will not dominate the visualization of the expression profiles.
-In this manner, we maintain consistency with the use of `design` in the previous steps.
-(However, if an analysis method can accept a design matrix, blocking on nuisance factors in the design matrix is preferable to manipulating the expression values with `removeBatchEffect`.
-This is because the latter does not account for the loss of residual degrees of freedom, nor the uncertainty of estimation of the blocking factor terms.)
-We store these sex-corrected expression values in the `norm_exprs` field of the `SCESet` object for later use.
+- Some downstream procedures must be performed on all batches at once, e.g., clustering or dimensionality reduction of all cells across multiple batches.
+However, many of these procedures are not model-based and thus do not accept a design matrix to account for the batch effect.
+To remove uninteresting factors of variation beforehand, we use the `removeBatchEffect` function from the `r Biocpkg("limma")` package [@ritchie2015limma].
+This computes new expression values where the batch effect is regressed out, ensuring that it does not drive separation between clusters or in low-dimensional space.
+This is demonstrated below for the sex effect in the brain data.
+Note that this step is automatically performed inside `denoisePCA` when `design` is supplied, and does not need to be repeated.
 
 ```{r}
 library(limma)
@@ -1042,13 +1036,21 @@ adj.exprs <- removeBatchEffect(adj.exprs, batch=sce$sex)
 norm_exprs(sce) <- adj.exprs 
 ```
 
+- That being said, if an analysis method can accept a design matrix, blocking on nuisance factors in the design matrix is preferable to using `removeBatchEffect`.
+This is because the latter does not account for the loss of residual degrees of freedom, nor the uncertainty of estimation of the blocking factor terms.
+
+```{r, echo=FALSE, results='hide', message=FALSE}
+rm(cur.sce)
+gc()
+```
+
+## Data exploration with dimensionality reduction
+
 We perform dimensionality reduction on the correlated HVGs to check if there is any substructure. 
-Cells separate into clear clusters in the _t_-SNE plot (Figure ((tsneplotbrain))), corresponding to distinct subpopulations.
+Cells separate into clear clusters in the _t_-SNE plot (Figure \@ref(fig:tsneplotbrain)), corresponding to distinct subpopulations.
 This is consistent with the presence of multiple cell types in the diverse brain population.
 
 ```{r tsneplotbrain, fig.cap="_t_-SNE plots constructed from the normalized and corrected log-expression values of correlated HVGs for cells in the brain dataset. Each point represents a cell and is coloured according to its expression of the top HVG (left) or _Mog_ (right).", fig.width=15, fig.height=6}
-chosen <- var.cor$gene[sig.cor]
-top.hvg <- rownames(hvg.out)[1]
 tsne1 <- plotTSNE(sce, exprs_values="norm_exprs", colour_by=top.hvg,
     perplexity=10, rand_seed=100, feature_set=chosen) + fontsize
 tsne2 <- plotTSNE(sce, exprs_values="norm_exprs", colour_by="Mog",
@@ -1061,12 +1063,12 @@ rm(var.cor)
 gc()
 ```
 
-The PCA plot is less effective at separating cells into many different clusters (Figure ((pcaplotbrain))).
-This is because the first two principal components (PCs) are driven by strong differences between specific subpopulations, which reduces the resolution of more subtle differences between some of the other subpopulations.
+The PCA plot is less effective at separating cells into many different clusters (Figure \@ref(fig:pcaplotbrain)).
+This is because the first two PCs are driven by strong differences between specific subpopulations, which reduces the resolution of more subtle differences between some of the other subpopulations.
 Nonetheless, some substructure is still visible.
 
-```{r pcaplotbrain, fig.cap="PCA plots constructed from the normalized and corrected log-expression values of correlated HVGs for cells in the brain dataset. Each point represents a cell and is coloured according to its expression of the top HVG (left) or _Mog_ (right).", fig.width=15, fig.height=6}
-pca1 <- plotPCA(sce, exprs_values="norm_exprs", colour_by=top.hvg) + fontsize
+```{r pcaplotbrain, fig.cap="PCA plots constructed from the normalized and corrected log-expression values of correlated HVGs for cells in the brain dataset. Each point represents a cell and is coloured according to its expression of the _Neurod6_ (left) or _Mog_ (right).", fig.width=15, fig.height=6}
+pca1 <- plotPCA(sce, exprs_values="norm_exprs", colour_by="Neurod6") + fontsize
 pca2 <- plotPCA(sce, exprs_values="norm_exprs", colour_by="Mog") + fontsize
 multiplot(pca1, pca2, cols=2)
 ```
@@ -1078,14 +1080,14 @@ For example, _Mog_ can be used to identify clusters corresponding to oligodendro
 
 ## Clustering cells into putative subpopulations
 
-The normalized and sex-adjusted log-expression values for correlated HVGs are used to cluster cells into putative subpopulations.
+The denoised log-expression values are used to cluster cells into putative subpopulations.
 Specifically, we perform hierarchical clustering on the Euclidean distances between cells, using Ward's criterion to minimize the total variance within each cluster.
 This yields a dendrogram that groups together cells with similar expression patterns across the chosen genes.
 An alternative approach is to cluster on a matrix of distances derived from correlations (e.g., as in `quickCluster`).
 This is more robust to noise and normalization errors, but is also less sensitive to subtle changes in the expression profiles. 
 
 ```{r}
-chosen.exprs <- norm_exprs(sce)[chosen,]
+chosen.exprs <- assayDataElement(sce, "lowrank")
 my.dist <- dist(t(chosen.exprs))
 my.tree <- hclust(my.dist, method="ward.D2")
 ```
@@ -1099,26 +1101,13 @@ library(dynamicTreeCut)
 my.clusters <- unname(cutreeDynamic(my.tree, distM=as.matrix(my.dist), verbose=0))
 ```
 
-Figure ((heatmapbrain)) contains a clear block-like pattern, representing systematic differences between clusters of cells with distinct expression profiles.
-This is consistent with the presence of well-defined subpopulations that were previously observed in the dimensionality reduction plots.
+We visualize the cluster assignments for all cells on the _t_-SNE plot in Figure \@(fig:heatmapbrain).
+Adjacent cells are generally assigned to the same cluster, indicating that the clustering procedure was applied correctly.
 
-```{r heatmapbrain, message=FALSE, fig.width=7, fig.height=10, fig.cap="Heatmap of mean-centred normalized and corrected log-expression values for correlated HVGs in the brain dataset. Dendrograms are formed by hierarchical clustering on the Euclidean distances between genes (row) or cells (column). Column colours represent the cluster to which each cell is assigned after a dynamic tree cut. Heatmap colours are capped at a maximum absolute log-fold change of 5."}
-heat.vals <- chosen.exprs - rowMeans(chosen.exprs)
-clust.col <- rainbow(max(my.clusters))
-heatmap.2(heat.vals, col=bluered, symbreak=TRUE, trace='none', cexRow=0.3,
-    ColSideColors=clust.col[my.clusters], Colv=as.dendrogram(my.tree), 
-    breaks=seq(-5, 5, length.out=21))
-```
-
-This heatmap can be stored at a greater resolution for detailed inspection later.
-
-```{r, results='hide'}
-pdf("brain_heat.pdf", width=10, height=100) # Large 'height' to show all gene names.
-heatmap.2(heat.vals, col=bluered, symbreak=TRUE, trace='none', cexRow=0.3,
-    ColSideColors=clust.col[my.clusters], Colv=as.dendrogram(my.tree), 
-    lwid=c(1, 4), lhei=c(1, 50), # Avoid having a very large colour key.
-    breaks=seq(-5, 5, length.out=21))
-dev.off()
+```{r heatmapbrain, message=FALSE, fig.width=7, fig.height=10, fig.cap="_t_-SNE plot of the denoised expression profiles of all cells in the brain data set. Each cell is coloured according to the cluster identity to which it was assigned."}
+sce$cluster <- my.clusters
+plotTSNE(sce, exprs_values="norm_exprs", colour_by="cluster",
+    perplexity=10, rand_seed=100) + fontsize
 ```
 
 <!--
@@ -1141,22 +1130,25 @@ plot(sil, main = paste(length(unique(my.clusters)), "clusters"),
     border=sil.cols, col=sil.cols, do.col.sort=FALSE) 
 ```
 
-A complementary approach is to perform PCA on the log-expression values for correlated HVGs and cluster on the first few PCs.
-This assumes that random technical noise in each gene will be represented by later PCs, while biological substructure involving coregulated groups of genes will contribute more variance and be represented by earlier PCs.
-The `denoisePCA` function will remove later PCs until the total discard variance is equal to the sum of technical components for all genes used in the PCA.
-This eliminates technical noise and enriches for biological signal in the remaining PCs, allowing for improved resolution during clustering.
+__Comments from Aaron:__
 
-```{r}
-# Using the technical components computed with a design matrix.
-pcs <- denoisePCA(sce, design=design, technical=var.fit.des$trend, subset.row=chosen) 
-dim(reducedDimension(pcs)) # Cluster on this instead of t(chosen.exprs)
-```
-
-When examining very heterogeneous datasets, it can be useful to repeat the HVG detection and clustering using only the cells within a particular cluster.
+- Very heterogeneous datasets may yield a few large clusters on the first round of clustering.
+It can be useful to repeat the variance modelling, denoising and clustering using only the cells within each of the initial clusters.
 This can be achieved by subsetting `sce` according to a particular level of `my.clusters`, and applying the same functions that were previously described.
-Doing so may identify a different set of correlated HVGs that define heterogeneity within the cluster, as opposed to those that define differences between clusters.
+Doing so may focus on a different set of genes that define heterogeneity within an initial cluster, as opposed to those that define differences between the initial clusters.
 This would allow fine-scale structure within each cluster to be explored at greater resolution. 
 For simplicity, though, we will only use the broad clusters corresponding to clear subpopulations in this workflow.
+- For larger data sets, consider using `buildSNNGraph` and methods from the `r CRANpkg("igraph")` package to perform clustering.
+This builds a shared-nearest-neighbour graph [@snndudes] in which cells are the nodes and edges are formed between cells that share nearest neighbours.
+Clusters are then defined as highly connected communities of cells within this graph.
+This is more efficient than forming a pairwise distance matrix for large numbers of cells.
+Clustering parameters can be optimized by maximizing the modularity score for the formed clusters.
+
+```{r}
+snn.gr <- buildSNNGraph(sce)
+library(igraph)
+gr.clusters <- cluster_fast_greedy(snn.gr)
+```
 
 ```{r echo=FALSE, results='hide'}
 gc()
@@ -1200,7 +1192,7 @@ write.table(marker.set, file="brain_marker_1.tsv", sep="\t", quote=FALSE, col.na
 ```
 
 We visualize the expression profiles of the top candidates to verify that the DE signature is robust.
-Figure ((heatmapmarkerbrain)) indicates that most of the top markers have strong and consistent up- or downregulation in cells of cluster 1 compared to some or all of the other clusters.
+Figure \@ref(fig:heatmapmarkerbrain) indicates that most of the top markers have strong and consistent up- or downregulation in cells of cluster 1 compared to some or all of the other clusters.
 Thus, cells from the subpopulation of interest can be identified as those that express the upregulated markers and do not express the downregulated markers.
 
 ```{r heatmapmarkerbrain, fig.cap="Heatmap of mean-centred normalized and corrected log-expression values for the top set of markers for cluster 1 in the brain dataset. Column colours represent the cluster to which each cell is assigned, as indicated by the legend."}
@@ -1212,19 +1204,23 @@ heatmap.2(heat.vals, col=bluered, symbreak=TRUE, trace='none', cexRow=0.6,
 legend("bottomleft", col=clust.col, legend=sort(unique(my.clusters)), pch=16)
 ```
 
-Many of the markers in Figure ((heatmapmarkerbrain)) are not uniquely up- or downregulated in the chosen cluster.
+Many of the markers in Figure \@ref(fig:heatmapmarkerbrain) are not uniquely up- or downregulated in the chosen cluster.
 Testing for unique DE tends to be too stringent as it overlooks important genes that are expressed in two or more clusters.
 For example, in a mixed population of CD4^+^-only, CD8^+^-only, double-positive and double-negative T cells, neither _Cd4_ or _Cd8_ would be detected as subpopulation-specific markers because each gene is expressed in two subpopulations.
 With our approach, both of these genes will be picked up as candidate markers as they will be DE between at least one pair of subpopulations.
 A combination of markers can then be chosen to characterize a subpopulation, which is more flexible than trying to find uniquely DE genes.
 
-It must be stressed that the (adjusted) _p_-values computed here cannot be properly interpreted as measures of significance.
+__Comments from Aaron:__
+
+- `findMarkers` can also be directed to find genes that are DE between the chosen cluster and _all_ other clusters.
+This should be done by setting `pval.type="all"`, which defines the p-value for each gene as the maximum value across all pairwise comparisons involving the chosen cluster.
+Combined with `direction="up"`, this can be used to identify unique markers for each cluster.
+However, this is sensitive to overclustering, as unique marker genes will no longer exist if a cluster is split into two smaller subclusters.
+- It must be stressed that the (adjusted) _p_-values computed here cannot be properly interpreted as measures of significance.
 This is because the clusters have been empirically identified from the data.
 `r Biocpkg("limma")` does not account for the uncertainty of clustering, which means that the _p_-values are much lower than they should be. 
 However, this is not a concern in other analyses where the groups are pre-defined.
-For such analyses, the FDR-adjusted _p_-value can be directly used to define significant genes for each DE comparison, though some care may be required to deal with plate effects [@hicks2015widespread; @tung2016batch].
-
-The `SCESet` object can also be easily transformed for use in other DE analysis methods.
+- The `SCESet` object can also be easily transformed for use in other DE analysis methods.
 For example, the `convertTo` function can be used to construct a `DGEList` for input into the `r Biocpkg("edgeR")` pipeline [@robinson2010edgeR].
 This allows users to construct their own marker detection pipeline, though we find that direct use of `findMarkers` is usually sufficient.
 
