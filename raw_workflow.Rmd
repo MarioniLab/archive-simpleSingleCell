@@ -620,8 +620,7 @@ In this case, no clear separation of cells into distinct subpopulations is obser
 This is consistent with the presence of a highly homogeneous population of HSCs [@wilson2015combined].
 
 ```{r pcaplothsc, fig.cap="PCA plot constructed from normalized log-expression values of correlated HVGs, where each point represents a cell in the HSC dataset. First and second components are shown, along with the percentage of variance explained. Bars represent the coordinates of the cells on each axis. Each cell is coloured according to its total number of expressed features.", fig.height=9, fig.width=9}
-plotReducedDim(sce, ncomponents=3, colour_by="total_features",
-    feature_set=chosen) + fontsize
+plotReducedDim(sce, ncomponents=3, colour_by="total_features") + fontsize
 ```
 
 Another widely used approach is the _t_-stochastic neighbour embedding (_t_-SNE) method [@van2008visualizing].
@@ -632,12 +631,14 @@ We demonstrate the generation of _t_-SNE plots in Figure \@ref(fig:tsneplothsc),
 As with the PCA plots, no consistent substructure is observed.
 
 ```{r tsneplothsc, fig.cap="_t_-SNE plots constructed from normalized log-expression values of correlated HVGs, using a range of perplexity values. In each plot, each point represents a cell in the HSC dataset. Bars represent the coordinates of the cells on each axis. Each cell is coloured according to its total number of expressed features.", fig.width=12, fig.height=6}
-out5 <- plotTSNE(sce, exprs_values="lowrank", perplexity=5, colour_by="total_features", 
-    rand_seed=100, feature_set=chosen) + fontsize + ggtitle("Perplexity = 5")
-out10 <- plotTSNE(sce, exprs_values="lowrank", perplexity=10, colour_by="total_features",
-    rand_seed=100, feature_set=chosen) + fontsize + ggtitle("Perplexity = 10")
-out20 <- plotTSNE(sce, exprs_values="lowrank", perplexity=20, colour_by="total_features",
-    rand_seed=100, feature_set=chosen) + fontsize + ggtitle("Perplexity = 20")
+dummy <- newSCESet(t(reducedDimension(sce)))
+dummy$total_features <- sce$total_features
+out5 <- plotTSNE(dummy, pca=FALSE, perplexity=5, colour_by="total_features", 
+    rand_seed=100) + fontsize + ggtitle("Perplexity = 5")
+out10 <- plotTSNE(dummy, pca=FALSE, perplexity=10, colour_by="total_features",
+    rand_seed=100) + fontsize + ggtitle("Perplexity = 10")
+out20 <- plotTSNE(dummy, pca=FALSE, perplexity=20, colour_by="total_features",
+    rand_seed=100) + fontsize + ggtitle("Perplexity = 20")
 multiplot(out5, out10, out20, cols=3)
 ```
 
@@ -654,8 +655,9 @@ Experimental validation of the clusters is critical to ensure that the putative 
 __Comments from Aaron:__
 
 - For each visualization method, additional cell-specific information can be incorporated into the colour, size or shape of each point.
-Here, cells are coloured by the total number of expressed features to demonstrate that this metric does not drive any systematic differences across the population.
-- For PCA, more components can be shown but are usually less informative (and more difficult to interpret) as they explain less of the variance. 
+Here, cells are coloured by the total number of expressed features, which is strongly correlated with the first PC.
+We will discuss this in more detail in the next section.
+- For PCA, more components can be shown but these are usually less informative (and more difficult to interpret) as they explain less of the variance. 
 - _t_-SNE is a stochastic method, so users should run the algorithm several times to ensure that the results are representative.
 Scripts should set a seed (via the `rand_seed` argument) to ensure that the chosen results are reproducible.
 It is also advisable to test different settings of the "perplexity" parameter as this will affect the distribution of points in the low-dimensional space.
@@ -663,8 +665,37 @@ A good guide on how to interpret _t_-SNE plots can be found at http://distill.pu
 - The `selectorPlot` function from `r Biocpkg("scran")` can also be used to interactively select groups of cells in two-dimensional space.
 This facilitates data exploration as visually identified subpopulations can be directly selected for further examination.
 The `exploreData` function can also be used to interactively visualize gene expression, dimensionality reduction results and other covariates simultaneously.
-- Putative subpopulations can be computationally defined by clustering, but we do not attempt this here due to the absence of strong substructure.
-We will discuss this in more detail for the next data set.
+
+## Interpreting heterogeneity across a continuum
+
+Putative subpopulations of cells can be computationally defined by unsupervised classification, i.e., clustering.
+We do not attempt this here due to the absence of distinct subpopulations in the plots above.
+However, there is a clear correlation with the number of expressed features and the first PC in Figure \@ref(fig:pcaplothsc).
+We can study this in more detail by detecting genes that are differentially expressed along the first PC, using methods from the _limma_ package.
+
+```{r, eval=FALSE}
+pc1 <- reducedDimension(sce)[,1]
+design <- model.matrix(~pc1)
+library(limma)
+fit <- lmFit(exprs(sce), design)
+fit <- eBayes(fit, trend=TRUE, robust=TRUE)
+topTable(fit)
+```
+
+Figure \@ref{fig:heatmaphsc} indicates that the majority of genes increase in expression along the first PC.
+However, there are also a few genes that decrease in expression, e.g., _H2-D1_ and _Malat1_.
+This indicates that the first PC corresponds to more than a general increase in cell size that affects all transcripts non-specifically.
+For example, a number of these genes are involved in DNA replication and the cell cycle.
+
+```{r heatmaphsc, fig.height=10, fig.width=6, fig.cap="Heatmap of the top 50 DE genes along the first PC in the HSC data set. The colour for each cell (column) represents the log-fold change from the average log-expression for each gene (row), bounded to [-2, 2] for visualization purposes. Cells are ordered by their location on the first PC."}
+de.genes <- rownames(topTable(fit, coef=2, n=50))
+heat.vals <- exprs(sce)[de.genes,]
+heat.vals <- heat.vals - rowMeans(heat.vals)
+heat.vals[heat.vals > 2] <- 2
+heat.vals[heat.vals < -2] <- -2
+pheatmap(heat.vals[,order(pc1)], cluster_cols=FALSE)
+plot(pc1, exprs(sce)["Itm2b",])
+```
 
 ## Additional comments
 
@@ -787,7 +818,7 @@ We examine the distribution of library sizes and numbers of expressed genes acro
 In particular, the spike-in proportions here are more variable than in the HSC dataset.
 This may reflect a greater variability in the total amount of endogenous RNA per cell when many cell types are present.
 
-```{r libplotbrain, fig.width=12, fig.height=12 fig.cap="Histograms of QC metrics including the library sizes, number of expressed genes and proportion of UMIs assigned to spike-in transcripts or mitochondrial genes for all cells in the brain dataset."}
+```{r libplotbrain, fig.width=12, fig.height=12, fig.cap="Histograms of QC metrics including the library sizes, number of expressed genes and proportion of UMIs assigned to spike-in transcripts or mitochondrial genes for all cells in the brain dataset."}
 par(mfrow=c(2,2))
 hist(sce$total_counts/1e3, xlab="Library sizes (thousands)", main="", 
     breaks=20, col="grey80", ylab="Number of cells")
@@ -857,7 +888,7 @@ Figure \@ref(fig:topgenebrain) shows the most highly expressed genes across the 
 This is mostly occupied by spike-in transcripts, suggesting that too much spike-in RNA may be have been used.
 There are also a number of constitutively expressed genes, as expected.
 
-```{r topgenehsc, fig.height=9, fig.width=6, fig.cap="Percentage of total counts assigned to the top 50 most highly-abundant features in the brain dataset. For each feature, each bar represents the percentage assigned to that feature for a single cell, while the circle represents the average across all cells. Bars are coloured by the total number of expressed features in each cell, while circles are coloured according to whether the feature is labelled as a control feature."}
+```{r topgenebrain, fig.height=9, fig.width=6, fig.cap="Percentage of total counts assigned to the top 50 most highly-abundant features in the brain dataset. For each feature, each bar represents the percentage assigned to that feature for a single cell, while the circle represents the average across all cells. Bars are coloured by the total number of expressed features in each cell, while circles are coloured according to whether the feature is labelled as a control feature."}
 plotQC(sce, type = "highest-expression", n=50) + fontsize
 ```
 
