@@ -263,7 +263,7 @@ Thus, for this workflow, we will use the simple approach whereby each quality me
 Users interested in the more sophisticated approaches are referred to the `r Biocpkg("scater")` and `r Biocpkg("cellity")` packages.
 
 For completeness, we note that outliers can also be identified based on the gene expression profiles, rather than QC metrics.
-We consider this to be risky as it can remove high-quality cells in rare populations.
+However, we consider this to be a risky strategy as it can remove high-quality cells in rare populations.
 
 ## Classification of cell cycle phase 
 
@@ -272,19 +272,22 @@ Using a training dataset, the sign of the difference in expression between two g
 Pairs with changes in the sign across cell cycle phases were chosen as markers.
 Cells in a test dataset can then be classified into the appropriate phase, based on whether the observed sign for each marker pair is consistent with one phase or another.
 This approach is implemented in the `cyclone` function using a pre-trained set of marker pairs for mouse data.
-The result of phase assignment for each cell in the HSC dataset is shown in Figure \@ref(fig:phaseplothsc).
 (Some additional work is necessary to match the gene symbols in the data to the Ensembl annotation in the pre-trained marker set.)
 
-```{r, echo=FALSE, results="hide", message=FALSE}
+```{r}
 set.seed(100)
-```
-
-```{r phaseplothsc, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the HSC dataset, where each point represents a cell."}
 mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", package="scran"))
 library(org.Mm.eg.db)
 anno <- select(org.Mm.eg.db, keys=rownames(sce), keytype="SYMBOL", column="ENSEMBL")
 ensembl <- anno$ENSEMBL[match(rownames(sce), anno$SYMBOL)]
 assignments <- cyclone(sce, mm.pairs, gene.names=ensembl)
+```
+
+The `cyclone` result for each cell in the HSC dataset is shown in Figure \@ref(fig:phaseplothsc).
+Each cell is assigned a score for each phase, with a higher score corresponding to a higher probability that the cell is in that phase.
+We focus on the G1 and G2/M scores as these are the most informative for classification.
+
+```{r phaseplothsc, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the HSC dataset, where each point represents a cell."}
 plot(assignments$score$G1, assignments$score$G2M, xlab="G1 score", ylab="G2/M score", pch=16)
 ```
 
@@ -292,20 +295,24 @@ Cells are classified as being in G1 phase if the G1 score is above 0.5 and great
     in G2/M phase if the G2/M score is above 0.5 and greater than the G1 score; 
     and in S phase if neither score is above 0.5.
 Here, the vast majority of cells are classified as being in G1 phase.
-We will focus on these cells in the downstream analysis.
-Cells in other phases are removed to avoid potential confounding effects from cell cycle-induced differences.
-Alternatively, if a non-negligible number of cells are in other phases, we can use the assigned phase as a blocking factor in downstream analyses.
-This protects against cell cycle effects without discarding information.
+We save these assignments into the `SCESet` object for later use.
 
 ```{r}
-sce <- sce[,assignments$phases=="G1"]
+sce$phases <- assignments$phases
+table(sce$phases)
 ```
 
 Pre-trained classifiers are available in `r Biocpkg("scran")` for human and mouse data. 
 While the mouse classifier used here was trained on data from embryonic stem cells, it is still accurate for other cell types [@scialdone2015computational].
 This may be due to the conservation of the transcriptional program associated with the cell cycle [@bertoli2013control;@conboy2007cell].
 The pair-based method is also a non-parametric procedure that is robust to most technical differences between datasets.
-However, it will be less accurate for data that are substantially different from those used in the training set, e.g., due to the use of a different protocol.
+
+__Comments from Aaron:__
+
+- To remove confounding effects due to cell cycle phase, we can filter the cells to only retain those in a particular phase (usually G1) for downstream analysis.
+Alternatively, if a non-negligible number of cells are in other phases, we can use the assigned phase as a blocking factor.
+This protects against cell cycle effects without discarding information, and will be discussed later in more detail.
+- The classifier may not be accurate for data that are substantially different from those used in the training set, e.g., due to the use of a different protocol.
 In such cases, users can construct a custom classifier from their own training data using the `sandbag` function.
 This will also be necessary for other model organisms where pre-trained classifiers are not available.
 
@@ -619,7 +626,7 @@ Cells with similar expression profiles should be located close together in the p
 In this case, no clear separation of cells into distinct subpopulations is observed.
 This is consistent with the presence of a highly homogeneous population of HSCs [@wilson2015combined].
 
-```{r pcaplothsc, fig.cap="PCA plot constructed from normalized log-expression values of correlated HVGs, where each point represents a cell in the HSC dataset. First and second components are shown, along with the percentage of variance explained. Bars represent the coordinates of the cells on each axis. Each cell is coloured according to its total number of expressed features.", fig.height=9, fig.width=9}
+```{r pcaplothsc, fig.cap="Pairwise PCA plots of the first three PCs in the HSC data set, constructed from normalized log-expression values of genes with positive biological components. Each point represents a cell, coloured according to its total number of expressed features. Bars represent the coordinates of the cells on each axis.", fig.height=9, fig.width=9}
 plotReducedDim(sce, ncomponents=3, colour_by="total_features") + fontsize
 ```
 
@@ -630,7 +637,7 @@ However, this improvement comes at the cost of more computational effort and req
 We demonstrate the generation of _t_-SNE plots in Figure \@ref(fig:tsneplothsc), using the low-rank approximation of the data to take advantage of the denoising step.
 As with the PCA plots, no consistent substructure is observed.
 
-```{r tsneplothsc, fig.cap="_t_-SNE plots constructed from normalized log-expression values of correlated HVGs, using a range of perplexity values. In each plot, each point represents a cell in the HSC dataset. Bars represent the coordinates of the cells on each axis. Each cell is coloured according to its total number of expressed features.", fig.width=12, fig.height=6}
+```{r tsneplothsc, fig.cap="_t_-SNE plots constructed from the denoised PCs in the HSC data set, using a range of perplexity values. Each point represents a cell, coloured according to its total number of expressed features. Bars represent the coordinates of the cells on each axis.", fig.width=12, fig.height=6}
 dummy <- newSCESet(t(reducedDimension(sce)))
 dummy$total_features <- sce$total_features
 out5 <- plotTSNE(dummy, pca=FALSE, perplexity=5, colour_by="total_features", 
@@ -671,9 +678,10 @@ The `exploreData` function can also be used to interactively visualize gene expr
 Putative subpopulations of cells can be computationally defined by unsupervised classification, i.e., clustering.
 We do not attempt this here due to the absence of distinct subpopulations in the plots above.
 However, there is a clear correlation with the number of expressed features and the first PC in Figure \@ref(fig:pcaplothsc).
-We can study this in more detail by detecting genes that are differentially expressed along the first PC, using methods from the _limma_ package.
+We can study this in more detail by detecting genes that are differentially expressed along the first PC.
+This is done by applying methods from the `r Biocpkg("limma")` package to the log-expression values.
 
-```{r, eval=FALSE}
+```{r}
 pc1 <- reducedDimension(sce)[,1]
 design <- model.matrix(~pc1)
 library(limma)
@@ -685,7 +693,7 @@ topTable(fit)
 Figure \@ref{fig:heatmaphsc} indicates that the majority of genes increase in expression along the first PC.
 However, there are also a few genes that decrease in expression, e.g., _H2-D1_ and _Malat1_.
 This indicates that the first PC corresponds to more than a general increase in cell size that affects all transcripts non-specifically.
-For example, a number of these genes are involved in DNA replication and the cell cycle.
+For example, a number of these genes are involved in DNA replication and the cell cycle, e.g., _Chek1_.
 
 ```{r heatmaphsc, fig.height=10, fig.width=6, fig.cap="Heatmap of the top 50 DE genes along the first PC in the HSC data set. The colour for each cell (column) represents the log-fold change from the average log-expression for each gene (row), bounded to [-2, 2] for visualization purposes. Cells are ordered by their location on the first PC."}
 de.genes <- rownames(topTable(fit, coef=2, n=50))
@@ -693,9 +701,20 @@ heat.vals <- exprs(sce)[de.genes,]
 heat.vals <- heat.vals - rowMeans(heat.vals)
 heat.vals[heat.vals > 2] <- 2
 heat.vals[heat.vals < -2] <- -2
+library(pheatmap)
 pheatmap(heat.vals[,order(pc1)], cluster_cols=FALSE)
-plot(pc1, exprs(sce)["Itm2b",])
 ```
+
+__Comments from Aaron:__
+
+- Users are discouraged from treating the adjusted _p_-values from this analysis with any particular reverence.
+This is because the DE testing is performed on the same data used to define the first PC.
+PCA empirically captures the maximum variance in the data, so there will always be some genes with low _p_-values, even if the variance is purely driven by random noise.
+- The procedure above can be used to test for changes along any covariate, e.g., pseudotime.
+Specifying `~pc1` only models linear changes across the covariate.
+Other trends can be more flexibly modelled using splines, i.e., `~splines::ns(pc1, df=5)`.
+However, users should keep in mind that the spline coefficients are not easily interpretable.
+- It is not uncommon for cell cycle to be the major driver of variability in cell populations that are very homogeneous.
 
 ## Additional comments
 
@@ -1250,7 +1269,7 @@ However, this is sensitive to overclustering, as unique marker genes will no lon
 - It must be stressed that the (adjusted) _p_-values computed here cannot be properly interpreted as measures of significance.
 This is because the clusters have been empirically identified from the data.
 `r Biocpkg("limma")` does not account for the uncertainty of clustering, which means that the _p_-values are much lower than they should be. 
-However, this is not a concern in other analyses where the groups are pre-defined.
+This is not a concern in other analyses where the groups are pre-defined.
 - The `SCESet` object can also be easily transformed for use in other DE analysis methods.
 For example, the `convertTo` function can be used to construct a `DGEList` for input into the `r Biocpkg("edgeR")` pipeline [@robinson2010edgeR].
 This allows users to construct their own marker detection pipeline, though we find that direct use of `findMarkers` is usually sufficient.
