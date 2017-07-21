@@ -537,6 +537,14 @@ cur.spike <- isSpike(sce)
 points(var.out$mean[cur.spike], var.out$total[cur.spike], col="red", pch=16)
 ```
 
+We check the distribution of expression values for the genes with the largest biological components.
+This ensures that the variance estimate is not driven by one or two outlier cells (Figure \@ref(fig:hvgvioplothsc)).
+
+```{r hvgvioplothsc, fig.cap="Violin plots of normalized log-expression values for the top 10 genes with the largest biological components in the HSC dataset. Each point represents the log-expression value in a single cell."}
+chosen.genes <- order(var.out$bio, decreasing=TRUE)[1:10]
+plotExpression(sce, rownames(var.out)[chosen.genes]) + fontsize
+```
+
 __Comments from Aaron:__
 
 - In practice, trend fitting is complicated by the small number of spike-in transcripts and the uneven distribution of their abundances.
@@ -547,6 +555,8 @@ This ensures that low-abundance genes dominated by discreteness do not interfere
 The default threshold was chosen by observing the appearance of discrete patterns in the variance estimates for Poisson-distributed counts.
 However, the threshold can also be manually specified by setting `mean.threshold`.
 In most cases, manual specification is not necessary, though lowering the threshold to 0.001-0.01 may improve the fit for very sparse data, e.g., from droplet-based protocols. 
+- `decomposeVar` also yields _p_-values that can be used to define HVGs at a specific threshold for the false discovery rate (FDR).
+We will discuss this in more detail later - formal detection of HVGs is not necessary for feature selection during data exploration.
 
 ### Trend fitting when spike-ins are unavailable
 
@@ -912,13 +922,13 @@ abline(v=log10(0.1), col="blue", lwd=2, lty=2)
 ```
 
 We save the average counts into the `SCESet` object for later use.
-For example, we might filter out low-abundance genes by setting a minimum threshold of 0.1 on the average UMI count.
-(Obviously, the chosen threshold here will be lower than the one recommended for average read counts.)
+We also remove genes that have average counts of zero, as this means that they are not expressed in any cell.
 
 ```{r}
 fData(sce)$ave.count <- ave.counts
-keep.example <- ave.counts >= 0.1
-summary(keep.example)
+to.keep <- ave.counts > 0
+sce <- sce[to.keep,]
+summary(to.keep)
 ```
 
 ```{r echo=FALSE, results='hide'}
@@ -933,8 +943,9 @@ This improves normalization accuracy by reducing the number of DE genes between 
 Scaling is then performed to ensure that size factors of cells in different clusters are comparable.
 
 ```{r}
-clusters <- quickCluster(sce, subset.row=keep.example)
-sce <- computeSumFactors(sce, cluster=clusters, subset.row=keep.example)
+high.ab <- fData(sce)$ave.count >= 0.1
+clusters <- quickCluster(sce, subset.row=high.ab)
+sce <- computeSumFactors(sce, cluster=clusters, subset.row=high.ab)
 summary(sizeFactors(sce))
 ```
 
@@ -966,7 +977,7 @@ sce <- normalize(sce)
 __Comments from Aaron:__
 
 - We specify high-abundance genes for normalization by using the `subset.row` argument.
-As previously mentioned, we use a lower threshold for abundance to reflect the fact that the counts are lower for UMI data.
+As previously mentioned, we use a lower threshold of 0.1 to reflect the fact that the counts are lower for UMI data.
 - Only a rough clustering is required, to avoid pooling together very different cell types in `computeSumFactors`.
 The function is robust to a moderate level of differential expression between cells in the same cluster.
 - For large data sets, consider using `method="igraph"` in `quickCluster` for faster clustering.
@@ -1027,11 +1038,13 @@ points(var.out$mean[isSpike(sce)], var.out$total[isSpike(sce)], col="red", pch=1
 curve(var.fit$trend(x), col="dodgerblue", add=TRUE, lwd=2)
 ```
 
-Again, we check the distribution of expression values for the top 10 HVGs to ensure that they are not being driven by outliers (Figure \@(fig:hvgvioplotbrain)).
+We check the distribution of expression values for the genes with the largest biological components to ensure that they are not driven by outliers (Figure \@(fig:hvgvioplotbrain)).
 Some tweaking of the `plotExpression` parameters is necessary to visualize a large number of cells.
 
 ```{r hvgvioplotbrain, fig.cap="Violin plots of normalized log-expression values for the top 10 HVGs in the brain dataset. For each gene, each point represents the log-expression value for an individual cell."}
-plotExpression(sce, rownames(hvg.out)[1:10], alpha=0.05, jitter="jitter") + fontsize
+chosen.genes <- order(var.out$bio, decreasing=TRUE)[1:10]
+plotExpression(sce, rownames(var.out)[chosen.genes], 
+    alpha=0.05, jitter="jitter") + fontsize
 ```
 
 Finally, we denoise the expression values using our PCA-based approach.
@@ -1085,7 +1098,7 @@ gc()
 
 ## Data exploration with dimensionality reduction
 
-We perform dimensionality reduction on the correlated HVGs to check if there is any substructure. 
+We perform dimensionality reduction on the denoised PCs to check if there is any substructure. 
 Cells separate into clear clusters in the _t_-SNE plot (Figure \@ref(fig:tsneplotbrain)), corresponding to distinct subpopulations.
 This is consistent with the presence of multiple cell types in the diverse brain population.
 
@@ -1353,7 +1366,7 @@ Spike-in normalization will preserve these differences in total RNA content such
 
 ### Detecting highly variable genes
 
-Highly variable genes (HVGs) are defined as genes with biological components that are significantly greater than zero.
+HVGs are defined as genes with biological components that are significantly greater than zero.
 These genes are interesting as they drive differences in the expression profiles between cells, and should be prioritized for further investigation.
 We can identify HVGs based on the statistics reported by `decomposeVar`, as shown below.
 
@@ -1370,12 +1383,6 @@ We rank the results by the biological component to focus on genes with larger bi
 hvg.out <- hvg.out[order(hvg.out$bio, decreasing=TRUE),] 
 write.table(file="hsc_hvg.tsv", hvg.out, sep="\t", quote=FALSE, col.names=NA)
 head(hvg.out)
-```
-
-We check the distribution of expression values for the top HVGs to ensure that the variance estimate is not driven by one or two outlier cells (Figure \@ref(fig:hvgvioplothsc)).
-
-```{r hvgvioplothsc, fig.cap="Violin plots of normalized log-expression values for the top 10 HVGs in the HSC dataset. Each point represents the log-expression value in a single cell."}
-plotExpression(sce, rownames(hvg.out)[1:10]) + fontsize
 ```
 
 There are many other strategies for defining HVGs, e.g., by using the coefficient of variation [@brennecke2013accounting;@kolod2015singlecell;@kim2015characterizing], with the dispersion parameter in the negative binomial distribution [@mccarthy2012differential], or as a proportion of total variability [@vallejos2015basics].
