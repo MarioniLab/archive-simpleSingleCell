@@ -459,6 +459,10 @@ This is usually more relevant than the absolute differences in coverage, which n
 The log-transformation also provides some measure of variance stabilization [@law2014voom], so that high-abundance genes with large variances do not dominate downstream analyses.
 The computed values are stored as an `exprs` matrix in addition to the other assay elements.
 
+```{r, echo=FALSE, results="hide"}
+gc()
+```
+
 ## Checking for confounding technical factors 
 
 We check whether there are technical factors that contribute substantially to the heterogeneity of gene expression.
@@ -638,13 +642,11 @@ We demonstrate the generation of _t_-SNE plots in Figure \@ref(fig:tsneplothsc),
 As with the PCA plots, no consistent substructure is observed.
 
 ```{r tsneplothsc, fig.cap="_t_-SNE plots constructed from the denoised PCs in the HSC data set, using a range of perplexity values. Each point represents a cell, coloured according to its total number of expressed features. Bars represent the coordinates of the cells on each axis.", fig.width=12, fig.height=6}
-dummy <- newSCESet(t(reducedDimension(sce)))
-dummy$total_features <- sce$total_features
-out5 <- plotTSNE(dummy, pca=FALSE, perplexity=5, colour_by="total_features", 
+out5 <- plotTSNE(sce, use_dimred=TRUE, perplexity=5, colour_by="total_features", 
     rand_seed=100) + fontsize + ggtitle("Perplexity = 5")
-out10 <- plotTSNE(dummy, pca=FALSE, perplexity=10, colour_by="total_features",
+out10 <- plotTSNE(sce, use_dimred=TRUE, perplexity=10, colour_by="total_features",
     rand_seed=100) + fontsize + ggtitle("Perplexity = 10")
-out20 <- plotTSNE(dummy, pca=FALSE, perplexity=20, colour_by="total_features",
+out20 <- plotTSNE(sce, use_dimred=TRUE, perplexity=20, colour_by="total_features",
     rand_seed=100) + fontsize + ggtitle("Perplexity = 20")
 multiplot(out5, out10, out20, cols=3)
 ```
@@ -679,7 +681,7 @@ Putative subpopulations of cells can be computationally defined by unsupervised 
 We do not attempt this here due to the absence of distinct subpopulations in the plots above.
 However, there is a clear correlation with the number of expressed features and the first PC in Figure \@ref(fig:pcaplothsc).
 We can study this in more detail by detecting genes that are differentially expressed along the first PC.
-This is done by applying methods from the `r Biocpkg("limma")` package to the log-expression values.
+This is done by applying methods from the `r Biocpkg("limma")` package to the log-expression values [@ritchie2015limma].
 
 ```{r}
 pc1 <- reducedDimension(sce)[,1]
@@ -712,8 +714,7 @@ This is because the DE testing is performed on the same data used to define the 
 PCA empirically captures the maximum variance in the data, so there will always be some genes with low _p_-values, even if the variance is purely driven by random noise.
 - The procedure above can be used to test for changes along any covariate, e.g., pseudotime.
 Specifying `~pc1` only models linear changes across the covariate.
-Other trends can be more flexibly modelled using splines, i.e., `~splines::ns(pc1, df=5)`.
-However, users should keep in mind that the spline coefficients are not easily interpretable.
+Other trends can be more flexibly modelled using splines, i.e., `~splines::ns(pc1, df=5)`, though the spline coefficients are not easy to interpret.
 - It is not uncommon for cell cycle to be the major driver of variability in cell populations that are very homogeneous.
 
 ## Additional comments
@@ -945,9 +946,8 @@ This improves normalization accuracy by reducing the number of DE genes between 
 Scaling is then performed to ensure that size factors of cells in different clusters are comparable.
 
 ```{r}
-clusters <- quickCluster(sce)
-sce <- computeSumFactors(sce, cluster=clusters, 
-    subset.row=fData(sce)$ave.count >= 0.1)
+clusters <- quickCluster(sce, subset.row=keep.example)
+sce <- computeSumFactors(sce, cluster=clusters, subset.row=keep.example)
 summary(sizeFactors(sce))
 ```
 
@@ -998,6 +998,7 @@ fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=
 ```
 
 ```{r explvarplotbrain, fig.cap="Density plot of the percentage of variance explained by each factor across all genes in the brain dataset. For each gene, the percentage of the variance of the normalized log-expression values that is explained by the (log-transformed) total spike-in counts, the sex or age of the mouse, or the tissue of origin is calculated. Each curve corresponds to one factor and represents the distribution of percentages across all genes."}
+#nzero.exprs <- fData(sce)$ave.count > 0
 plotExplanatoryVariables(sce, variables=c("counts_feature_controls_Spike", 
     "log10_counts_feature_controls_Spike", "sex", "tissue", "age")) + fontsize
 ```
@@ -1048,10 +1049,11 @@ plotExpression(sce, rownames(hvg.out)[1:10], alpha=0.05, jitter="jitter") + font
 
 Finally, we denoise the expression values using our PCA-based approach.
 We supply `design` to regress out uninteresting factors, and we use only the genes with positive biological components, 
-This yields a low-rank approximation where the technical noise has been removed.
+This yields a set of coordinates for each cell where the technical noise has been removed.
 
 ```{r}
-sce <- denoisePCA(sce, design=design, value="lowrank", subset.row=var.out$bio > 0)
+sce <- denoisePCA(sce, technical=var.fit$trend, design=design, 
+    subset.row=var.out$bio > 0)
 ```
 
 __Comments from Aaron:__
@@ -1066,7 +1068,7 @@ collected <- list()
 for (block in levels(sce$sex)) {
     cur.sce <- sce[,sce$sex==block]
     cur.sce <- normalize(cur.sce) 
-    var.fit <- trendVar(cur.sce, trend="loess", span=0.4)
+    var.fit <- trendVar(cur.sce, span=0.4)
     collected[[block]] <- decomposeVar(cur.sce, var.fit)
 }
 var.out <- do.call(combineVar, collected)
@@ -1100,11 +1102,11 @@ We perform dimensionality reduction on the correlated HVGs to check if there is 
 Cells separate into clear clusters in the _t_-SNE plot (Figure \@ref(fig:tsneplotbrain)), corresponding to distinct subpopulations.
 This is consistent with the presence of multiple cell types in the diverse brain population.
 
-```{r tsneplotbrain, fig.cap="_t_-SNE plots constructed from the normalized and corrected log-expression values of correlated HVGs for cells in the brain dataset. Each point represents a cell and is coloured according to its expression of the top HVG (left) or _Mog_ (right).", fig.width=15, fig.height=6}
-tsne1 <- plotTSNE(sce, exprs_values="norm_exprs", colour_by=top.hvg,
-    perplexity=10, rand_seed=100, feature_set=chosen) + fontsize
-tsne2 <- plotTSNE(sce, exprs_values="norm_exprs", colour_by="Mog",
-    perplexity=10, rand_seed=100, feature_set=chosen) + fontsize
+```{r tsneplotbrain, fig.cap="_t_-SNE plots constructed from the denoised PCs using the cells in the brain dataset. Each point represents a cell and is coloured according to its expression of _Neurod6_ (left) or _Mog_ (right).", fig.width=15, fig.height=6}
+tsne1 <- plotTSNE(sce, use_dimred=TRUE, colour_by="Neurod6",
+    perplexity=10, rand_seed=100) + fontsize
+tsne2 <- plotTSNE(sce, use_dimred=TRUE, colour_by="Mog",
+    perplexity=10, rand_seed=100) + fontsize
 multiplot(tsne1, tsne2, cols=2)
 ```
 
@@ -1118,8 +1120,8 @@ This is because the first two PCs are driven by strong differences between speci
 Nonetheless, some substructure is still visible.
 
 ```{r pcaplotbrain, fig.cap="PCA plots constructed from the normalized and corrected log-expression values of correlated HVGs for cells in the brain dataset. Each point represents a cell and is coloured according to its expression of the _Neurod6_ (left) or _Mog_ (right).", fig.width=15, fig.height=6}
-pca1 <- plotPCA(sce, exprs_values="norm_exprs", colour_by="Neurod6") + fontsize
-pca2 <- plotPCA(sce, exprs_values="norm_exprs", colour_by="Mog") + fontsize
+pca1 <- plotReducedDim(sce, colour_by="Neurod6") + fontsize
+pca2 <- plotReducedDim(sce, colour_by="Mog") + fontsize
 multiplot(pca1, pca2, cols=2)
 ```
 
@@ -1137,8 +1139,8 @@ An alternative approach is to cluster on a matrix of distances derived from corr
 This is more robust to noise and normalization errors, but is also less sensitive to subtle changes in the expression profiles. 
 
 ```{r}
-chosen.exprs <- assayDataElement(sce, "lowrank")
-my.dist <- dist(t(chosen.exprs))
+pcs <- reducedDimension(sce)
+my.dist <- dist(pcs)
 my.tree <- hclust(my.dist, method="ward.D2")
 ```
 
@@ -1155,14 +1157,10 @@ We visualize the cluster assignments for all cells on the _t_-SNE plot in Figure
 Adjacent cells are generally assigned to the same cluster, indicating that the clustering procedure was applied correctly.
 
 ```{r heatmapbrain, message=FALSE, fig.width=7, fig.height=10, fig.cap="_t_-SNE plot of the denoised expression profiles of all cells in the brain data set. Each cell is coloured according to the cluster identity to which it was assigned."}
-sce$cluster <- my.clusters
-plotTSNE(sce, exprs_values="norm_exprs", colour_by="cluster",
+sce$cluster <- factor(my.clusters)
+tsne.out <- plotTSNE(sce, use_reddim=TRUE, colour_by="cluster",
     perplexity=10, rand_seed=100) + fontsize
 ```
-
-<!--
-Use Acrobat reader or zathura for linux (selecting gene names and looking a copied text works better than continually zooming in/out).
--->
 
 We check the separatedness of the clusters using the silhouette width (Figure ((silhouettebrain))).
 Cells with large positive silhouette widths are closer to other cells in the _same_ cluster than to cells in _different_ clusters.
@@ -1184,8 +1182,8 @@ __Comments from Aaron:__
 
 - Very heterogeneous datasets may yield a few large clusters on the first round of clustering.
 It can be useful to repeat the variance modelling, denoising and clustering using only the cells within each of the initial clusters.
-This can be achieved by subsetting `sce` according to a particular level of `my.clusters`, and applying the same functions that were previously described.
-Doing so may focus on a different set of genes that define heterogeneity within an initial cluster, as opposed to those that define differences between the initial clusters.
+This can be achieved by subsetting `sce` according to a particular level of `my.clusters`, and re-applying the relevant functions on the subset.
+Doing so may focus on a different set of genes that define heterogeneity _within_ an initial cluster, as opposed to those that define differences _between_ the initial clusters.
 This would allow fine-scale structure within each cluster to be explored at greater resolution. 
 For simplicity, though, we will only use the broad clusters corresponding to clear subpopulations in this workflow.
 - For larger data sets, consider using `buildSNNGraph` and methods from the `r CRANpkg("igraph")` package to perform clustering.
@@ -1198,6 +1196,7 @@ Clustering parameters can be optimized by maximizing the modularity score for th
 snn.gr <- buildSNNGraph(sce)
 library(igraph)
 gr.clusters <- cluster_fast_greedy(snn.gr)
+gr.clusters$modularity
 ```
 
 ```{r echo=FALSE, results='hide'}
@@ -1207,7 +1206,7 @@ gc()
 ## Detecting marker genes between subpopulations
 
 Once putative subpopulations are identified by clustering, we can identify marker genes for each cluster using the `findMarkers` function.
-This fits a linear model to the log-expression values for each gene, using methods in the `r Biocpkg("limma")` package [@law2014voom; @ritchie2015limma].
+This fits a linear model to the log-expression values for each gene using `r Biocpkg("limma")` [@ritchie2015limma].
 The aim is to test for DE in each cluster compared to the others while blocking on uninteresting factors in `design`.
 The top DE genes are likely to be good candidate markers as they can effectively distinguish between cells in different clusters.
 
@@ -1343,7 +1342,7 @@ sce <- normalize(sce)
 ```
 
 For comparison, we also compute the deconvolution size factors and plot them against the spike-in factors.
-We observe a negative correlation between the two sets of values (Figure ((normplotspikemef))).
+We observe a negative correlation between the two sets of values (Figure \@ref(fig:normplotspikemef)).
 This is because MEFs contain more endogenous RNA, which reduces the relative spike-in coverage in each library (thereby decreasing the spike-in size factors) but increases the coverage of endogenous genes (thus increasing the deconvolution size factors).
 If the spike-in size factors were applied to the counts, the expression values in MEFs would be scaled up while expression in mESCs would be scaled down.
 However, the opposite would occur if deconvolution size factors were used.
@@ -1425,7 +1424,7 @@ sce <- newSCESet(exprsData=t(incoming))
 ```
 
 We empirically identify the cell cycle phase using the pair-based classifier in `cyclone`.
-The majority of cells in Figure ((phaseplotth2)) seem to lie in G1 phase, with small numbers of cells in the other phases.
+The majority of cells in Figure \@ref(phaseplotth2) seem to lie in G1 phase, with small numbers of cells in the other phases.
 
 ```{r, echo=FALSE, results='hide', message=FALSE}
 mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", package="scran"))
@@ -1449,18 +1448,18 @@ For example, model fitting is not possible if all cells in one experimental cond
 
 ```{r}
 design <- model.matrix(~ G1 + G2M, assignments$score)
-fit.block <- trendVar(sce, use.spikes=NA, trend="loess", design=design)
+fit.block <- trendVar(sce, use.spikes=NA, design=design)
 dec.block <- decomposeVar(sce, fit.block)
 ```
 
 For analyses that do not use design matrices, we remove the cell cycle effect directly from the expression values using `removeBatchEffect`.
-The result of this procedure is visualized with some PCA plots in Figure ((pcaplotth2)).
+The result of this procedure is visualized with some PCA plots in Figure \@ref(pcaplotth2).
 Before removal, the distribution of cells along the first two principal components is strongly associated with their G1 and G2/M scores.
 This is no longer the case after removal, which suggests that the cell cycle effect has been mitigated.
 
 ```{r pcaplotth2, fig.width=12, fig.height=6, fig.cap="PCA plots before (left) and after (right) removal of the cell cycle effect in the T~H~2 dataset. Each cell is represented by a point with colour and size determined by the G1 and G2/M scores, respectively. Only HVGs were used to construct each plot."}
 # Finding HVGs without blocking on phase score.
-fit <- trendVar(sce, use.spikes=NA, trend="loess") 
+fit <- trendVar(sce, use.spikes=NA) 
 dec <- decomposeVar(sce, fit)
 top.hvgs <- which(dec$FDR <= 0.05 & dec$bio >= 0.5)
 sce$G1score <- assignments$score$G1
@@ -1478,7 +1477,7 @@ multiplot(out, out2, cols=2)
 
 As an aside, this dataset contains cells at various stages of differentiation [@mahata2014singlecell].
 This is an ideal use case for diffusion maps which perform dimensionality reduction along a continuous process.
-In Figure ((diffusionth2)), cells are arranged along a trajectory in the low-dimensional space.
+In Figure \@ref(diffusionth2), cells are arranged along a trajectory in the low-dimensional space.
 The first diffusion component is likely to correspond to T~H~2 differentiation, given that a key regulator _Gata3_ [@zhu2006gata3] changes in expression from left to right.
 
 ```{r diffusionth2, fig.cap="A diffusion map for the T~H~2 dataset, where each cell is coloured by its expression of _Gata3_."}
