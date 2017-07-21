@@ -332,8 +332,13 @@ plotQC(sce, type = "highest-expression", n=50) + fontsize
 ### Filtering out low-abundance genes
 
 Low-abundance genes are problematic as zero or near-zero counts do not contain much information for reliable statistical inference [@bourgon2010independent].
+These genes typically do not provide enough evidence to reject the null hypothesis during testing, yet they still increase the severity of the multiple testing correction.
 In addition, the discreteness of the counts may interfere with downstream statistical procedures, e.g., by compromising the accuracy of continuous approximations.
-We define the abundance of each gene as the average count across all cells, with some adjustment for library size differences between cells (Figure \@ref(fig:abhisthsc)).
+Thus, it is common for low-abundance genes to be removed at the start of many RNA-seq analysis pipelines.
+
+Several metrics can be used to define low-abundance genes.
+We compute the average count across all cells in the HSC data set, with some adjustment for library size differences between cells (Figure \@ref(fig:abhisthsc)).
+A minimum threshold can be applied to this value to filter out genes that are lowly expressed.
 
 ```{r abhisthsc, fig.cap="Histogram of log-average counts for all genes in the HSC dataset."}
 ave.counts <- calcAverage(sce)
@@ -352,25 +357,33 @@ smoothScatter(log10(ave.counts), num.cells, ylab="Number of cells",
 ```
 
 Either of these metrics can be used to filter out low-abundance genes.
-The example below demonstrates how we could only retain genes with average counts greater than or equal to 1.
-Alternatively, we could retain genes that are expressed in at least _n_ cells.
+The example below demonstrates how we could remove genes with average counts less than 1.
+Alternatively, we could remove genes that are expressed in fewer than _n_ cells.
 
 ```{r}
-to.keep <- ave.counts >= 1
-summary(to.keep)
+demo.keep <- ave.counts >= 1
+summary(demo.keep)
 ```
 
 We generally prefer the mean-based filter as it tends to be less aggressive.
 A gene will be retained as long as it has sufficient expression in any subset of cells.
 In contrast, the "at least _n_" filter depends heavily on the choice of _n_, possibly resulting in the failure to detect rare subpopulations that are present at frequencies below _n_.
-
-Here, we save the two abundance metrics into the `SCESet` object for future use.
-We _could_ also directly subset the `SCESet` object by row to remove the low-abundance genes.
-However, at this point, we choose to retain all genes in case they are needed later, e.g., for visualization.
+Here, we save the average count into the `SCESet` object for future use.
 
 ```{r}
 fData(sce)$ave.counts <- ave.counts
-fData(sce)$num.cells <- num.cells
+```
+
+It is important to note that the "optimal" choice of filtering strategy depends on the downstream application.
+A more aggressive filter is usually required to remove discreteness (e.g., for normalization) compared to that required for removing underpowered tests.
+For testing procedures, the filter statistic should also be independent of the test statistic under the null hypothesis [@bourgon2010independent].
+Thus, we will filter at each step as needed, rather than applying a single filter for the entire analysis.
+We only remove genes that are not expressed in any cell, as such genes provide no information and would be removed by any filtering strategy.
+
+```{r}
+to.keep <- num.cells > 0
+sce <- sce[to.keep,]
+summary(to.keep)
 ```
 
 ## Normalization of cell-specific biases
@@ -407,7 +420,8 @@ __Comments from Aaron:__
 
 - We set `subset.row` in the code above to remove the low-abundance genes prior to the calculation of size factors.
 `computeSumFactors` is robust to the high frequency of zeroes in scRNA-seq data, but it will eventually fail (yielding negative size factors) if too many counts are zero.
-A threshold of 1 is usually satisfactory for read count data, while for UMI data, the counts are universally lower so a threshold of 0.1 is used.
+A threshold of 1 is usually satisfactory for read count data.
+For UMI data, counts are lower so a threshold of 0.1 is recommended. 
 - Cell-based QC should always be performed prior to normalization, to remove cells with very low numbers of expressed genes.
 If this is not done, the `computeSumFactors` function may yield negative size factors for low-quality cells.
 - The `sizes` argument can be used to specify the number of pool sizes to use to compute the size factors.
@@ -530,40 +544,9 @@ For low numbers of cells, these issues are exacerbated by the low precision of t
 Some tuning of trend parameters such as `span` may be required to achieve a suitable fit - see `?trendVar` for more details.
 - `trendVar` will automatically ignore genes with mean log-expression values below 0.1 when fitting the trend.
 This ensures that low-abundance genes dominated by discreteness do not interfere with the fit.
-The default threshold was chosen by assuming Poisson-distributed counts, but can also be manually specified by setting `mean.threshold`.
+The default threshold was chosen by observing the appearance of discrete patterns in the variance estimates for Poisson-distributed counts.
+However, the threshold can also be manually specified by setting `mean.threshold`.
 In most cases, manual specification is not necessary, though lowering the threshold to 0.001-0.01 may improve the fit for very sparse data, e.g., from droplet-based protocols. 
-
-### Detecting highly variable genes
-
-Highly variable genes (HVGs) are defined as genes with biological components that are significantly greater than zero.
-These genes are interesting as they drive differences in the expression profiles between cells, and should be prioritized for further investigation.
-We can identify HVGs based on the statistics reported by `decomposeVar`, as shown below.
-
-```{r}
-hvg.out <- var.out[which(var.out$FDR <= 0.05),]
-nrow(hvg.out)
-```
-
-HVGs are strong candidates for further study as they are responsible for the biological heterogeneity in the cell population.
-This avoids prioritizing genes that are highly variable due to technical factors such as sampling noise during RNA capture and library preparation.
-We rank the results by the biological component to focus on genes with larger biological variability.
-
-```{r}
-hvg.out <- hvg.out[order(hvg.out$bio, decreasing=TRUE),] 
-write.table(file="hsc_hvg.tsv", hvg.out, sep="\t", quote=FALSE, col.names=NA)
-head(hvg.out)
-```
-
-We check the distribution of expression values for the top HVGs to ensure that the variance estimate is not driven by one or two outlier cells (Figure \@ref(fig:hvgvioplothsc)).
-
-```{r hvgvioplothsc, fig.cap="Violin plots of normalized log-expression values for the top 10 HVGs in the HSC dataset. Each point represents the log-expression value in a single cell."}
-plotExpression(sce, rownames(hvg.out)[1:10]) + fontsize
-```
-
-There are many other strategies for defining HVGs, e.g., by using the coefficient of variation [@brennecke2013accounting;@kolod2015singlecell;@kim2015characterizing], with the dispersion parameter in the negative binomial distribution [@mccarthy2012differential], or as a proportion of total variability [@vallejos2015basics].
-Some of these methods are available in `r Biocpkg("scran")` -- for example, see `DM` or `technicalCV2` for calculations based on the coefficient of variation.
-Here, we use the variance of the log-expression values because the log-transformation protects against genes with strong expression in only one or two cells.
-This ensures that the set of top HVGs is not dominated by genes with (mostly uninteresting) outlier expression patterns.
 
 ### Trend fitting when spike-ins are unavailable
 
@@ -585,9 +568,10 @@ curve(var.fit.nospike$trend(x), col="dodgerblue", lwd=2, add=TRUE)
 points(var.out.nospike$mean[cur.spike], var.out.nospike$total[cur.spike], col="red", pch=16)
 ```
 
-Even if our assumption does not hold, the use of `decomposeVar` may still be valid if we are willing to accept a change to the null hypothesis.
-Instead of testing whether the total variance is greater than the technical noise, we ask whether the total variance of each gene is greater than the average biological variance for the majority of other genes.
-This effectively identifies HVGs relative to other genes, which is still a useful result provided that most genes are not differentially expressed across the population.
+If our assumption does not hold, the output of `decomposeVar` is more difficult to interpret.
+The function quantifies changes in variances for each gene over the majority of genes with the same abundance.
+One could assume that the variabilities of most genes are driven by constitutive "house-keeping" processes, which are generally uninteresting.
+Any gene with an increase in its variance is _relatively_ highly variable and can be prioritized for further study.
 
 ## Denoising expression values using PCA
 
@@ -616,7 +600,7 @@ __Comments from Aaron:__
 - We only use genes with positive biological components in `denoisePCA`.
 This guarantees that the total technical variance to be discarded will not be greater than the total variance in the data.
 - It is also possible to obtain a low-rank approximation of the original expression matrix, capturing the variance equivalent to the retained PCs.
-This is useful for denoising prior to downstream procedures that require a gene expression profile for each cell.
+This is useful for denoising prior to downstream procedures that require gene-wise expression values.
 
 ```{r}
 sce <- denoisePCA(sce, technical=var.fit$trend, subset.row=to.keep, value="lowrank") 
@@ -715,6 +699,9 @@ PCA empirically captures the maximum variance in the data, so there will always 
 - The procedure above can be used to test for changes along any covariate, e.g., pseudotime.
 Specifying `~pc1` only models linear changes across the covariate.
 Other trends can be more flexibly modelled using splines, i.e., `~splines::ns(pc1, df=5)`, though the spline coefficients are not easy to interpret.
+- Technically, we could achieve more power by filtering out low-abundance genes to reduce the severity of the multiple testing correction.
+This would be performed on the mean of the log-expression values (i.e., `rowMeans(exprs(sce))`, which is an independent filter statistic for linear models.
+However, this is probably unnecessary given that the interpretation of the adjusted _p_-values is already compromised. 
 - It is not uncommon for cell cycle to be the major driver of variability in cell populations that are very homogeneous.
 
 ## Additional comments
@@ -925,7 +912,7 @@ abline(v=log10(0.1), col="blue", lwd=2, lty=2)
 ```
 
 We save the average counts into the `SCESet` object for later use.
-For example, we might filter out low-abundance genes by setting a minimum threshold of 0.1 on the average count.
+For example, we might filter out low-abundance genes by setting a minimum threshold of 0.1 on the average UMI count.
 (Obviously, the chosen threshold here will be lower than the one recommended for average read counts.)
 
 ```{r}
@@ -1361,6 +1348,40 @@ This may not always be appropriate if total RNA is associated with a biological 
 For example, @islam2011characterization observe a 5-fold difference in total RNA between mESCs and MEFs.
 Similarly, the total RNA in a cell changes across phases of the cell cycle [@buettner2015computational].
 Spike-in normalization will preserve these differences in total RNA content such that the corresponding biological groups can be easily resolved in downstream analyses.
+
+## Characterising heterogeneity with hypothesis tests 
+
+### Detecting highly variable genes
+
+Highly variable genes (HVGs) are defined as genes with biological components that are significantly greater than zero.
+These genes are interesting as they drive differences in the expression profiles between cells, and should be prioritized for further investigation.
+We can identify HVGs based on the statistics reported by `decomposeVar`, as shown below.
+
+```{r}
+hvg.out <- var.out[which(var.out$FDR <= 0.05),]
+nrow(hvg.out)
+```
+
+HVGs are strong candidates for further study as they are responsible for the biological heterogeneity in the cell population.
+This avoids prioritizing genes that are highly variable due to technical factors such as sampling noise during RNA capture and library preparation.
+We rank the results by the biological component to focus on genes with larger biological variability.
+
+```{r}
+hvg.out <- hvg.out[order(hvg.out$bio, decreasing=TRUE),] 
+write.table(file="hsc_hvg.tsv", hvg.out, sep="\t", quote=FALSE, col.names=NA)
+head(hvg.out)
+```
+
+We check the distribution of expression values for the top HVGs to ensure that the variance estimate is not driven by one or two outlier cells (Figure \@ref(fig:hvgvioplothsc)).
+
+```{r hvgvioplothsc, fig.cap="Violin plots of normalized log-expression values for the top 10 HVGs in the HSC dataset. Each point represents the log-expression value in a single cell."}
+plotExpression(sce, rownames(hvg.out)[1:10]) + fontsize
+```
+
+There are many other strategies for defining HVGs, e.g., by using the coefficient of variation [@brennecke2013accounting;@kolod2015singlecell;@kim2015characterizing], with the dispersion parameter in the negative binomial distribution [@mccarthy2012differential], or as a proportion of total variability [@vallejos2015basics].
+Some of these methods are available in `r Biocpkg("scran")` -- for example, see `DM` or `technicalCV2` for calculations based on the coefficient of variation.
+Here, we use the variance of the log-expression values because the log-transformation protects against genes with strong expression in only one or two cells.
+This ensures that the set of top HVGs is not dominated by genes with (mostly uninteresting) outlier expression patterns.
 
 ## Identifying correlated gene pairs with Spearman's rho
 
