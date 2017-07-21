@@ -333,12 +333,18 @@ plotQC(sce, type = "highest-expression", n=50) + fontsize
 
 Low-abundance genes are problematic as zero or near-zero counts do not contain much information for reliable statistical inference [@bourgon2010independent].
 These genes typically do not provide enough evidence to reject the null hypothesis during testing, yet they still increase the severity of the multiple testing correction.
-In addition, the discreteness of the counts may interfere with downstream statistical procedures, e.g., by compromising the accuracy of continuous approximations.
-Thus, it is common for low-abundance genes to be removed at the start of many RNA-seq analysis pipelines.
+In addition, the discreteness of the counts may interfere with statistical procedures, e.g., by compromising the accuracy of continuous approximations.
+Thus, low-abundance genes are often removed in many RNA-seq analysis pipelines before the application of downstream methods.
+
+The "optimal" choice of filtering strategy depends on the downstream application.
+A more aggressive filter is usually required to remove discreteness (e.g., for normalization) compared to that required for removing underpowered tests.
+For hypothesis testing, the filter statistic should also be independent of the test statistic under the null hypothesis.
+Thus, we will filter at each step as needed, rather than applying a single filter for the entire analysis.
 
 Several metrics can be used to define low-abundance genes.
-We compute the average count across all cells in the HSC data set, with some adjustment for library size differences between cells (Figure \@ref(fig:abhisthsc)).
-A minimum threshold can be applied to this value to filter out genes that are lowly expressed.
+The most obvious is the average count for each gene, computed across all cells in the data set.
+We calculate this using the `calcAverage` function, which also performs some adjustment for library size differences between cells 
+We typically observe a peak of moderately expressed genes following a plateau of lowly expressed genes (Figure \@ref(fig:abhisthsc)).
 
 ```{r abhisthsc, fig.cap="Histogram of log-average counts for all genes in the HSC dataset."}
 ave.counts <- calcAverage(sce)
@@ -346,9 +352,20 @@ hist(log10(ave.counts), breaks=100, main="", col="grey80",
     xlab=expression(Log[10]~"average count"))
 ```
 
+A minimum threshold can be applied to this value to filter out genes that are lowly expressed.
+The example below demonstrates how we could remove genes with average counts less than 1.
+The number of `TRUE` values in `demo.keep` corresponds to the number of retained rows/genes after filtering.
+
+```{r}
+demo.keep <- ave.counts >= 1
+filtered.sce <- sce[demo.keep,]
+summary(demo.keep)
+```
+
 We also examine the number of cells that express each gene.
 This is closely related to the average count for most genes, as expression in many cells will result in a higher average (Figure \@ref(fig:nexprshisthsc)).
 Genes expressed in very few cells are often uninteresting as they are driven by amplification artifacts (though they may also also arise from rare populations).
+We could then remove genes that are expressed in fewer than _n_ cells.
 
 ```{r nexprshisthsc, fig.cap="Histogram of the number of cells expressing each gene in the HSC data set."}
 num.cells <- nexprs(sce, byrow=TRUE)
@@ -356,31 +373,11 @@ smoothScatter(log10(ave.counts), num.cells, ylab="Number of cells",
     xlab=expression(Log[10]~"average count"))
 ```
 
-Either of these metrics can be used to filter out low-abundance genes.
-The example below demonstrates how we could remove genes with average counts less than 1.
-Alternatively, we could remove genes that are expressed in fewer than _n_ cells.
-
-```{r}
-demo.keep <- ave.counts >= 1
-summary(demo.keep)
-```
-
-We generally prefer the mean-based filter as it tends to be less aggressive.
-A gene will be retained as long as it has sufficient expression in any subset of cells.
-In contrast, the "at least _n_" filter depends heavily on the choice of _n_, possibly resulting in the failure to detect rare subpopulations that are present at frequencies below _n_.
-Here, we save the average count into the `SCESet` object for future use.
+Here, we save the average count into the `SCESet` object to use for filtering in downstream steps.
+We also remove genes that are not expressed in any cell, as such genes provide no information and would be removed by any filtering strategy.
 
 ```{r}
 fData(sce)$ave.counts <- ave.counts
-```
-
-It is important to note that the "optimal" choice of filtering strategy depends on the downstream application.
-A more aggressive filter is usually required to remove discreteness (e.g., for normalization) compared to that required for removing underpowered tests.
-For testing procedures, the filter statistic should also be independent of the test statistic under the null hypothesis [@bourgon2010independent].
-Thus, we will filter at each step as needed, rather than applying a single filter for the entire analysis.
-We only remove genes that are not expressed in any cell, as such genes provide no information and would be removed by any filtering strategy.
-
-```{r}
 to.keep <- num.cells > 0
 sce <- sce[to.keep,]
 summary(to.keep)
@@ -492,8 +489,7 @@ This result is consistent with successful removal of cell-specific biases by sca
 Thus, the spike-in total does not need to be explicitly modelled in our downstream analyses.
 
 ```{r explvarplothsc, fig.cap="Density plot of the percentage of variance explained by the (log-transformed) total spike-in counts across all genes in the HSC dataset. For each gene, the percentage of the variance of the normalized log-expression values across cells that is explained by each factor is calculated. Each curve corresponds to one factor and represents the distribution of percentages across all genes."}
-nzero.exprs <- fData(sce)$ave.count > 0
-plotExplanatoryVariables(sce[nzero.exprs,], variables=c("counts_feature_controls_ERCC", 
+plotExplanatoryVariables(sce, variables=c("counts_feature_controls_ERCC", 
     "log10_counts_feature_controls_ERCC")) + fontsize
 ```
 
@@ -504,7 +500,7 @@ This means that the spike-in totals could be confounded with genuine biological 
 
 ## Modelling the technical noise in gene expression
 
-### Fitting a trend to the spike-in variances
+### <a name="trendvar"></a>Fitting a trend to the spike-in variances
 
 Variability in the observed expression values across genes can be driven by genuine biological heterogeneity or uninteresting technical noise. 
 To distinguish between these two possibiltiies, we need to model the technical component of the variance of the expression values for each gene.
@@ -513,7 +509,7 @@ Recall that the same set of spike-ins was added in the same quantity to each cel
 This means that the spike-in transcripts should exhibit no biological variability, i.e., any variance in their counts should be technical in origin.
 
 ```{r}
-var.fit <- trendVar(sce, span=0.2)
+var.fit <- trendVar(sce, parametric=TRUE, span=0.2)
 ```
 
 Given the mean abundance of a gene, the fitted value of the trend can be used as an estimate of the technical component for that gene.
@@ -550,13 +546,15 @@ __Comments from Aaron:__
 - In practice, trend fitting is complicated by the small number of spike-in transcripts and the uneven distribution of their abundances.
 For low numbers of cells, these issues are exacerbated by the low precision of the variance estimates.
 Some tuning of trend parameters such as `span` may be required to achieve a suitable fit - see `?trendVar` for more details.
+Setting `parametric=TRUE` is especially useful for modelling the expected wave-like shape of the mean-variance relationship.
+(This is not the default setting as it is not robust for arbitrary trend shapes.)
 - `trendVar` will automatically ignore genes with mean log-expression values below 0.1 when fitting the trend.
 This ensures that low-abundance genes dominated by discreteness do not interfere with the fit.
 The default threshold was chosen by observing the appearance of discrete patterns in the variance estimates for Poisson-distributed counts.
 However, the threshold can also be manually specified by setting `mean.threshold`.
 In most cases, manual specification is not necessary, though lowering the threshold to 0.001-0.01 may improve the fit for very sparse data, e.g., from droplet-based protocols. 
 - `decomposeVar` also yields _p_-values that can be used to define HVGs at a specific threshold for the false discovery rate (FDR).
-We will discuss this in more detail later - formal detection of HVGs is not necessary for feature selection during data exploration.
+We will discuss this in more detail later, as formal detection of HVGs is not necessary for feature selection during data exploration.
 
 ### Trend fitting when spike-ins are unavailable
 
@@ -564,7 +562,7 @@ If spike-in RNA has not been added in appropriate quantities, an alternative app
 This is done using the `use.spikes=FALSE` setting in `trendVar`, as shown below.
 
 ```{r}
-var.fit.nospike <- trendVar(sce, use.spikes=FALSE, span=0.2)
+var.fit.nospike <- trendVar(sce, parametric=TRUE, use.spikes=FALSE, span=0.2)
 var.out.nospike <- decomposeVar(sce, var.fit.nospike)
 ```
 
@@ -910,8 +908,9 @@ plotQC(sce, type = "highest-expression", n=50) + fontsize
 ```
 
 Gene abundance is quantified by computing the average count across all cells (Figure \@ref(fig:abhistbrain)).
-As previously mentioned, the number of transcript molecules will generally be lower than the number of reads generated from such molecules.
-While some information and power will be lost due to the decrease in the size of the counts, this is mitigated by a concomitant reduction in the variability of the counts.
+As previously mentioned, the UMI count is generally lower than the read count.
+This is because each transcript can only produce one UMI count but can yield many reads after fragmentation.
+Some power will be lost due to the decrease in the size of the counts, but this is mitigated by a concomitant reduction in their variability.
 Specifically, the use of UMIs eliminates technical noise due to amplification biases [@islam2014quantitative].
 
 ```{r abhistbrain, fig.cap="Histogram of log-average counts for all genes in the brain dataset. The filter threshold is represented by the blue line."}
@@ -974,6 +973,10 @@ Finally, normalized log-expression values are computed for each endogenous gene 
 sce <- normalize(sce)
 ```
 
+```{r echo=FALSE, results='hide'}
+gc()
+```
+
 __Comments from Aaron:__
 
 - We specify high-abundance genes for normalization by using the `subset.row` argument.
@@ -996,8 +999,8 @@ fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=
 ```
 
 ```{r explvarplotbrain, fig.cap="Density plot of the percentage of variance explained by each factor across all genes in the brain dataset. For each gene, the percentage of the variance of the normalized log-expression values that is explained by the (log-transformed) total spike-in counts, the sex or age of the mouse, or the tissue of origin is calculated. Each curve corresponds to one factor and represents the distribution of percentages across all genes."}
-#nzero.exprs <- fData(sce)$ave.count > 0
-plotExplanatoryVariables(sce, variables=c("counts_feature_controls_Spike", 
+to.check <- rowMeans(exprs(sce)) >= 0.01
+plotExplanatoryVariables(sce[to.check,], variables=c("counts_feature_controls_Spike", 
     "log10_counts_feature_controls_Spike", "sex", "tissue", "age")) + fontsize
 ```
 
@@ -1014,13 +1017,19 @@ design <- model.matrix(~sce$sex)
 Other relevant factors include the chip or plate on which the cells were processed and the batch in which the libraries were sequenced.
 Blocking on these factors may be necessary to account for batch effects that are often observed in scRNA-seq data [@hicks2015widespread; @tung2016batch].
 
+__Comments from Aaron:__
+
+- We have applied a gentle filter `to.check` based on the mean of the log-expression values.
+This is not strictly necessary from a statistical perspective, but reduces the amount of computational work that has to be performed.
+The mean log-expression is used as the filter statistic, as this is independent of the F-statistic (i.e., the ratio of explained variance to the total variance) in a linear modelling framework [@bourgon2010independent].
+
 ## Modelling and removing technical noise
 
 We model the technical noise by fitting a mean-variance trend to the spike-in transcripts, as previously described.
 To account for uninteresting factors, we supply `design` to `trendVar` to regress out any technical differences due to sex.
 
 ```{r}
-var.fit <- trendVar(sce, span=0.4, design=design)
+var.fit <- trendVar(sce, parametric=TRUE, span=0.4, design=design)
 var.out <- decomposeVar(sce, var.fit)
 ```
 
@@ -1029,7 +1038,7 @@ The technical and total variances are also much smaller than those in the HSC da
 This is due to the use of UMIs which reduces the noise caused by variable PCR amplification.
 Furthermore, the spike-in trend is consistently lower than the variances of the endogenous genes.
 This reflects the heterogeneity in gene expression across cells of different types.
-(It also provides an example where most genes _are_ highly variable, such that fitting a trend to their variances will not recover the technical component.)
+It also provides an example where most genes _are_ highly variable, such that fitting a trend to their variances would not recover the technical component.
 
 ```{r hvgplotbrain, fig.cap="Variance of normalized log-expression values against the mean for each gene, calculated across all cells in the brain data set after blocking on the sex effect. The blue line represents the mean-dependent trend in the technical variance of the spike-in transcripts (also highlighted as red points)."}
 plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression", 
@@ -1211,7 +1220,8 @@ The aim is to test for DE in each cluster compared to the others while blocking 
 The top DE genes are likely to be good candidate markers as they can effectively distinguish between cells in different clusters.
 
 ```{r}
-markers <- findMarkers(sce, my.clusters, design=design)
+to.test <- rowMeans(exprs(sce)) >= 0.1
+markers <- findMarkers(sce, my.clusters, design=design, subset.row=to.test)
 ```
 
 For each cluster, the DE results of the relevant comparisons are consolidated into a single output table.
@@ -1277,6 +1287,10 @@ This allows users to construct their own marker detection pipeline, though we fi
 library(edgeR)
 y <- convertTo(sce, type="edgeR")
 ```
+
+- Filtering is applied here for the sake of computational efficiency.
+It also improves the trend fit within `r Biocpkg("limma")`, following the (same reasoning)[#trendvar] as described for `min.mean` in `trendVar`.
+It also reduces the severity of the multiple testing correction, but this is not a major consideration when the adjusted _p_-values are already compromised.
 
 ## Additional comments
 
