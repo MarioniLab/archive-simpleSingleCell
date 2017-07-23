@@ -999,8 +999,7 @@ fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=
 ```
 
 ```{r explvarplotbrain, fig.cap="Density plot of the percentage of variance explained by each factor across all genes in the brain dataset. For each gene, the percentage of the variance of the normalized log-expression values that is explained by the (log-transformed) total spike-in counts, the sex or age of the mouse, or the tissue of origin is calculated. Each curve corresponds to one factor and represents the distribution of percentages across all genes."}
-to.check <- rowMeans(exprs(sce)) >= 0.01
-plotExplanatoryVariables(sce[to.check,], variables=c("counts_feature_controls_Spike", 
+plotExplanatoryVariables(sce, variables=c("counts_feature_controls_Spike", 
     "log10_counts_feature_controls_Spike", "sex", "tissue", "age")) + fontsize
 ```
 
@@ -1016,12 +1015,6 @@ design <- model.matrix(~sce$sex)
 
 Other relevant factors include the chip or plate on which the cells were processed and the batch in which the libraries were sequenced.
 Blocking on these factors may be necessary to account for batch effects that are often observed in scRNA-seq data [@hicks2015widespread; @tung2016batch].
-
-__Comments from Aaron:__
-
-- We have applied a gentle filter `to.check` based on the mean of the log-expression values.
-This is not strictly necessary from a statistical perspective, but reduces the amount of computational work that has to be performed.
-The mean log-expression is used as the filter statistic, as this is independent of the F-statistic (i.e., the ratio of explained variance to the total variance) in a linear modelling framework [@bourgon2010independent].
 
 ## Modelling and removing technical noise
 
@@ -1065,6 +1058,10 @@ sce <- denoisePCA(sce, technical=var.fit$trend, design=design,
     subset.row=var.out$bio > 0)
 ```
 
+```{r, echo=FALSE, results='hide', message=FALSE}
+gc()
+```
+
 __Comments from Aaron:__
 
 - For data sets containing multiple batches, an alternative strategy is to perform trend fitting and variance decomposition separately for each batch.
@@ -1083,6 +1080,11 @@ for (block in levels(sce$sex)) {
 var.out <- do.call(combineVar, collected)
 ```
 
+```{r, echo=FALSE, results='hide', message=FALSE}
+rm(cur.sce)
+gc()
+```
+
 - Some downstream procedures must be performed on all batches at once, e.g., clustering or dimensionality reduction of all cells across multiple batches.
 However, many of these procedures are not model-based and thus do not accept a design matrix to account for the batch effect.
 To remove uninteresting factors of variation beforehand, we use the `removeBatchEffect` function from the `r Biocpkg("limma")` package [@ritchie2015limma].
@@ -1097,13 +1099,13 @@ adj.exprs <- removeBatchEffect(adj.exprs, batch=sce$sex)
 norm_exprs(sce) <- adj.exprs 
 ```
 
-- That being said, if an analysis method can accept a design matrix, blocking on nuisance factors in the design matrix is preferable to using `removeBatchEffect`.
-This is because the latter does not account for the loss of residual degrees of freedom, nor the uncertainty of estimation of the blocking factor terms.
-
 ```{r, echo=FALSE, results='hide', message=FALSE}
-rm(cur.sce)
+rm(adj.exprs)
 gc()
 ```
+
+- That being said, if an analysis method can accept a design matrix, blocking on nuisance factors in the design matrix is preferable to using `removeBatchEffect`.
+This is because the latter does not account for the loss of residual degrees of freedom, nor the uncertainty of estimation of the blocking factor terms.
 
 ## Data exploration with dimensionality reduction
 
@@ -1111,7 +1113,7 @@ We perform dimensionality reduction on the denoised PCs to check if there is any
 Cells separate into clear clusters in the _t_-SNE plot (Figure \@ref(fig:tsneplotbrain)), corresponding to distinct subpopulations.
 This is consistent with the presence of multiple cell types in the diverse brain population.
 
-```{r tsneplotbrain, fig.cap="_t_-SNE plots constructed from the denoised PCs using the cells in the brain dataset. Each point represents a cell and is coloured according to its expression of _Neurod6_ (left) or _Mog_ (right).", fig.width=15, fig.height=6}
+```{r tsneplotbrain, fig.cap="_t_-SNE plots constructed from the denoised PCs of the brain dataset. Each point represents a cell and is coloured according to its expression of _Neurod6_ (left) or _Mog_ (right).", fig.width=15, fig.height=6}
 tsne1 <- plotTSNE(sce, use_dimred=TRUE, colour_by="Neurod6",
     perplexity=10, rand_seed=100) + fontsize
 tsne2 <- plotTSNE(sce, use_dimred=TRUE, colour_by="Mog",
@@ -1119,16 +1121,11 @@ tsne2 <- plotTSNE(sce, use_dimred=TRUE, colour_by="Mog",
 multiplot(tsne1, tsne2, cols=2)
 ```
 
-```{r echo=FALSE, results='hide'}
-rm(var.cor)
-gc()
-```
-
 The PCA plot is less effective at separating cells into many different clusters (Figure \@ref(fig:pcaplotbrain)).
 This is because the first two PCs are driven by strong differences between specific subpopulations, which reduces the resolution of more subtle differences between some of the other subpopulations.
 Nonetheless, some substructure is still visible.
 
-```{r pcaplotbrain, fig.cap="PCA plots constructed from the normalized and corrected log-expression values of correlated HVGs for cells in the brain dataset. Each point represents a cell and is coloured according to its expression of the _Neurod6_ (left) or _Mog_ (right).", fig.width=15, fig.height=6}
+```{r pcaplotbrain, fig.cap="PCA plots constructed from the denoised PCs of the brain dataset. Each point represents a cell and is coloured according to its expression of the _Neurod6_ (left) or _Mog_ (right).", fig.width=15, fig.height=6}
 pca1 <- plotReducedDim(sce, colour_by="Neurod6") + fontsize
 pca2 <- plotReducedDim(sce, colour_by="Mog") + fontsize
 multiplot(pca1, pca2, cols=2)
@@ -1138,6 +1135,11 @@ For both methods, we colour each cell based on the expression of a particular ge
 This is a useful strategy for visualizing changes in expression across the lower-dimensional space.
 It can also be used to characterise each cluster if the selected genes are known markers for particular cell types.
 For example, _Mog_ can be used to identify clusters corresponding to oligodendrocytes.
+
+```{r echo=FALSE, results='hide'}
+rm(tsne1, tsne2, pca1, pca2)
+gc()
+```
 
 ## Clustering cells into putative subpopulations
 
@@ -1165,9 +1167,9 @@ my.clusters <- unname(cutreeDynamic(my.tree, distM=as.matrix(my.dist), verbose=0
 We visualize the cluster assignments for all cells on the _t_-SNE plot in Figure \@(fig:heatmapbrain).
 Adjacent cells are generally assigned to the same cluster, indicating that the clustering procedure was applied correctly.
 
-```{r heatmapbrain, message=FALSE, fig.width=7, fig.height=10, fig.cap="_t_-SNE plot of the denoised expression profiles of all cells in the brain data set. Each cell is coloured according to the cluster identity to which it was assigned."}
+```{r heatmapbrain, message=FALSE, fig.width=7, fig.height=10, fig.cap="_t_-SNE plot of the denoised PCs of the brain data set. Each point represents a cell and is coloured according to the cluster identity to which it was assigned."}
 sce$cluster <- factor(my.clusters)
-tsne.out <- plotTSNE(sce, use_reddim=TRUE, colour_by="cluster",
+plotTSNE(sce, use_reddim=TRUE, colour_by="cluster",
     perplexity=10, rand_seed=100) + fontsize
 ```
 
@@ -1180,11 +1182,16 @@ For example, we could vary the cut height in `cutreeDynamic` to maximize the ave
 
 ```{r silhouettebrain, message=FALSE, fig.cap="Barplot of silhouette widths for cells in each cluster. Each cluster is assigned a colour and cells with positive widths are coloured according to the colour of its assigned cluster. Any cell with a negative width is coloured according to the colour of the cluster that it is closest to. The average width for all cells in each cluster is shown, along with the average width for all cells in the data set."}
 library(cluster)
+clust.col <- scater:::.get_palette("tableau10medium") # hidden scater colours
 sil <- silhouette(my.clusters, dist = my.dist)
 sil.cols <- clust.col[ifelse(sil[,3] > 0, sil[,1], sil[,2])]
 sil.cols <- sil.cols[order(-sil[,1], sil[,3])]
 plot(sil, main = paste(length(unique(my.clusters)), "clusters"), 
     border=sil.cols, col=sil.cols, do.col.sort=FALSE) 
+```
+
+```{r echo=FALSE, results='hide'}
+gc()
 ```
 
 __Comments from Aaron:__
@@ -1202,13 +1209,15 @@ This is more efficient than forming a pairwise distance matrix for large numbers
 Clustering parameters can be optimized by maximizing the modularity score for the formed clusters.
 
 ```{r}
-snn.gr <- buildSNNGraph(sce)
+snn.gr <- buildSNNGraph(sce, use.dimred=TRUE)
 library(igraph)
 gr.clusters <- cluster_fast_greedy(snn.gr)
+table(gr.clusters$membership)
 gr.clusters$modularity
 ```
 
 ```{r echo=FALSE, results='hide'}
+rm(snn.gr, gr.clusters)
 gc()
 ```
 
@@ -1342,7 +1351,7 @@ We then apply the `computeSpikeFactors` method to estimate size factors for all 
 This method computes the total count over all spike-in transcripts in each cell, and calculates size factors to equalize the total spike-in count across cells. 
 Here, we set `general.use=TRUE` as we intend to apply the spike-in factors to all counts.
 
-```{R}
+```{r}
 sce <- computeSpikeFactors(sce, general.use=TRUE)
 ```
 
@@ -1363,7 +1372,8 @@ However, the opposite would occur if deconvolution size factors were used.
 
 ```{r normplotspikemef, fig.cap="Size factors from spike-in normalization, plotted against the size factors from deconvolution for all cells in the mESC/MEF dataset. Axes are shown on a log-scale, and cells are coloured according to their identity. Deconvolution size factors were computed with small pool sizes owing to the low number of cells of each type."}
 colours <- c(mESC="red", MEF="grey")
-deconv.sf <- computeSumFactors(sce, sf.out=TRUE, cluster=sce$grouping, sizes=1:4*10)
+deconv.sf <- computeSumFactors(sce, sf.out=TRUE, 
+    cluster=sce$grouping, subset.row=calcAverage(sce) > 1)
 plot(sizeFactors(sce), deconv.sf, col=colours[sce$grouping], pch=16, log="xy", 
     xlab="Size factor (spike-in)", ylab="Size factor (deconvolution)")
 legend("bottomleft", col=colours, legend=names(colours), pch=16)
@@ -1375,6 +1385,13 @@ This may not always be appropriate if total RNA is associated with a biological 
 For example, @islam2011characterization observe a 5-fold difference in total RNA between mESCs and MEFs.
 Similarly, the total RNA in a cell changes across phases of the cell cycle [@buettner2015computational].
 Spike-in normalization will preserve these differences in total RNA content such that the corresponding biological groups can be easily resolved in downstream analyses.
+
+__Comments from Aaron:__
+
+- We only use genes with average counts greater than 1 (as specified in `subset.row`) to compute the deconvolution size factors.
+This avoids problems with discreteness, consistent with our previous applications.
+- Setting `sf.out=TRUE` will directly return the size factors, rather than a `SCESet` object containing those factors.
+This is more convenient when only the size factors are required for further analysis.
 
 ## Characterising heterogeneity with hypothesis tests 
 
