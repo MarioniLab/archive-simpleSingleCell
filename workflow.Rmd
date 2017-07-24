@@ -12,7 +12,7 @@ author:
   - *CRUK
   - *EMBL
   - Wellcome Trust Sanger Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SA, United Kingdom
-date: 16 July 2017
+date: 24 July 2017
 vignette: >
   %\VignetteIndexEntry{A worfklow for low-level analyses of single-cell RNA-seq data
   %\VignetteEngine{knitr::rmarkdown}
@@ -1093,7 +1093,7 @@ collected <- list()
 for (block in levels(sce$sex)) {
     cur.sce <- sce[,sce$sex==block]
     cur.sce <- normalize(cur.sce) 
-    var.fit <- trendVar(cur.sce, paramertric=TRUE, span=0.4)
+    var.fit <- trendVar(cur.sce, parametric=TRUE, span=0.4)
     collected[[block]] <- decomposeVar(cur.sce, var.fit)
 }
 var.out <- do.call(combineVar, collected)
