@@ -399,15 +399,15 @@ To overcome this, we pool counts from many cells to increase the count size for 
 Pool-based size factors are then "deconvolved" into cell-based factors for cell-specific normalization.
 
 ```{r, warning=FALSE}
-high.ab <- fData(sce)$ave.counts >= 1
-sce <- computeSumFactors(sce, subset.row=high.ab)
+high.ave <- fData(sce)$ave.counts >= 1
+sce <- computeSumFactors(sce, subset.row=high.ave)
 summary(sizeFactors(sce))
 ```
 
 We set `subset.row` to remove the low-abundance genes prior to the calculation of size factors.
 The deconvolution approach is designed to be robust to the high frequency of zeroes in scRNA-seq data, but it will eventually fail if too many counts are zero.
 This manifests in the results as negative size factors, which are obviously nonsensical.
-We define the filter vector `high.ab` with a threshold of 1 on the average count, which is usually satisfactory for read count data.
+We define the filter vector `high.ave` with a threshold of 1 on the average count, which is usually satisfactory for read count data.
 For UMI data, counts are lower so a threshold of 0.1 is recommended. 
 
 In this case, the size factors are tightly correlated with the library sizes for all cells (Figure \@ref(fig:normplothsc)).
@@ -512,19 +512,19 @@ Recall that the same set of spike-ins was added in the same quantity to each cel
 This means that the spike-in transcripts should exhibit no biological variability, i.e., any variance in their counts should be technical in origin.
 
 ```{r}
-high.ab <- rowMeans(exprs(sce)) >= 0.1
-var.fit <- trendVar(sce, parametric=TRUE, subset.row=high.ab, span=0.2)
+high.logave <- rowMeans(exprs(sce)) >= 0.1
+var.fit <- trendVar(sce, parametric=TRUE, subset.row=high.logave, span=0.2)
 ```
 
 We set `subset.row` to filter out low-abundance genes prior to trend fitting.
 This ensures that low-abundance genes do not interfere with the fit - either due to discreteness, which biases the estimate of variability of the variances around the trend;
 or due to the frequency of low-abundance genes, which reduces the sensitivity of span-based smoothing algorithms at higher abundances.
-The threshold of 0.1 was chosen (`high.ab`) by observing the appearance of discrete patterns in the variance estimates for simulated Poisson-distributed counts.
+We use a threshold of 0.1 (`high.logave`) based on the appearance of discrete patterns in the variance estimates for simulated Poisson-distributed counts.
 Lower thresholds of 0.001-0.01 may be more suitable for very sparse data, e.g., from droplet-based protocols. 
 
 Given the mean abundance of a gene, the fitted value of the trend can be used as an estimate of the technical component for that gene.
 The biological component of the variance can then be calculated by subtracting the technical component from the total variance of each gene with the `decomposeVar` function.
-Note that this variance decomposition is performed for all genes in `sce`.
+Note that this variance decomposition is performed for all genes in `sce`, regardless of abundance.
 The filter used in `trendVar` is _not_ applied in `decomposeVar` by default, unless explicitly specified with `subset.row` in the latter.
 Retention of all genes ensures that weak biological signal from rare subpopulations is not discarded.
 
@@ -576,7 +576,8 @@ If spike-in RNA has not been added in appropriate quantities, an alternative app
 This is done using the `use.spikes=FALSE` setting in `trendVar`, as shown below.
 
 ```{r}
-var.fit.nospike <- trendVar(sce, parametric=TRUE, use.spikes=FALSE, span=0.2)
+var.fit.nospike <- trendVar(sce, parametric=TRUE, use.spikes=FALSE, 
+    subset.row=high.logave, span=0.2)
 var.out.nospike <- decomposeVar(sce, var.fit.nospike)
 ```
 
@@ -958,14 +959,15 @@ This improves normalization accuracy by reducing the number of DE genes between 
 Scaling is then performed to ensure that size factors of cells in different clusters are comparable.
 
 ```{r}
-high.ab <- fData(sce)$ave.count >= 0.1
-clusters <- quickCluster(sce, subset.row=high.ab)
-sce <- computeSumFactors(sce, cluster=clusters, subset.row=high.ab, mean.warn=FALSE)
+high.ave <- fData(sce)$ave.count >= 0.1
+clusters <- quickCluster(sce, subset.row=high.ave)
+sce <- computeSumFactors(sce, cluster=clusters, 
+    subset.row=high.ave, mean.warn=FALSE)
 summary(sizeFactors(sce))
 ```
 
 We set `subset.row` again to use only the high-abundance genes for normalization (and clustering, for consistency).
-As previously mentioned, we use a threshold of 0.1 to define `high.ab`. 
+As previously mentioned, we use a threshold of 0.1 to define `high.ave`. 
 This is lower than the threshold used for the HSC data set to reflect the fact that UMI counts are generally smaller.
 Note that `computeSumFactors` will raise warnings if it detects low-abundance genes.
 These are intended as reminders to perform filtering, and can be turned off with `mean.warn=FALSE` if `subset.row` has been appropriately specified.
@@ -1042,13 +1044,13 @@ Blocking on these factors may be necessary to account for batch effects that are
 ## Modelling and removing technical noise
 
 We model the technical noise by fitting a mean-variance trend to the spike-in transcripts, as previously described.
-For trend fitting, we filter on the average log-expression for each gene (`high.ab`) to avoid problems with discreteness.
+For trend fitting, we filter on the average log-expression for each gene (`high.logave`) to avoid problems with discreteness.
 To account for uninteresting factors, we supply `design` to `trendVar` to regress out any technical differences due to sex.
 
 ```{r}
-high.ab <- rowMeans(exprs(sce)) >= 0.1
+high.logave <- rowMeans(exprs(sce)) >= 0.1
 var.fit <- trendVar(sce, parametric=TRUE, span=0.4, 
-    subset.row=high.ab, design=design)
+    subset.row=high.logave, design=design)
 var.out <- decomposeVar(sce, var.fit)
 ```
 
@@ -1100,8 +1102,8 @@ collected <- list()
 for (block in levels(sce$sex)) {
     cur.sce <- sce[,sce$sex==block]
     cur.sce <- normalize(cur.sce) 
-    high.ab <- rowMeans(exprs(cur.sce)) >= 0.1
-    var.fit <- trendVar(cur.sce, subset.row=high.ab, 
+    cur.high <- rowMeans(exprs(cur.sce)) >= 0.1
+    var.fit <- trendVar(cur.sce, subset.row=cur.high, 
         paramertric=TRUE, span=0.4)
     collected[[block]] <- decomposeVar(cur.sce, var.fit)
 }
@@ -1422,17 +1424,13 @@ This is more convenient when only the size factors are required for further anal
 HVGs are defined as genes with biological components that are significantly greater than zero.
 These genes are interesting as they drive differences in the expression profiles between cells, and should be prioritized for further investigation.
 Formal detection of HVGs avoids focusing on genes that are highly variable due to technical factors such as sampling noise during RNA capture and library preparation.
-
 We can identify HVGs based on the statistics reported by `decomposeVar`, as shown below for the HSC data set.
-Here, we filter out low-abundance genes in both `trendVar` _and_ `decomposeVar` by setting `subset.row=high.ab`.
-This reflects our focus on high-abundance genes with large variances that are the largest contributors to population heterogeneity.
-Filtering reduces the severity of the multiple testing correction, and also avoids problems with computing _p_-values for discrete variance estimates.
 
 ```{r}
 sce <- readRDS("hsc_data.rds")
-high.ab <- rowMeans(exprs(sce)) > 0.1
-var.fit <- trendVar(sce, subset.row=high.ab, parametric=TRUE, span=0.2)
-var.out <- decomposeVar(sce, var.fit, subset.row=high.ab)
+high.logave <- rowMeans(exprs(sce)) >= 0.1
+var.fit <- trendVar(sce, subset.row=high.logave, parametric=TRUE, span=0.2)
+var.out <- decomposeVar(sce, var.fit)
 hvg.out <- var.out[which(var.out$FDR <= 0.05),]
 nrow(hvg.out)
 ```
@@ -1544,25 +1542,26 @@ high.ab <- rowMeans(exprs(sce)) >= 0.1
 fit.block <- trendVar(sce, subset.row=high.ab, design=design,
     parametric=TRUE, use.spikes=NA)
 dec.block <- decomposeVar(sce, fit.block)
-sce.block <- denoisePCA(sce, technical=fit.block$trend, design=design)
+sce.block <- denoisePCA(sce, technical=fit.block$trend, 
+    subset.row=dec.block$bio > 0, design=design)
 ```
 
 The result of blocking on `design` is visualized with some PCA plots in Figure \@ref(pcaplotth2).
 Before removal, the distribution of cells along the first two principal components is strongly associated with their G1 and G2/M scores.
 This is no longer the case after removal, which suggests that the cell cycle effect has been mitigated.
 
-```{r pcaplotth2, fig.width=12, fig.height=6, fig.cap="PCA plots before (left) and after (right) removal of the cell cycle effect in the T~H~2 dataset. Each cell is represented by a point with colour and size determined by the G1 and G2/M scores, respectively. Only HVGs were used to construct each plot."}
+```{r pcaplotth2, fig.width=12, fig.height=6, fig.cap="PCA plots before (left) and after (right) removal of the cell cycle effect in the T~H~2 dataset. Each cell is represented by a point with colour and size determined by the G1 and G2/M scores, respectively."}
 sce$G1score <- sce.block$G1score <- assignments$score$G1
 sce$G2Mscore <- sce.block$G2Mscore <- assignments$score$G2M
 
-# Finding HVGs without blocking on phase score.
+# Without blocking on phase score.
 fit <- trendVar(sce, subset.row=high.ab, parametric=TRUE, use.spikes=NA) 
 dec <- decomposeVar(sce, fit)
-sce <- denoisePCA(sce, technical=fit$trend)
+sce <- denoisePCA(sce, technical=fit$trend, subset.row=dec$bio > 0)
 out <- plotReducedDim(sce, ncomponents=2, colour_by="G1score", size_by="G2Mscore") + 
     fontsize + ggtitle("Before removal")
 
-# Using HVGs after blocking on the phase score.
+# After blocking on the phase score.
 out2 <- plotReducedDim(sce.block, ncomponents=2, colour_by="G1score", 
     size_by="G2Mscore") + fontsize + ggtitle("After removal")
 multiplot(out, out2, cols=2)
@@ -1574,7 +1573,7 @@ In Figure \@ref(diffusionth2), cells are arranged along a trajectory in the low-
 The first diffusion component is likely to correspond to T~H~2 differentiation, given that a key regulator _Gata3_ [@zhu2006gata3] changes in expression from left to right.
 
 ```{r diffusionth2, fig.cap="A diffusion map for the T~H~2 dataset, where each cell is coloured by its expression of _Gata3_."}
-plotDiffusionMap(sce, exprs_values="norm_exprs", colour_by="Gata3") + fontsize
+plotDiffusionMap(sce.block, use_dimred=TRUE, colour_by="Gata3") + fontsize
 ```
 
 ```{r, echo=FALSE, results='hide'}
