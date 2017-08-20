@@ -9,6 +9,11 @@
 *.txt
 *.xlsx
 
+*.bbl
+*.aux
+*.blg
+*.log
+
 workflow.Rmd
 existing/
 
