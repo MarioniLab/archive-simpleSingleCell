@@ -243,19 +243,9 @@ However, the interpretation of these differences is sensitive to the choice of n
 For example, depending on whether you use spike-in or non-DE normalization, you can flip the sign of the log-fold changes.
 This could completely alter your determination of what the clusters actually represents.
 
-## Why use log-transformed normalized counts?
+## Should we standardize the log-counts?
 
-The log-transformation is convenient as it means that differences between log-expression values directly represent log-fold changes.
-This is arguably more relevant than differences in the absolute scale of the counts.
-You _could_ downweight the absolute differences based on the standard deviation, in order to adjust for the value of the mean.
-However, this depends on a sensible estimate of the standard deviation - across the population? Subpopulations?
-
-The log-transformation also provides some measure of variance stabilization for NB-distributed counts with a constant dispersion but a variable mean. 
-Without it, the trend would be pretty extreme and difficult to fit reliably, especially as the precision of the variance estimate will change with the mean.
-Log-transformation seems better than square-rooting it, which is the VST for the Poisson only.
-You could play around with various Box-Cox transformations, but the mean-variance trend is pretty extreme and probably won't go away just by changing lambda.
-
-While we're talking about the transformation, should we standardize the log-expression values?
+Should we standardize the log-expression values?
 This ensures that all genes contribute the same amount of variance, thereby eliminating the mean-variance relationship.
 Genes in the middle of the range with high technical variance will not dominate the variance of the data set.
 However, there are several drawbacks:
