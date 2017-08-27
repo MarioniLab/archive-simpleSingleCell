@@ -1582,6 +1582,25 @@ gc()
 
 ## Extracting annotation from Ensembl identifiers
 
+```{r, echo=FALSE, results="hide"}
+# Cleaning out DLLs, with some protection to get it to work.
+repeat {
+    present <- setdiff(loadedNamespaces(), 
+        c(rownames(installed.packages(.Library, priority="base"), 
+        "AnnotationDbi", "GenomeInfoDb", "scran")))
+    discarded <- 0L        
+    for (pkg in present) { 
+       try({ 
+           unloadNamespace(pkg)
+           discarded <- discarded + 1L
+       }, silent=TRUE) 
+    }
+    if (discarded==0) break
+}
+library(R.utils)
+gcDLLs()
+```
+
 Feature-counting tools typically report genes in terms of standard identifiers from Ensembl or Entrez.
 These identifiers are used as they are unambiguous and highly stable.
 However, they are difficult to interpret compared to the gene symbols which are more commonly used in the literature.
