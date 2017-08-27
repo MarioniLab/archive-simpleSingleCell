@@ -18,7 +18,7 @@ vignette: >
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}    
 output: 
-    BiocStyle::html_document2
+    BiocStyle::html_document
 bibliography: ref.bib
 ---
 
@@ -112,7 +112,6 @@ Alternatively, rapid quantification of expression with alignment-free methods su
 The first task is to load the count matrix into memory.
 In this case, some work is required to retrieve the data from the Gzip-compressed Excel format.
 Each row of the matrix represents an endogenous gene or a spike-in transcript, and each column represents a single HSC.
-For convenience, the counts for spike-in transcripts and endogenous genes are stored in a `SCESet` object from the `r Biocpkg("scater")` package [@mccarthy2016scater].
 
 ```{r}
 library(R.utils)
@@ -120,36 +119,34 @@ gunzip("GSE61533_HTSEQ_count_results.xls.gz", remove=FALSE, overwrite=TRUE)
 library(readxl)
 all.counts <- as.data.frame(read_excel('GSE61533_HTSEQ_count_results.xls', sheet=1))
 rownames(all.counts) <- all.counts$ID
-all.counts <- all.counts[,-1]
-library(scater)
-sce <- newSCESet(countData=all.counts)
+all.counts <- as.matrix(all.counts[,-1])
+```
+
+For convenience, the counts for spike-in transcripts and endogenous genes are stored in a `SingleCellExperiment` object from the `r Biocpkg("SingleCellExperiment")` package.
+
+```{r}
+library(SingleCellExperiment)
+sce <- SingleCellExperiment(list(counts=all.counts))
 dim(sce)
 ```
 
-We identify the rows corresponding to ERCC spike-ins and mitochondrial genes.
-For this dataset, this information can be easily extracted from the row names.
-In general, though, identifying mitochondrial genes from standard identifiers like Ensembl requires extra annotation (this will be discussed later in more detail).
+We identify the rows corresponding to ERCC spike-in transcripts from the row names.
+We store this information in the `SingleCellExperiment` object for future use.
+This is necessary as spike-ins require special treatment in some downstream steps such as normalization.
 
 ```{r}
 is.spike <- grepl("^ERCC", rownames(sce))
+isSpike(sce, "ERCC") <- is.spike
+summary(is.spike)
+```
+
+We also identify the rows corresponding to mitochondrial genes, which is useful for quality control.
+In this case, the information can be obtained from the row names, 
+More generally, though, identifying mitochondrial genes from standard identifiers like Ensembl requires extra annotation (this will be discussed later in more detail).
+
+```{r}
 is.mito <- grepl("^mt-", rownames(sce))
-```
-
-For each cell, we calculate quality control metrics such as the total number of counts or the proportion of counts in mitochondrial genes or spike-in transcripts.
-These are stored in the `pData` of the `SCESet` for future reference.
-
-```{r}
-sce <- calculateQCMetrics(sce, feature_controls=list(ERCC=is.spike, Mt=is.mito))
-head(colnames(pData(sce)))
-```
-
-We need to explicitly indicate that the ERCC set is, in fact, a spike-in set.
-This is necessary as spike-ins require special treatment in some downstream steps such as variance estimation and normalization.
-We do this by supplying the name of the spike-in set to `setSpike`.
-
-```{r}
-library(scran)
-setSpike(sce) <- "ERCC"
+summary(is.mito)
 ```
 
 ## Quality control on the cells 
@@ -170,6 +167,15 @@ The same amount of spike-in RNA to each cell, so an enrichment in spike-in count
 High proportions are indicative of poor-quality cells [@islam2014quantitative;@ilicic2016classification], possibly because of loss of cytoplasmic RNA from perforated cells.
 The reasoning is that mitochondria are larger than individual transcript molecules and less likely to escape through tears in the cell membrane.
 
+For each cell, we calculate these quality control metrics using the `calculateQCMetrics` function from the `r Biocpkg("scater")` package [@mccarthy2016scater].
+These are stored in the row- and column-wise metadata of the `SingleCellExperiment` for future reference.
+
+```{r}
+library(scater)
+sce <- calculateQCMetrics(sce, feature_controls=list(ERCC=is.spike, Mt=is.mito))
+head(colnames(colData(sce)))
+```
+
 The distributions of these metrics are shown in Figure \@ref(fig:qcplothsc).
 The aim is to remove putative low-quality cells that have low library sizes, low numbers of expressed features, and high spike-in (or mitochondrial) proportions.
 
@@ -179,9 +185,9 @@ hist(sce$total_counts/1e6, xlab="Library sizes (millions)", main="",
     breaks=20, col="grey80", ylab="Number of cells")
 hist(sce$total_features, xlab="Number of expressed genes", main="", 
     breaks=20, col="grey80", ylab="Number of cells")
-hist(sce$pct_counts_feature_controls_ERCC, xlab="ERCC proportion (%)", 
+hist(sce$pct_counts_ERCC, xlab="ERCC proportion (%)", 
     ylab="Number of cells", breaks=20, main="", col="grey80")
-hist(sce$pct_counts_feature_controls_Mt, xlab="Mitochondrial proportion (%)", 
+hist(sce$pct_counts_Mt, xlab="Mitochondrial proportion (%)", 
     ylab="Number of cells", breaks=20, main="", col="grey80")
 ```
 
@@ -207,7 +213,7 @@ Here, no transformation is required as we are identifying large outliers, for wh
 We do not use the mitochondrial proportions as we already have the spike-in proportions for this data set.
 
 ```{r}
-spike.drop <- isOutlier(sce$pct_counts_feature_controls_ERCC, nmads=3, type="higher")
+spike.drop <- isOutlier(sce$pct_counts_ERCC, nmads=3, type="higher")
 ```
 
 Subsetting by column will retain only the high-quality cells that pass each filter described above.
@@ -280,6 +286,7 @@ mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", package="sc
 library(org.Mm.eg.db)
 anno <- select(org.Mm.eg.db, keys=rownames(sce), keytype="SYMBOL", column="ENSEMBL")
 ensembl <- anno$ENSEMBL[match(rownames(sce), anno$SYMBOL)]
+library(scran)
 assignments <- cyclone(sce, mm.pairs, gene.names=ensembl)
 ```
 
@@ -295,7 +302,7 @@ Cells are classified as being in G1 phase if the G1 score is above 0.5 and great
     in G2/M phase if the G2/M score is above 0.5 and greater than the G1 score; 
     and in S phase if neither score is above 0.5.
 Here, the vast majority of cells are classified as being in G1 phase.
-We save these assignments into the `SCESet` object for later use.
+We save these assignments into the `SingleCellExperiment` object for later use.
 
 ```{r}
 sce$phases <- assignments$phases
@@ -450,7 +457,7 @@ To ensure normalization is performed correctly, we compute a separate set of siz
 For each cell, the spike-in-specific size factor is defined as the total count across all transcripts in the spike-in set.
 This assumes that none of the spike-in transcripts are differentially expressed, which is reasonable given that the same amount and composition of spike-in RNA should have been added to each cell.
 (See below for a more detailed discussion on spike-in normalization.)
-These size factors are stored in a separate field of the `SCESet` object by setting `general.use=FALSE` in `computeSpikeFactors`.
+These size factors are stored in a separate field of the `SingleCellExperiment` object by setting `general.use=FALSE` in `computeSpikeFactors`.
 This ensures that they will only be used with the spike-in transcripts but not the endogenous genes.
 
 ```{r}
@@ -471,7 +478,7 @@ sce <- normalize(sce)
 The log-transformation is useful as it means that any differences in the values directly represent log~2~-fold changes in expression between cells.
 This is usually more relevant than the absolute differences in coverage, which need to be interpreted in the context of the overall abundance.
 The log-transformation also provides some measure of variance stabilization [@law2014voom], so that high-abundance genes with large variances do not dominate downstream analyses.
-The computed values are stored as an `exprs` matrix in addition to the other assay elements.
+The computed values are stored as an `"logcounts"` matrix in addition to the other assay elements.
 
 ```{r, echo=FALSE, results="hide"}
 gc()
@@ -492,8 +499,8 @@ This result is consistent with successful removal of cell-specific biases by sca
 Thus, the spike-in total does not need to be explicitly modelled in our downstream analyses.
 
 ```{r explvarplothsc, fig.cap="Density plot of the percentage of variance explained by the (log-transformed) total spike-in counts across all genes in the HSC dataset. For each gene, the percentage of the variance of the normalized log-expression values across cells that is explained by each factor is calculated. Each curve corresponds to one factor and represents the distribution of percentages across all genes."}
-plotExplanatoryVariables(sce, variables=c("counts_feature_controls_ERCC", 
-    "log10_counts_feature_controls_ERCC")) + fontsize
+plotExplanatoryVariables(sce, variables=c("total_counts_ERCC", 
+    "log10_total_counts_ERCC")) + fontsize
 ```
 
 Note that the use of the spike-in total as an accurate proxy for the relative technical bias assumes that no library quantification was performed.
@@ -541,7 +548,7 @@ This ensures that the variance estimate is not driven by one or two outlier cell
 
 ```{r hvgvioplothsc, fig.cap="Violin plots of normalized log-expression values for the top 10 genes with the largest biological components in the HSC dataset. Each point represents the log-expression value in a single cell."}
 chosen.genes <- order(var.out$bio, decreasing=TRUE)[1:10]
-plotExpression(sce, rownames(var.out)[chosen.genes]) + fontsize
+plotExpression(sce, features=rownames(var.out)[chosen.genes]) + fontsize
 ```
 
 __Comments from Aaron:__
@@ -562,7 +569,7 @@ or due to the frequency of low-abundance genes, which reduces the sensitivity of
     Lower thresholds of 0.001-0.01 may be more suitable for very sparse data, e.g., from droplet-based protocols.
     - The filter used in `trendVar` is _not_ applied in `decomposeVar` by default.
     Retention of all genes ensures that weak biological signal from rare subpopulations is not discarded.
-    To apply the filter in `decomposeVar`, users should set `subset.row=rowMeans(exprs(sce)) > 0.1` in the function call.
+    To apply the filter in `decomposeVar`, users should set `subset.row=rowMeans(logcounts(sce)) > 0.1` in the function call.
 - Negative biological components are often obtained from `decomposeVar`. 
 These are intuitively meaningless as it is impossible for a gene to have total variance below technical noise.
 Nonetheless, such values occur due to imprecise estimation of the total variance, especially for low numbers of cells.
@@ -607,18 +614,17 @@ In contrast, random technical noise affects each gene independently and will be 
 The `denoisePCA` function removes later PCs until the total discarded variance is equal to the sum of technical components for all genes used in the PCA.
 
 ```{r}
-to.keep <- var.out$bio > 0
-sce <- denoisePCA(sce, technical=var.fit$trend, subset.row=to.keep) 
-dim(reducedDimension(sce)) 
+sce <- denoisePCA(sce, technical=var.fit$trend) 
+dim(reducedDim(sce, "PCA")) 
 ```
 
-The function returns a `SCESet` object containing the PC scores for each cell in the `reducedDimension` slot.
+The function returns a `SingleCellExperiment` object containing the PC scores for each cell in the `reducedDims` slot.
 The aim is to eliminate technical noise and enrich for biological signal in the retained PCs.
 This improves resolution of the underlying biology during downstream procedures such as clustering.
 
 __Comments from Aaron:__
 
-- We only use genes with positive biological components in `denoisePCA`.
+- `denoisePCA` will internally filter to only genes that have positive biological components in `denoisePCA`.
 This guarantees that the total technical variance to be discarded will not be greater than the total variance in the data.
 - No filtering is performed on abundance here, which ensures that PCs corresponding to rare subpopulations can still be detected. 
 Discreteness is less of an issue as low-abundance genes also have lower variance, thus reducing their contribution to the PCA.
@@ -626,8 +632,13 @@ Discreteness is less of an issue as low-abundance genes also have lower variance
 This is useful for denoising prior to downstream procedures that require gene-wise expression values.
 
 ```{r}
-sce <- denoisePCA(sce, technical=var.fit$trend, subset.row=to.keep, value="lowrank") 
-assayDataElementNames(sce)
+sce2 <- denoisePCA(sce, technical=var.fit$trend, value="lowrank") 
+assayNames(sce2)
+```
+
+```{r, echo=FALSE, results="hide"}
+rm(sce2)
+gc()
 ```
 
 ## Data exploration with dimensionality reduction 
@@ -638,7 +649,7 @@ In this case, no clear separation of cells into distinct subpopulations is obser
 This is consistent with the presence of a highly homogeneous population of HSCs [@wilson2015combined].
 
 ```{r pcaplothsc, fig.cap="Pairwise PCA plots of the first three PCs in the HSC data set, constructed from normalized log-expression values of genes with positive biological components. Each point represents a cell, coloured according to its total number of expressed features. Bars represent the coordinates of the cells on each axis.", fig.height=9, fig.width=9}
-plotReducedDim(sce, ncomponents=3, colour_by="total_features") + fontsize
+plotReducedDim(sce, use_dimred="PCA", ncomponents=3, colour_by="total_features") + fontsize
 ```
 
 Another widely used approach is the _t_-stochastic neighbour embedding (_t_-SNE) method [@van2008visualizing].
@@ -649,11 +660,11 @@ We demonstrate the generation of _t_-SNE plots in Figure \@ref(fig:tsneplothsc),
 As with the PCA plots, no consistent substructure is observed.
 
 ```{r tsneplothsc, fig.cap="_t_-SNE plots constructed from the denoised PCs in the HSC data set, using a range of perplexity values. Each point represents a cell, coloured according to its total number of expressed features. Bars represent the coordinates of the cells on each axis.", fig.width=12, fig.height=6}
-out5 <- plotTSNE(sce, use_dimred=TRUE, perplexity=5, colour_by="total_features", 
+out5 <- plotTSNE(sce, use_dimred="PCA", perplexity=5, colour_by="total_features", 
     rand_seed=100) + fontsize + ggtitle("Perplexity = 5")
-out10 <- plotTSNE(sce, use_dimred=TRUE, perplexity=10, colour_by="total_features",
+out10 <- plotTSNE(sce, use_dimred="PCA", perplexity=10, colour_by="total_features",
     rand_seed=100) + fontsize + ggtitle("Perplexity = 10")
-out20 <- plotTSNE(sce, use_dimred=TRUE, perplexity=20, colour_by="total_features",
+out20 <- plotTSNE(sce, use_dimred="PCA", perplexity=20, colour_by="total_features",
     rand_seed=100) + fontsize + ggtitle("Perplexity = 20")
 multiplot(out5, out10, out20, cols=3)
 ```
@@ -691,10 +702,10 @@ We can study this in more detail by detecting genes that are differentially expr
 This is done by applying methods from the `r Biocpkg("limma")` package to the log-expression values [@ritchie2015limma].
 
 ```{r}
-pc1 <- reducedDimension(sce)[,1]
+pc1 <- reducedDim(sce, "PCA")[,1]
 design <- model.matrix(~pc1)
 library(limma)
-fit <- lmFit(exprs(sce), design)
+fit <- lmFit(logcounts(sce), design)
 fit <- eBayes(fit, trend=TRUE, robust=TRUE)
 topTable(fit)
 ```
@@ -706,7 +717,7 @@ For example, a number of these genes are involved in DNA replication and the cel
 
 ```{r heatmaphsc, fig.height=10, fig.width=6, fig.cap="Heatmap of the top 50 DE genes along the first PC in the HSC data set. The colour for each cell (column) represents the log-fold change from the average log-expression for each gene (row), bounded to [-2, 2] for visualization purposes. Cells are ordered by their location on the first PC."}
 de.genes <- rownames(topTable(fit, coef=2, n=50))
-heat.vals <- exprs(sce)[de.genes,]
+heat.vals <- logcounts(sce)[de.genes,]
 heat.vals <- heat.vals - rowMeans(heat.vals)
 heat.vals[heat.vals > 2] <- 2
 heat.vals[heat.vals < -2] <- -2
@@ -723,13 +734,13 @@ PCA empirically captures the maximum variance in the data, so there will always 
 Specifying `~pc1` only models linear changes across the covariate.
 Other trends can be more flexibly modelled using splines, i.e., `~splines::ns(pc1, df=5)`, though the spline coefficients are not easy to interpret.
 - Technically, we could achieve more power by filtering out low-abundance genes to reduce the severity of the multiple testing correction.
-This would be performed on the mean of the log-expression values (i.e., `rowMeans(exprs(sce))`, which is an independent filter statistic for linear models.
+This would be performed on the mean of the log-expression values (i.e., `rowMeans(logcounts(sce))`, which is an independent filter statistic for linear models.
 However, this is probably unnecessary given that the interpretation of the adjusted _p_-values is already compromised. 
 - It is not uncommon for cell cycle to be the major driver of variability in cell populations that are very homogeneous.
 
 ## Additional comments
 
-Once the basic analysis is completed, it is often useful to save the `SCESet` object to file with the `saveRDS` function.
+Once the basic analysis is completed, it is often useful to save the `SingleCellExperiment` object to file with the `saveRDS` function.
 The object can then be easily restored into new R sessions using the `readRDS` function.
 This allows further work to be conducted without having to repeat all of the processing steps described above.
 
@@ -810,13 +821,12 @@ new.counts <- rowsum(endo.data$counts, group=raw.names, reorder=FALSE)
 endo.data$counts <- new.counts
 ```
 
-The counts are then combined into a single matrix for constructing a `SCESet` object.
+The counts are then combined into a single matrix for constructing a `SingleCellExperiment` object.
 For convenience, metadata for all cells are stored in the same object for later access.
 
 ```{r}
 all.counts <- rbind(endo.data$counts, mito.data$counts, spike.data$counts)
-metadata <- AnnotatedDataFrame(endo.data$metadata)
-sce <- newSCESet(countData=all.counts, phenoData=metadata)
+sce <- SingleCellExperiment(list(counts=all.counts), colData=endo.data$metadata)
 dim(sce)
 ```
 
@@ -826,6 +836,8 @@ We also add annotation identifying rows that correspond to each class of feature
 nrows <- c(nrow(endo.data$counts), nrow(mito.data$counts), nrow(spike.data$counts))
 is.spike <- rep(c(FALSE, FALSE, TRUE), nrows)
 is.mito <- rep(c(FALSE, TRUE, FALSE), nrows)
+isSpike(sce, "Spike") <- is.spike
+sce
 ```
 
 ```{r, echo=FALSE, results='hide'}
@@ -841,7 +853,6 @@ Nonetheless, we compute some quality control metrics to check whether the remain
 
 ```{r}
 sce <- calculateQCMetrics(sce, feature_controls=list(Spike=is.spike, Mt=is.mito)) 
-setSpike(sce) <- "Spike"
 ```
 
 We examine the distribution of library sizes and numbers of expressed genes across cells (Figure \@ref(fig:libplotbrain)).
@@ -854,9 +865,9 @@ hist(sce$total_counts/1e3, xlab="Library sizes (thousands)", main="",
     breaks=20, col="grey80", ylab="Number of cells")
 hist(sce$total_features, xlab="Number of expressed genes", main="", 
     breaks=20, col="grey80", ylab="Number of cells")
-hist(sce$pct_counts_feature_controls_Spike, xlab="ERCC proportion (%)",
+hist(sce$pct_counts_Spike, xlab="ERCC proportion (%)",
     ylab="Number of cells", breaks=20, main="", col="grey80")
-hist(sce$pct_counts_feature_controls_Mt, xlab="Mitochondrial proportion (%)", 
+hist(sce$pct_counts_Mt, xlab="Mitochondrial proportion (%)", 
     ylab="Number of cells", breaks=20, main="", col="grey80")
 ```
 
@@ -866,7 +877,7 @@ Again, the presence of spike-in transcripts means that we do not have to use the
 ```{r}
 libsize.drop <- isOutlier(sce$total_counts, nmads=3, type="lower", log=TRUE)
 feature.drop <- isOutlier(sce$total_features, nmads=3, type="lower", log=TRUE)
-spike.drop <- isOutlier(sce$pct_counts_feature_controls_Spike, nmads=3, type="higher")
+spike.drop <- isOutlier(sce$pct_counts_Spike, nmads=3, type="higher")
 ```
 
 Removal of low-quality cells is then performed by combining the filters for all of the metrics.
@@ -935,11 +946,11 @@ hist(log10(ave.counts), breaks=100, main="", col="grey",
 abline(v=log10(0.1), col="blue", lwd=2, lty=2)
 ```
 
-We save the average counts into the `SCESet` object for later use.
+We save the average counts into the `SingleCellExperiment` object for later use.
 We also remove genes that have average counts of zero, as this means that they are not expressed in any cell.
 
 ```{r}
-fData(sce)$ave.count <- ave.counts
+rowData(sce)$ave.count <- ave.counts
 to.keep <- ave.counts > 0
 sce <- sce[to.keep,]
 summary(to.keep)
@@ -957,8 +968,8 @@ This improves normalization accuracy by reducing the number of DE genes between 
 Scaling is then performed to ensure that size factors of cells in different clusters are comparable.
 
 ```{r}
-high.ave <- fData(sce)$ave.count >= 0.1
-clusters <- quickCluster(sce, subset.row=high.ave)
+high.ave <- rowData(sce)$ave.count >= 0.1
+clusters <- quickCluster(sce, subset.row=high.ave, method="igraph")
 sce <- computeSumFactors(sce, cluster=clusters, 
     subset.row=high.ave, min.mean=NULL)
 summary(sizeFactors(sce))
@@ -1002,7 +1013,7 @@ __Comments from Aaron:__
 
 - Only a rough clustering is required to avoid pooling together very different cell types in `computeSumFactors`.
 The function is robust to a moderate level of differential expression between cells in the same cluster.
-- For large data sets, consider using `method="igraph"` in `quickCluster` for faster clustering.
+- For large data sets, using `method="igraph"` in `quickCluster` will speed up clustering. 
 This uses a graph-based clustering algorithm - see `?buildSNNGraph` for more details.
 
 ## Checking for important technical factors
@@ -1018,8 +1029,8 @@ fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=
 ```
 
 ```{r explvarplotbrain, fig.cap="Density plot of the percentage of variance explained by each factor across all genes in the brain dataset. For each gene, the percentage of the variance of the normalized log-expression values that is explained by the (log-transformed) total spike-in counts, the sex or age of the mouse, or the tissue of origin is calculated. Each curve corresponds to one factor and represents the distribution of percentages across all genes."}
-plotExplanatoryVariables(sce, variables=c("counts_feature_controls_Spike", 
-    "log10_counts_feature_controls_Spike", "sex", "tissue", "age")) + fontsize
+plotExplanatoryVariables(sce, variables=c("log10_total_counts_Spike", 
+    "log10_total_counts_Spike", "sex", "tissue", "age")) + fontsize
 ```
 
 Nonetheless, we demonstrate how to account for uninteresting technical factors by using sex as an example.
@@ -1073,8 +1084,7 @@ We supply `design` to regress out uninteresting factors, and we use only the gen
 This yields a set of coordinates for each cell where the technical noise has been removed.
 
 ```{r}
-sce <- denoisePCA(sce, technical=var.fit$trend, design=design, 
-    subset.row=var.out$bio > 0)
+sce <- denoisePCA(sce, technical=var.fit$trend, design=design) 
 ```
 
 ```{r, echo=FALSE, results='hide', message=FALSE}
@@ -1113,7 +1123,7 @@ Note that this step is automatically performed inside `denoisePCA` when `design`
 
 ```{r}
 library(limma)
-adj.exprs <- exprs(sce)
+adj.exprs <- logcounts(sce)
 adj.exprs <- removeBatchEffect(adj.exprs, batch=sce$sex)
 norm_exprs(sce) <- adj.exprs 
 ```
@@ -1133,9 +1143,9 @@ Cells separate into clear clusters in the _t_-SNE plot (Figure \@ref(fig:tsneplo
 This is consistent with the presence of multiple cell types in the diverse brain population.
 
 ```{r tsneplotbrain, fig.cap="_t_-SNE plots constructed from the denoised PCs of the brain dataset. Each point represents a cell and is coloured according to its expression of _Neurod6_ (left) or _Mog_ (right).", fig.width=15, fig.height=6}
-tsne1 <- plotTSNE(sce, use_dimred=TRUE, colour_by="Neurod6",
+tsne1 <- plotTSNE(sce, use_dimred="PCA", colour_by="Neurod6",
     perplexity=10, rand_seed=100) + fontsize
-tsne2 <- plotTSNE(sce, use_dimred=TRUE, colour_by="Mog",
+tsne2 <- plotTSNE(sce, use_dimred="PCA", colour_by="Mog",
     perplexity=10, rand_seed=100) + fontsize
 multiplot(tsne1, tsne2, cols=2)
 ```
@@ -1145,8 +1155,8 @@ This is because the first two PCs are driven by strong differences between speci
 Nonetheless, some substructure is still visible.
 
 ```{r pcaplotbrain, fig.cap="PCA plots constructed from the denoised PCs of the brain dataset. Each point represents a cell and is coloured according to its expression of the _Neurod6_ (left) or _Mog_ (right).", fig.width=15, fig.height=6}
-pca1 <- plotReducedDim(sce, colour_by="Neurod6") + fontsize
-pca2 <- plotReducedDim(sce, colour_by="Mog") + fontsize
+pca1 <- plotReducedDim(sce, use_dimred="PCA", colour_by="Neurod6") + fontsize
+pca2 <- plotReducedDim(sce, use_dimred="PCA", colour_by="Mog") + fontsize
 multiplot(pca1, pca2, cols=2)
 ```
 
@@ -1169,7 +1179,7 @@ An alternative approach is to cluster on a matrix of distances derived from corr
 This is more robust to noise and normalization errors, but is also less sensitive to subtle changes in the expression profiles. 
 
 ```{r}
-pcs <- reducedDimension(sce)
+pcs <- reducedDim(sce, "PCA")
 my.dist <- dist(pcs)
 my.tree <- hclust(my.dist, method="ward.D2")
 ```
@@ -1228,7 +1238,7 @@ This is more efficient than forming a pairwise distance matrix for large numbers
 Clustering parameters can be optimized by maximizing the modularity score for the formed clusters.
 
 ```{r}
-snn.gr <- buildSNNGraph(sce, use.dimred=TRUE)
+snn.gr <- buildSNNGraph(sce, use.dimred="PCA")
 gr.clusters <- igraph::cluster_fast_greedy(snn.gr)
 table(gr.clusters$membership)
 gr.clusters$modularity
@@ -1308,7 +1318,7 @@ However, this is sensitive to overclustering, as unique marker genes will no lon
 This is because the clusters have been empirically identified from the data.
 `r Biocpkg("limma")` does not account for the uncertainty of clustering, which means that the _p_-values are much lower than they should be. 
 This is not a concern in other analyses where the groups are pre-defined.
-- The `SCESet` object can also be easily transformed for use in other DE analysis methods.
+- The `SingleCellExperiment` object can also be easily transformed for use in other DE analysis methods.
 For example, the `convertTo` function can be used to construct a `DGEList` for input into the `r Biocpkg("edgeR")` pipeline [@robinson2010edgeR].
 This allows users to construct their own marker detection pipeline, though we find that direct use of `findMarkers` is usually sufficient.
 
@@ -1319,7 +1329,7 @@ y <- convertTo(sce, type="edgeR")
 
 ## Additional comments
 
-Having completed the basic analysis, we save the `SCESet` object with its associated data to file.
+Having completed the basic analysis, we save the `SingleCellExperiment` object with its associated data to file.
 This is especially important here as the brain dataset is quite large.
 If further analyses are to be performed, it would be inconvenient to have to repeat all of the pre-processing steps described above.
 
@@ -1356,11 +1366,13 @@ The negative control wells do not contain any cells and are useful for quality c
 ```{r}
 counts <- read.table("GSE29087_L139_expression_tab.txt.gz", colClasses=c(list("character", 
     NULL, NULL, NULL, NULL, NULL, NULL), rep("integer", 96)), skip=6, sep='\t', row.names=1)
-sce <- newSCESet(countData=counts)
+is.spike <- grep("SPIKE", rownames(counts)) 
+sce <- SingleCellExperiment(list(counts=as.matrix(counts)))
+isSpike(sce, "spike") <- is.spike
 sce$grouping <- rep(c("mESC", "MEF", "Neg"), c(48, 44, 4))
 sce <- sce[,sce$grouping!="Neg"] # Removing negative control wells.
-sce <- calculateQCMetrics(sce, feature_controls=list(spike=grep("SPIKE", rownames(counts))))
-setSpike(sce) <- "spike"
+sce <- calculateQCMetrics(sce, feature_controls=list(spike=is.spike))
+sce
 ```
 
 We then apply the `computeSpikeFactors` method to estimate size factors for all cells.
@@ -1388,8 +1400,7 @@ However, the opposite would occur if deconvolution size factors were used.
 
 ```{r normplotspikemef, fig.cap="Size factors from spike-in normalization, plotted against the size factors from deconvolution for all cells in the mESC/MEF dataset. Axes are shown on a log-scale, and cells are coloured according to their identity. Deconvolution size factors were computed with small pool sizes owing to the low number of cells of each type."}
 colours <- c(mESC="red", MEF="grey")
-deconv.sf <- computeSumFactors(sce, sf.out=TRUE, 
-    cluster=sce$grouping, subset.row=calcAverage(sce) > 1)
+deconv.sf <- computeSumFactors(sce, sf.out=TRUE, cluster=sce$grouping)
 plot(sizeFactors(sce), deconv.sf, col=colours[sce$grouping], pch=16, log="xy", 
     xlab="Size factor (spike-in)", ylab="Size factor (deconvolution)")
 legend("bottomleft", col=colours, legend=names(colours), pch=16)
@@ -1406,7 +1417,7 @@ __Comments from Aaron:__
 
 - We only use genes with average counts greater than 1 (as specified in `subset.row`) to compute the deconvolution size factors.
 This avoids problems with discreteness as mentioned in our previous uses of `computeSumFactors`.
-- Setting `sf.out=TRUE` will directly return the size factors, rather than a `SCESet` object containing those factors.
+- Setting `sf.out=TRUE` will directly return the size factors, rather than a `SingleCellExperiment` object containing those factors.
 This is more convenient when only the size factors are required for further analysis.
 
 ## Characterising heterogeneity with hypothesis tests 
@@ -1501,7 +1512,7 @@ incoming <- as.data.frame(read_excel("nbt.3102-S7.xlsx", sheet=1))
 rownames(incoming) <- incoming[,1]
 incoming <- incoming[,-1]
 incoming <- incoming[,!duplicated(colnames(incoming))] # Remove duplicated genes.
-sce <- newSCESet(exprsData=t(incoming))
+sce <- SingleCellExperiment(list(logcounts=t(incoming)))
 ```
 
 We empirically identify the cell cycle phase using the pair-based classifier in `cyclone`.
@@ -1511,13 +1522,13 @@ The majority of cells in Figure \@ref(phaseplotth2) seem to lie in G1 phase, wit
 mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", package="scran"))
 library(org.Mm.eg.db)
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
-set.seed(100)
 ```
 
 ```{r phaseplotth2, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the T~H~2 dataset, where each point represents a cell."}
 anno <- select(org.Mm.eg.db, keys=rownames(sce), keytype="SYMBOL", column="ENSEMBL")
 ensembl <- anno$ENSEMBL[match(rownames(sce), anno$SYMBOL)]
-assignments <- cyclone(sce, mm.pairs, gene.names=ensembl, assay="exprs")
+set.seed(100)
+assignments <- cyclone(sce, mm.pairs, gene.names=ensembl, assay.type="logcounts")
 plot(assignments$score$G1, assignments$score$G2M, xlab="G1 score", ylab="G2/M score", pch=16)
 ```
 
@@ -1531,8 +1542,7 @@ For example, model fitting is not possible if all cells in one experimental cond
 design <- model.matrix(~ G1 + G2M, assignments$score)
 fit.block <- trendVar(sce, design=design, parametric=TRUE, use.spikes=NA)
 dec.block <- decomposeVar(sce, fit.block)
-sce.block <- denoisePCA(sce, technical=fit.block$trend, 
-    subset.row=dec.block$bio > 0, design=design)
+sce.block <- denoisePCA(sce, technical=fit.block$trend, design=design)
 ```
 
 The result of blocking on `design` is visualized with some PCA plots in Figure \@ref(pcaplotth2).
@@ -1546,12 +1556,12 @@ sce$G2Mscore <- sce.block$G2Mscore <- assignments$score$G2M
 # Without blocking on phase score.
 fit <- trendVar(sce, parametric=TRUE, use.spikes=NA) 
 dec <- decomposeVar(sce, fit)
-sce <- denoisePCA(sce, technical=fit$trend, subset.row=dec$bio > 0)
-out <- plotReducedDim(sce, ncomponents=2, colour_by="G1score", size_by="G2Mscore") + 
-    fontsize + ggtitle("Before removal")
+sce <- denoisePCA(sce, technical=fit$trend)
+out <- plotReducedDim(sce, use_dimred="PCA", ncomponents=2, colour_by="G1score", 
+    size_by="G2Mscore") + fontsize + ggtitle("Before removal")
 
 # After blocking on the phase score.
-out2 <- plotReducedDim(sce.block, ncomponents=2, colour_by="G1score", 
+out2 <- plotReducedDim(sce.block, use_dimred="PCA", ncomponents=2, colour_by="G1score", 
     size_by="G2Mscore") + fontsize + ggtitle("After removal")
 multiplot(out, out2, cols=2)
 ```
@@ -1562,7 +1572,7 @@ In Figure \@ref(diffusionth2), cells are arranged along a trajectory in the low-
 The first diffusion component is likely to correspond to T~H~2 differentiation, given that a key regulator _Gata3_ [@zhu2006gata3] changes in expression from left to right.
 
 ```{r diffusionth2, fig.cap="A diffusion map for the T~H~2 dataset, where each cell is coloured by its expression of _Gata3_."}
-plotDiffusionMap(sce.block, use_dimred=TRUE, colour_by="Gata3") + fontsize
+plotDiffusionMap(sce.block, use_dimred="PCA", colour_by="Gata3") + fontsize
 ```
 
 ```{r, echo=FALSE, results='hide'}
@@ -1606,15 +1616,16 @@ is.spike <- grepl("^ERCC", my.ids)
 sum(is.spike)
 ```
 
-All of this information can be consolidated into a `SCESet` object for further manipulation.
+All of this information can be consolidated into a `SingleCellExperiment` object for further manipulation.
 Alternatively, annotation from BioMart resources can be directly added to the object using the `getBMFeatureAnnos` function from `r Biocpkg("scater")`.
 
 ```{r}
 anno <- anno[,-1,drop=FALSE]
 rownames(anno) <- my.ids
-sce <- newSCESet(countData=incoming, featureData=AnnotatedDataFrame(anno))
+sce <- SingleCellExperiment(list(counts=incoming), rowData=anno)
+isSpike(sce, "ERCC") <- is.spike
 sce <- calculateQCMetrics(sce, feature_controls=list(ERCC=is.spike))
-setSpike(sce) <- "ERCC"
+sce
 ```
 
 We filter out rows that do not correspond to endogenous genes or spike-in transcripts.
