@@ -12,7 +12,7 @@ author:
   - *CRUK
   - *EMBL
   - Wellcome Trust Sanger Institute, Wellcome Genome Campus, Hinxton, Cambridge CB10 1SA, United Kingdom
-date: 24 July 2017
+date: 28 August 2017
 vignette: >
   %\VignetteIndexEntry{A worfklow for low-level analyses of single-cell RNA-seq data
   %\VignetteEngine{knitr::rmarkdown}
@@ -697,7 +697,7 @@ The `exploreData` function can also be used to interactively visualize gene expr
 
 Putative subpopulations of cells can be computationally defined by unsupervised classification, i.e., clustering.
 We do not attempt this here due to the absence of distinct subpopulations in the plots above.
-However, there is a clear correlation with the number of expressed features and the first PC in Figure \@ref(fig:pcaplothsc).
+However, there is a clear visual correlation between the number of expressed features and the first PC in Figure \@ref(fig:pcaplothsc).
 We can study this in more detail by detecting genes that are differentially expressed along the first PC.
 This is done by applying methods from the `r Biocpkg("limma")` package to the log-expression values [@ritchie2015limma].
 
@@ -711,9 +711,10 @@ topTable(fit)
 ```
 
 Figure \@ref{fig:heatmaphsc} indicates that the majority of genes increase in expression along the first PC.
-However, there are also a few genes that decrease in expression, e.g., _H2-D1_ and _Malat1_.
-This indicates that the first PC corresponds to more than a general increase in cell size that affects all transcripts non-specifically.
-For example, a number of these genes are involved in DNA replication and the cell cycle, e.g., _Chek1_.
+Some of these genes are involved in DNA replication and the cell cycle, e.g., _Chek1_.
+However, there are also a few genes that decrease in expression, e.g., _Lst1_.
+This suggests that the first PC corresponds to genuine biology (namely the cell cycle),
+not just a change in total RNA content that non-specifically increases the expression of all transcripts.
 
 ```{r heatmaphsc, fig.height=10, fig.width=6, fig.cap="Heatmap of the top 50 DE genes along the first PC in the HSC data set. The colour for each cell (column) represents the log-fold change from the average log-expression for each gene (row), bounded to [-2, 2] for visualization purposes. Cells are ordered by their location on the first PC."}
 de.genes <- rownames(topTable(fit, coef=2, n=50))
@@ -731,12 +732,13 @@ __Comments from Aaron:__
 This is because the DE testing is performed on the same data used to define the first PC.
 PCA empirically captures the maximum variance in the data, so there will always be some genes with low _p_-values, even if the variance is purely driven by random noise.
 - The procedure above can be used to test for changes along any covariate, e.g., pseudotime.
-Specifying `~pc1` only models linear changes across the covariate.
+Note that specifying `~pc1` only models linear changes across the covariate.
 Other trends can be more flexibly modelled using splines, i.e., `~splines::ns(pc1, df=5)`, though the spline coefficients are not easy to interpret.
 - Technically, we could achieve more power by filtering out low-abundance genes to reduce the severity of the multiple testing correction.
 This would be performed on the mean of the log-expression values (i.e., `rowMeans(logcounts(sce))`, which is an independent filter statistic for linear models.
 However, this is probably unnecessary given that the interpretation of the adjusted _p_-values is already compromised. 
 - It is not uncommon for cell cycle to be the major driver of variability in cell populations that are very homogeneous.
+If necessary, the `cyclone` results can be used to filter out non-G1 cells prior to further analysis.
 
 ## Additional comments
 
@@ -1084,7 +1086,8 @@ We supply `design` to regress out uninteresting factors, and we use only the gen
 This yields a set of coordinates for each cell where the technical noise has been removed.
 
 ```{r}
-sce <- denoisePCA(sce, technical=var.fit$trend, design=design) 
+sce <- denoisePCA(sce, technical=var.fit$trend, design=design, approximate=TRUE) 
+ncol(reducedDim(sce, "PCA"))
 ```
 
 ```{r, echo=FALSE, results='hide', message=FALSE}
@@ -1135,6 +1138,8 @@ gc()
 
 - That being said, if an analysis method can accept a design matrix, blocking on nuisance factors in the design matrix is preferable to using `removeBatchEffect`.
 This is because the latter does not account for the loss of residual degrees of freedom, nor the uncertainty of estimation of the blocking factor terms.
+- Setting `approximate=TRUE` wil perform an approximate singular value decomposition, using methods from the `r CRANpkg("irlba")` package.
+This is much faster than the exact algorithm on large data sets, without much loss of accuracy.
 
 ## Data exploration with dimensionality reduction
 
@@ -1541,8 +1546,7 @@ For example, model fitting is not possible if all cells in one experimental cond
 ```{r}
 design <- model.matrix(~ G1 + G2M, assignments$score)
 fit.block <- trendVar(sce, design=design, parametric=TRUE, use.spikes=NA)
-dec.block <- decomposeVar(sce, fit.block)
-sce.block <- denoisePCA(sce, technical=fit.block$trend, design=design)
+sce.block <- denoisePCA(sce, technical=fit.block$trend, design=design) 
 ```
 
 The result of blocking on `design` is visualized with some PCA plots in Figure \@ref(pcaplotth2).
@@ -1555,7 +1559,6 @@ sce$G2Mscore <- sce.block$G2Mscore <- assignments$score$G2M
 
 # Without blocking on phase score.
 fit <- trendVar(sce, parametric=TRUE, use.spikes=NA) 
-dec <- decomposeVar(sce, fit)
 sce <- denoisePCA(sce, technical=fit$trend)
 out <- plotReducedDim(sce, use_dimred="PCA", ncomponents=2, colour_by="G1score", 
     size_by="G2Mscore") + fontsize + ggtitle("Before removal")
@@ -1572,7 +1575,9 @@ In Figure \@ref(diffusionth2), cells are arranged along a trajectory in the low-
 The first diffusion component is likely to correspond to T~H~2 differentiation, given that a key regulator _Gata3_ [@zhu2006gata3] changes in expression from left to right.
 
 ```{r diffusionth2, fig.cap="A diffusion map for the T~H~2 dataset, where each cell is coloured by its expression of _Gata3_."}
-plotDiffusionMap(sce.block, use_dimred="PCA", colour_by="Gata3") + fontsize
+sce.block <- denoisePCA(sce, technical=fit.block$trend, design=design, 
+    min.rank=10) # avoid odd-looking plot due to too few PCs.
+plotDiffusionMap(sce.block, use_reddim="PCA", colour_by="Gata3") + fontsize
 ```
 
 ```{r, echo=FALSE, results='hide'}
