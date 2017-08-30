@@ -1237,7 +1237,7 @@ Doing so may focus on a different set of genes that define heterogeneity _within
 This would allow fine-scale structure within each cluster to be explored at greater resolution. 
 For simplicity, though, we will only use the broad clusters corresponding to clear subpopulations in this workflow.
 - For larger data sets, consider using `buildSNNGraph` and methods from the `r CRANpkg("igraph")` package to perform clustering.
-This builds a shared-nearest-neighbour graph [@snndudes] in which cells are the nodes and edges are formed between cells that share nearest neighbours.
+This builds a shared-nearest-neighbour graph [@xu2015identification] in which cells are the nodes and edges are formed between cells that share nearest neighbours.
 Clusters are then defined as highly connected communities of cells within this graph.
 This is more efficient than forming a pairwise distance matrix for large numbers of cells.
 Clustering parameters can be optimized by maximizing the modularity score for the formed clusters.
