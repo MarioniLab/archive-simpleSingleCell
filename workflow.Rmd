@@ -510,7 +510,7 @@ This means that the spike-in totals could be confounded with genuine biological 
 
 ## Modelling the technical noise in gene expression
 
-### <a name="trendvar"></a>Fitting a trend to the spike-in variances
+### Fitting a trend to the spike-in variances
 
 Variability in the observed expression values across genes can be driven by genuine biological heterogeneity or uninteresting technical noise. 
 To distinguish between these two possibiltiies, we need to model the technical component of the variance of the expression values for each gene.
@@ -1086,7 +1086,7 @@ We supply `design` to regress out uninteresting factors, and we use only the gen
 This yields a set of coordinates for each cell where the technical noise has been removed.
 
 ```{r}
-sce <- denoisePCA(sce, technical=var.fit$trend, design=design, approximate=TRUE) 
+sce <- denoisePCA(sce, technical=var.fit$trend, design=design, approximate=TRUE)
 ncol(reducedDim(sce, "PCA"))
 ```
 
@@ -1138,7 +1138,7 @@ gc()
 
 - That being said, if an analysis method can accept a design matrix, blocking on nuisance factors in the design matrix is preferable to using `removeBatchEffect`.
 This is because the latter does not account for the loss of residual degrees of freedom, nor the uncertainty of estimation of the blocking factor terms.
-- Setting `approximate=TRUE` wil perform an approximate singular value decomposition, using methods from the `r CRANpkg("irlba")` package.
+- Setting `approximate=TRUE` in `denoisePCA` will perform an approximate singular value decomposition, using methods from the `r CRANpkg("irlba")` package.
 This is much faster than the exact algorithm on large data sets, without much loss of accuracy.
 
 ## Data exploration with dimensionality reduction
@@ -1591,8 +1591,8 @@ gc()
 # Cleaning out DLLs, with some protection to get it to work.
 repeat {
     present <- setdiff(loadedNamespaces(), 
-        c(rownames(installed.packages(.Library, priority="base"), 
-        "AnnotationDbi", "GenomeInfoDb", "scran")))
+        c(rownames(installed.packages(.Library, priority="base")), 
+        "AnnotationDbi", "GenomeInfoDb", "scran"))
     discarded <- 0L        
     for (pkg in present) { 
        try({ 
