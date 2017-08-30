@@ -729,23 +729,13 @@ However, that kind of model is notoriously finicky due to the large numbers of m
 
 ## Do we need zero inflation in our models?
 
-Not when you're concerned with the first two moments of the expression distribution, at least.
-For purposes of DE, linear models are fine when you have enough cells, as the coefficients will just converge to normality via the CLT.
-Even NB distributions work well as they have a substantial probability mass at zero with large dispersions.
-For detecting HVGs, a ZI term would have to be combined with the variance of the non-zero term to get a summary of the total variance.
-It would be simpler to estimate the variance directly from the expression values.
-
-The main argument for a ZI model is that it would separate zero and non-zero components, especially when testing for differences.
-This might be useful in cases where both the proportion of zeros and the non-zero mean increase in one condition compared to the other - 
-for example, if the cells in the first condition split into one silent subpopulation and one upregulated subpopulation.
+The main argument for a ZI model is that it is more accurate, through separation of the zero and non-zero components.
+For characterization of differences, this might be useful in cases where _both_ the proportion of zeros _and_ the non-zero mean increase in one condition compared to the other.
 Here, a standard DE analysis would be underpowered as there would be no change in mean between conditions.
-However, the logical conclusion of this reasoning would be to look for differential distributions, e.g., via MW tests, which obviates the need for an explicit ZI model.
 
-(It's hard to interpret DD without clustering.
-Simple shifts in mean are preferred as top candidates for explaining differences between conditions.
-There is a possible role for DD if changes in structure between conditions are of interest, and shifts in location are not.
-That said, DV would probably do better here if you don't care about DE.
-The use case is also moderately contrived as strong substrcuture would be detected by detecting HVGs in each cluster.)
+The main argument against a ZI model is that it is more troublesome to fit and interpret, due to the presence of a whole bunch of extra parameters.
+How can I get a direct estimate of the log-fold change between conditions, or variance across the population?
+NB distributions are probably sufficient (especially for UMI data) as they have a substantial probability mass at zero with large dispersions.
 
 As a side note, people often observe a trend in the proportion of zeros with increasing abundance.
 This is a natural consequence of the decreasing mass at zero with increasing mean, e.g., in a standard NB distribution.
@@ -756,6 +746,20 @@ disp <- 1
 y <- matrix(rnbinom(100000, mu=means, size=1), nrow=length(means))
 dropout <- rowSums(y==0)/ncol(y)
 plot(means, dropout, log="x")
+```
+
+## Looking for differential distributions
+
+The logical conclusion of the ZI reasoning would be to look for differential distributions, e.g., via MW tests.
+This handles changes beyond the presence or absence of zeroes, including the presence of a lowly-expressing (but non-zero) population.
+However, this has its own problems, one of which is the difficulty in summarizing and interpreting the results with something other than repeated boxplots of distributions.
+Another is the fact that you can get differences in distributions due to technical effects like sequencing depth.
+Such effects are relatively easy to model in tests for the mean but confound distribution-based tests.
+This is because normalization usually only deals with the expectation of the biases, rather than adjusting for differences in the quantiles.
+
+```{r}
+wilcox.test(rpois(100, lambda=1)*10,
+            rpois(100, lambda=10))
 ```
 
 ## Do we need imputation?
