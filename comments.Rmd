@@ -762,6 +762,12 @@ wilcox.test(rpois(100, lambda=1)*10,
             rpois(100, lambda=10))
 ```
 
+So yes, testing for differential distributions would be nice, but it's hard to see how to do that rigorously.
+Biological interpretation of the differences is also _ad hoc_, requiring some clustering rather than relying on gene-by-gene inferences.
+Rigorous testing is better achieved with DE analyses, which better acommodates complex experimental designs.
+With summation, DE testing avoids assumptions about the count distribution across cells.
+Without summation, DE testing will allow you to get marker genes, which is much easier to interpret.
+
 ## Factor analysis vs PCA
 
 FA is more flexible with respect to properly modelling the distribution of observations.
