@@ -762,6 +762,13 @@ wilcox.test(rpois(100, lambda=1)*10,
             rpois(100, lambda=10))
 ```
 
+## Factor analysis vs PCA
+
+FA is more flexible with respect to properly modelling the distribution of observations.
+This will allow it to correctly weight low counts compared to high counts, which should yield more accurate dimensionality reduction results.
+It will also distinguish between random measurement error and correlated variance, more than PCA (and thus would probably plug into `denoisePCA` better).
+The trade-off is that it is sensitive to violations of the model assumptions, and there are no unique solutions; it may also be slower, though PCA isn't exactly fast either.
+
 ## Do we need imputation?
 
 The difficulty with dealing with dropouts is that you don't know whether a zero count is a true dropout or due to a genuine lack of expression.
