@@ -284,8 +284,7 @@ This approach is implemented in the `cyclone` function using a pre-trained set o
 set.seed(100)
 mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", package="scran"))
 library(org.Mm.eg.db)
-anno <- select(org.Mm.eg.db, keys=rownames(sce), keytype="SYMBOL", column="ENSEMBL")
-ensembl <- anno$ENSEMBL[match(rownames(sce), anno$SYMBOL)]
+ensembl <- mapIds(org.Mm.eg.db, keys=rownames(sce), keytype="SYMBOL", column="ENSEMBL")
 library(scran)
 assignments <- cyclone(sce, mm.pairs, gene.names=ensembl)
 ```
@@ -909,8 +908,7 @@ library(org.Mm.eg.db)
 ```
 
 ```{r phaseplotbrain, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the brain dataset, where each point represents a cell."}
-anno <- select(org.Mm.eg.db, keys=rownames(sce), keytype="SYMBOL", column="ENSEMBL")
-ensembl <- anno$ENSEMBL[match(rownames(sce), anno$SYMBOL)]
+ensembl <- mapIds(org.Mm.eg.db, keys=rownames(sce), keytype="SYMBOL", column="ENSEMBL")
 assignments <- cyclone(sce, mm.pairs, gene.names=ensembl)
 plot(assignments$score$G1, assignments$score$G2M, xlab="G1 score", ylab="G2/M score", pch=16)
 ```
@@ -1611,14 +1609,13 @@ These identifiers are used as they are unambiguous and highly stable.
 However, they are difficult to interpret compared to the gene symbols which are more commonly used in the literature.
 We can easily convert from one to the other using annotation packages like `r Biocpkg("org.Mm.eg.db")`.
 This is demonstrated below for Ensembl identifiers in a mESC dataset [@kolod2015singlecell] obtained from http://www.ebi.ac.uk/teichmann-srv/espresso.
-The `select` call extracts the specified data from the annotation object, and the `match` call ensures that the first gene symbol is used if multiple symbols correspond to a single Ensembl identifier.
+The `mapIds` call extracts the specified data from the annotation object, returning the first gene symbol if multiple symbols correspond to a single Ensembl identifier.
 
 ```{r}
 incoming <- read.table("counttable_es.csv", header=TRUE, row.names=1)
 my.ids <- rownames(incoming)
-anno <- select(org.Mm.eg.db, keys=my.ids, keytype="ENSEMBL", column="SYMBOL")
-anno <- anno[match(my.ids, anno$ENSEMBL),]
-head(anno)
+symb <- mapIds(org.Mm.eg.db, keys=my.ids, keytype="ENSEMBL", column="SYMBOL")
+head(symb)
 ```
 
 To identify which rows correspond to mitochondrial genes, we need to use extra annotation describing the genomic location of each gene.
@@ -1626,10 +1623,9 @@ For Ensembl, this involves using the `r Biocpkg("TxDb.Mmusculus.UCSC.mm10.ensGen
 
 ```{r}
 library(TxDb.Mmusculus.UCSC.mm10.ensGene)
-location <- select(TxDb.Mmusculus.UCSC.mm10.ensGene, keys=my.ids, 
+location <- mapIds(TxDb.Mmusculus.UCSC.mm10.ensGene, keys=my.ids, 
     column="CDSCHROM", keytype="GENEID")
-location <- location[match(my.ids, location$GENEID),]
-is.mito <- location$CDSCHROM == "chrM" & !is.na(location$CDSCHROM)
+is.mito <- location == "chrM" & !is.na(location)
 sum(is.mito)
 ```
 
@@ -1644,11 +1640,10 @@ All of this information can be consolidated into a `SingleCellExperiment` object
 Alternatively, annotation from BioMart resources can be directly added to the object using the `getBMFeatureAnnos` function from `r Biocpkg("scater")`.
 
 ```{r}
-anno <- anno[,-1,drop=FALSE]
-rownames(anno) <- my.ids
-sce <- SingleCellExperiment(list(counts=incoming), rowData=anno)
+sce <- SingleCellExperiment(list(counts=as.matrix(incoming)), 
+    rowData=DataFrame(Symbol=symb, Chr=location))
 isSpike(sce, "ERCC") <- is.spike
-sce <- calculateQCMetrics(sce, feature_controls=list(ERCC=is.spike))
+sce <- calculateQCMetrics(sce, feature_controls=list(ERCC=is.spike, Mito=is.mito))
 sce
 ```
 
