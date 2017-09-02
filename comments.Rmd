@@ -591,7 +591,7 @@ This means that the variance needs to be modelled across cells.
 For DE genes, any change will do, even if it only appears in a small percentage of cells of the subpopulation.
 This requires modelling of the variance across replicate instances of the entire subpopulation.
 
-In short, testing for differential expression is not the best approach to identify marker genes.
+That being said, testing for differential expression is not the best approach to identify marker genes.
 If the difference is strong enough, the null hypothesis will be rejected, regardless of how variable the expression values might be.
 One might expect that DE analyses would at least rank good markers more highly if they have, e.g., strong log-fold changes and low variability.
 This is true to some extent - however, the implicit balance between variability and log-fold change is not well defined.
@@ -761,6 +761,19 @@ This is because normalization usually only deals with the expectation of the bia
 wilcox.test(rpois(100, lambda=1)*10,
             rpois(100, lambda=10))
 ```
+
+So yes, testing for differential distributions would be nice, but it's hard to see how to do that rigorously.
+Biological interpretation of the differences is also _ad hoc_, requiring some clustering rather than relying on gene-by-gene inferences.
+Rigorous testing is better achieved with DE analyses, which better acommodates complex experimental designs.
+DE testing will allow you to get marker genes, which is much easier to interpret biologically.
+Also, with summation, DE testing avoids assumptions about the count distribution across cells.
+
+## Factor analysis vs PCA
+
+FA is more flexible with respect to properly modelling the distribution of observations.
+This will allow it to correctly weight low counts compared to high counts, which should yield more accurate dimensionality reduction results.
+It will also distinguish between random measurement error and correlated variance, more than PCA (and thus would probably plug into `denoisePCA` better).
+The trade-off is that it is sensitive to violations of the model assumptions, and there are no unique solutions; it may also be slower, though PCA isn't exactly fast either.
 
 ## Do we need imputation?
 
