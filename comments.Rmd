@@ -748,6 +748,21 @@ dropout <- rowSums(y==0)/ncol(y)
 plot(means, dropout, log="x")
 ```
 
+Stochastic zeroes due to low library sizes don't really mess up the _expected_ clustering, as long as normalization is properly performed.
+After normalization, the cells should just be scattered around the true mean expression, regardless of how many stochastic zeroes are present.
+(But see my comments about the log-transformation in the factor analysis section.)
+However, zeroes may distort rank-based clustering, which is why you should filter for high-abundance genes before running `quickCluster`.
+This is probably driven by a shift in the population center in rank space when there are ties, and is illustrated in the example below.
+
+```{r}
+means <- 1:100
+ncells <- 100
+a <- matrix(rpois(length(means)*ncells, means*0.01), ncol=ncells)
+b <- matrix(rpois(length(means)*ncells, means), ncol=ncells)
+x <- cbind(a, b)
+table(rep(1:2, each=ncells), quickCluster(x, min.size=100)) # on ranks
+```
+
 ## Looking for differential distributions
 
 The logical conclusion of the ZI reasoning would be to look for differential distributions, e.g., via MW tests.
@@ -774,6 +789,12 @@ FA is more flexible with respect to properly modelling the distribution of obser
 This will allow it to correctly weight low counts compared to high counts, which should yield more accurate dimensionality reduction results.
 It will also distinguish between random measurement error and correlated variance, more than PCA (and thus would probably plug into `denoisePCA` better).
 The trade-off is that it is sensitive to violations of the model assumptions, and there are no unique solutions; it may also be slower, though PCA isn't exactly fast either.
+
+In theory, dimensionality reduction on log-expression values is not-quite-right because normalization only corrects for scaling effects on the counts.
+The effect of the log-transformation will differ between cells with low versus high library sizes, even when the mean expression is the same.
+FA should avoid this as the counts can be modelled directly, eliminating the need for log-transformation to stabilize the variances prior to dimensionality reduction.
+In practice, this doesn't really matter - if the mean log-values differ with respect to the size factor, it implies that the variance at one size factor is much larger.
+This will prevent us from resolving a misleading shift in population centers that is solely driven by the log-transformation.
 
 ## Do we need imputation?
 
