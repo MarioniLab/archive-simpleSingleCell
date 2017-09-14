@@ -736,6 +736,7 @@ Here, a standard DE analysis would be underpowered as there would be no change i
 The main argument against a ZI model is that it is more troublesome to fit and interpret, due to the presence of a whole bunch of extra parameters.
 How can I get a direct estimate of the log-fold change between conditions, or variance across the population?
 NB distributions are probably sufficient (especially for UMI data) as they have a substantial probability mass at zero with large dispersions.
+The MAST model is particularly problematic as it uses a log-normal model, which means that it does not consider stochastic zeroes at all.
 
 As a side note, people often observe a trend in the proportion of zeros with increasing abundance.
 This is a natural consequence of the decreasing mass at zero with increasing mean, e.g., in a standard NB distribution.
@@ -748,8 +749,8 @@ dropout <- rowSums(y==0)/ncol(y)
 plot(means, dropout, log="x")
 ```
 
-Stochastic zeroes due to low library sizes don't really mess up the _expected_ clustering, as long as normalization is properly performed.
-After normalization, the cells should just be scattered around the true mean expression, regardless of how many stochastic zeroes are present.
+Stochastic zeroes due to low library sizes don't really distort the _expected_ clustering, as long as normalization is properly performed.
+After normalization, the cells should just be scattered around the true mean expression profile in high-D space, regardless of how many stochastic zeroes are present.
 (But see my comments about the log-transformation in the factor analysis section.)
 However, zeroes may distort rank-based clustering, which is why you should filter for high-abundance genes before running `quickCluster`.
 This is probably driven by a shift in the population center in rank space when there are ties, and is illustrated in the example below.
@@ -788,12 +789,13 @@ Also, with summation, DE testing avoids assumptions about the count distribution
 FA is more flexible with respect to properly modelling the distribution of observations.
 This will allow it to correctly weight low counts compared to high counts, which should yield more accurate dimensionality reduction results.
 It will also distinguish between random measurement error and correlated variance, more than PCA (and thus would probably plug into `denoisePCA` better).
-The trade-off is that it is sensitive to violations of the model assumptions, and there are no unique solutions; it may also be slower, though PCA isn't exactly fast either.
+The trade-off is that it is sensitive to violations of the model (distributional) assumptions, possibly putting too much weight on some observations.
+FA also has no unique solutions and may also be slower, though PCA isn't exactly fast either.
 
 In theory, dimensionality reduction on log-expression values is not-quite-right because normalization only corrects for scaling effects on the counts.
 The effect of the log-transformation will differ between cells with low versus high library sizes, even when the mean expression is the same.
 FA should avoid this as the counts can be modelled directly, eliminating the need for log-transformation to stabilize the variances prior to dimensionality reduction.
-In practice, this doesn't really matter - if the mean log-values differ with respect to the size factor, it implies that the variance at one size factor is much larger.
+In practice, this doesn't really seem to matter - if the mean log-values differ with respect to the size factor, it implies that the variance at one size factor is much larger.
 This will prevent us from resolving a misleading shift in population centers that is solely driven by the log-transformation.
 
 ## Do we need imputation?
