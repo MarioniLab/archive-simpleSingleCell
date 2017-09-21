@@ -562,55 +562,7 @@ This is because smaller cells have less stable expression and accumulate red/blu
 Obviously, if there are problems with normalization, it'll show up here as well.
 In general, these can be ignored; if they're not artifacts, then they'll be impossible to validate.
 
-## Identifying marker genes per cluster
-
-### Considering the variability across cells 
-
-DE genes between subpopulations are not necessarily marker genes.
-The latter requires that the gene be consistently expressed (or not) in all cells of one subpopulation compared to the other.
-This means that the variance needs to be modelled across cells.
-For DE genes, any change will do, even if it only appears in a small percentage of cells of the subpopulation.
-This requires modelling of the variance across replicate instances of the entire subpopulation.
-
-That being said, testing for differential expression is not the best approach to identify marker genes.
-If the difference is strong enough, the null hypothesis will be rejected, regardless of how variable the expression values might be.
-One might expect that DE analyses would at least rank good markers more highly if they have, e.g., strong log-fold changes and low variability.
-This is true to some extent - however, the implicit balance between variability and log-fold change is not well defined.
-A DE analysis will happily favour low-variability genes with weak DE - usually high-abundance genes expressed in both groups - that wouldn't be good markers.
-Conversely, good candidates that are heavily affected by technical noise may be triaged out.
-
-```r
-set.seed(100)
-library(statmod)
-ngroup <- 50
-design <- model.matrix(~rep(LETTERS[1:2], each=ngroup))
-design0 <- cbind(rep(1, nrow(design)))
-
-# Scenario 1: strong difference, highly variable.
-# This is arguably a strong candidate for a marker gene.
-y1 <- c(integer(ngroup), rnbinom(ngroup, mu=100, size=1)) 
-sum(y1==0) - ngroup # only one cell in the second group is zero.
-LR1 <- glmnb.fit(design0, y1, dispersion=1, offset=0)$deviance - 
-       glmnb.fit(design, y1, dispersion=1, offset=0)$deviance
-
-# Scenario 2: weaker difference, lowly variable.
-# This is not a particularly good marker gene.
-y2 <- c(rnbinom(ngroup, mu=50, size=100), 
-        rnbinom(ngroup, mu=100, size=100)) 
-LR2 <- glmnb.fit(design0, y2, dispersion=0.01, offset=0)$deviance - 
-       glmnb.fit(design, y2, dispersion=0.01, offset=0)$deviance
- 
-# Despite that, the second gene has a greater LR than the first.
-LR1
-LR2
-```
-
-A rigorous test for markers would need to consider the variability explicitly, e.g., set a maximum overlap between the group-specific expression distributions.
-This might be too conservative, though, due to high levels of technical noise.
-If one perseveres with DE analyses, the only way to prune out bad markers is to inspect the distributions.
-However, strong markers with large log-fold changes should appear at the top of the list, regardless of whether you do summation or model cell-to-cell variability.
-
-### Using _limma_ instead of _edgeR_
+## Using _limma_ instead of _edgeR_ to identify markers
 
 Much like in detecting HVGs, applying _limma_ on the log-transformed counts seems to do better than using _edgeR_ on the raw counts.
 This is because _edgeR_'s dispersion estimates are bounded by the grid search and can't fully account for the variability. 
