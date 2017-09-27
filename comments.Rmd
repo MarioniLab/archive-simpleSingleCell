@@ -686,8 +686,7 @@ Stochastic zeroes due to low library sizes don't really distort the _expected_ c
 After normalization, the cells should just be scattered around the true mean expression profile in high-D space, regardless of how many stochastic zeroes are present.
 (But see my comments about the log-transformation in the factor analysis section.)
 However, zeroes may distort rank-based clustering, which is why you should filter for high-abundance genes before running `quickCluster`.
-This results in loss of resolution, but this is fine as the point of pre-clustering is to reduce DE genes rather than to resolve biological clusters.
-
+This discards some resolution of biological structure, which is tolerable as the point of pre-clustering is to reduce DE genes rather than to identify subpopulations.
 
 ```{r}
 means <- 1:100
@@ -701,9 +700,17 @@ truth <- rep(1:2, each=ncells)
 obs <- quickCluster(x, min.size=100)
 table(truth, obs) 
 
-# It gets better after some aggressive filtering on the mean.
-keep <- means > 90
-obs <- quickCluster(x[keep,], min.size=50)
+# Though this effect seems to be driven by differences in spread, rather than a shift in location.
+# A silhouette plot gives negative widths for the low-count cells.
+library(cluster)
+r <- quickCluster(x, get.ranks=TRUE)
+plot(silhouette(truth, dist(t(r))))
+
+# And indeed, this can be overridden by genuine structure.
+a[1:10,1:50] <- 2
+b[1:10,1:50] <- 200
+y <- cbind(a, b)
+obs <- quickCluster(y, min.size=100)
 table(truth, obs) 
 ```
 
