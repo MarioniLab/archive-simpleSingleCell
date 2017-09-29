@@ -243,6 +243,14 @@ Scaling of the technical components will eliminate the mean-variance relationshi
 This ensures that the distribution of variances of non-HVGs will be the same across abundances, but will distort the biological component for HVGs.
 A better and simpler approach is to enriched for biological signal by only using HVGs in clustering, dimensionality reduction, etc.
 
+## Pre-clustering parameter choices
+
+We filter before we pre-cluster to ensure that we have the same set of genes being used in `quickCluster` and `computeSumFactors`.
+This ensures that we focus on separating cells by the DE genes (or lack thereof) in the set of genes to be used for normalization.
+There's no need to worry about DE genes in the low-abundance genes... because we've filtered them out already!
+Obviously, filtering out low-abundance genes will discard some reoslution of biological structure.
+This is tolerable as the point of pre-clustering is to reduce DE genes rather than to identify subpopulations.
+
 ## Dealing with dropouts 
 
 Differences in dropout rates between cells should not affect scaling normalization.
@@ -682,12 +690,17 @@ dropout <- rowSums(y==0)/ncol(y)
 plot(means, dropout, log="x")
 ```
 
+## Zeroes and clustering
+
 Stochastic zeroes due to low library sizes don't really distort the _expected_ clustering, as long as normalization is properly performed.
 After normalization, the cells should just be scattered around the true mean expression profile in high-D space, regardless of how many stochastic zeroes are present.
 (But see my comments about the log-transformation in the factor analysis section.)
-However, zeroes may distort rank-based clustering, which is why you should filter for high-abundance genes before running `quickCluster`.
-This discards some resolution of biological structure, which is tolerable as the point of pre-clustering is to reduce DE genes rather than to identify subpopulations.
 
+The real problem is that cells with low library sizes are more dispersed, which causes them to form their own (poorly separated) cluster.
+Presumably due to the fact that cells with large library sizes form a tight community, and everyone else just gets chucked into the "leftovers" cluster.
+I though zeroes might have also distorted rank-based clustering due to the presence of ties.
+However, breaking those ties doesn't seem to make a difference.
+ 
 ```{r}
 means <- 1:100
 ncells <- 100
@@ -695,26 +708,36 @@ a <- matrix(rpois(length(means)*ncells, means*0.01), ncol=ncells)
 b <- matrix(rpois(length(means)*ncells, means), ncol=ncells)
 x <- cbind(a, b)
 
-# Clustering on ranks separates by the library sizes, though the means are the same.
+# Clustering on normalized values forms one cluster containing only (but not all) small cells.
+norm.x <- t(t(x)/rep(c(1, 100), each=ncells))
+d <- dist(t(norm.x))
+library(dynamicTreeCut)
+obs <- cutreeDynamic(hclust(d), distM=as.matrix(d), minClusterSize=50)
 truth <- rep(1:2, each=ncells)
+table(truth, obs)
+
+# Clustering on ranks separates by the library sizes, though the means are the same.
+# This is not alleviated by tie breaking.
+library(scran)
 obs <- quickCluster(x, min.size=100)
 table(truth, obs) 
+obs <- quickCluster(x + runif(length(x), 0, 0.01), min.size=100)
+table(truth, obs)
 
-# Though this effect seems to be driven by differences in spread, rather than a shift in location.
+# This effect seems to be driven by differences in spread, rather than a shift in location.
 # A silhouette plot gives negative widths for the low-count cells.
 library(cluster)
 r <- quickCluster(x, get.ranks=TRUE)
 plot(silhouette(truth, dist(t(r))))
 
-# And indeed, this can be overridden by genuine structure.
+# If you have enough structure, we can override this effect.
 a[1:10,1:50] <- 2
 b[1:10,1:50] <- 200
 y <- cbind(a, b)
 obs <- quickCluster(y, min.size=100)
 table(truth, obs) 
 ```
-
-
+ 
 ## Looking for differential distributions
 
 The logical conclusion of the ZI reasoning would be to look for differential distributions, e.g., via MW tests.
