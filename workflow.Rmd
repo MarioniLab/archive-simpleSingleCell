@@ -1588,7 +1588,7 @@ gc()
 
 ## Extracting annotation from Ensembl identifiers
 
-```{r, echo=FALSE, results="hide"}
+```{r, eval=!on.bioc, echo=FALSE, results="hide"}
 # Cleaning out DLLs, with some protection to get it to work.
 repeat {
     present <- setdiff(loadedNamespaces(), 
@@ -1604,6 +1604,8 @@ repeat {
     if (discarded==0) break
 }
 library(R.utils)
+library(org.Mm.eg.db)
+library(BiocStyle)
 gcDLLs()
 ```
 
