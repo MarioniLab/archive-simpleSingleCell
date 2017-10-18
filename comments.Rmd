@@ -792,6 +792,21 @@ The effect of the log-transformation will differ between cells with low versus h
 FA should avoid this as the counts can be modelled directly, eliminating the need for log-transformation to stabilize the variances prior to dimensionality reduction.
 In practice, this doesn't really seem to matter - if the mean log-values differ with respect to the size factor, it implies that the variance at one size factor is much larger.
 This will prevent us from resolving a misleading shift in population centers that is solely driven by the log-transformation.
+Indeed, there doesn't seem to be a strong shift even with highly disparate size factors:
+
+```{r}
+# Using a large variance where there is more likely to be a difference.
+a <- rnbinom(10000, mu=100, size=0.1)
+b <- rnbinom(10000, mu=10, size=0.1)
+mean(log2(a/sqrt(10)+1))
+mean(log2(b*sqrt(10)+1))
+
+# Not a large difference, even at 100-fold difference in coverage.
+a <- rnbinom(10000, mu=100, size=0.1)
+b <- rnbinom(10000, mu=1, size=0.1)
+mean(log2(a/10+1))
+mean(log2(b*10+1))
+```
 
 ## Do we need imputation?
 
