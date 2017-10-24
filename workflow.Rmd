@@ -376,7 +376,7 @@ This is closely related to the average count for most genes, as expression in ma
 Genes expressed in very few cells are often uninteresting as they are driven by amplification artifacts (though they may also also arise from rare populations).
 We could then remove genes that are expressed in fewer than _n_ cells.
 
-```{r nexprshisthsc, fig.cap="Histogram of the number of cells expressing each gene in the HSC data set."}
+```{r nexprshisthsc, fig.cap="The number of cells expressing each gene in the HSC data set, plotted against the log-average count. Intensity of colour corresponds to the number of genes at any given location."}
 num.cells <- nexprs(sce, byrow=TRUE)
 smoothScatter(log10(ave.counts), num.cells, ylab="Number of cells", 
     xlab=expression(Log[10]~"average count"))
