@@ -1537,8 +1537,7 @@ fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=
 ```
 
 ```{r phaseplotth2, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the T~H~2 dataset, where each point represents a cell."}
-anno <- select(org.Mm.eg.db, keys=rownames(sce), keytype="SYMBOL", column="ENSEMBL")
-ensembl <- anno$ENSEMBL[match(rownames(sce), anno$SYMBOL)]
+ensembl <- mapIds(org.Mm.eg.db, keys=rownames(sce), keytype="SYMBOL", column="ENSEMBL")
 set.seed(100)
 assignments <- cyclone(sce, mm.pairs, gene.names=ensembl, assay.type="logcounts")
 plot(assignments$score$G1, assignments$score$G2M, xlab="G1 score", ylab="G2/M score", pch=16)
@@ -1581,10 +1580,9 @@ This is an ideal use case for diffusion maps which perform dimensionality reduct
 In Figure \@ref(fig:diffusionth2), cells are arranged along a trajectory in the low-dimensional space.
 The first diffusion component is likely to correspond to T~H~2 differentiation, given that a key regulator _Gata3_ [@zhu2006gata3] changes in expression from left to right.
 
-```{r diffusionth2, fig.cap="A diffusion map for the T~H~2 dataset, where each cell is coloured by its expression of _Gata3_."}
-sce.block <- denoisePCA(sce, technical=fit.block$trend, design=design, 
-    min.rank=10) # avoid odd-looking plot due to too few PCs.
-plotDiffusionMap(sce.block, use_dimred="PCA", colour_by="Gata3") + fontsize
+```{r diffusionth2, fig.cap="A diffusion map for the T~H~2 dataset, where each cell is coloured by its expression of _Gata3_. A larger `sigma` is used compared to the default value to obtain a smoother plot."}
+plotDiffusionMap(sce.block, use_dimred="PCA", sigma=25,
+    colour_by="Gata3") + fontsize
 ```
 
 ```{r, echo=FALSE, results='hide'}
