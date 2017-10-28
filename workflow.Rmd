@@ -1046,7 +1046,7 @@ plotExplanatoryVariables(sce, variables=c("log10_total_counts_Spike",
 Nonetheless, we demonstrate how to account for uninteresting technical factors by using sex as an example.
 We set up a design matrix with the sex of the animal as the explanatory factor for each cell.
 This ensures that any sex-specific changes in expression will be modelled in our downstream analyses.
-We do not block on the tissue of origin, despite the fact that it explains more of the variance than sex in Figure \@ref(explvarplotbrain).
+We do not block on the tissue of origin, despite the fact that it explains more of the variance than sex in Figure \@ref(fig:explvarplotbrain).
 This is because the tissue factor is likely to be associated with genuine differences between cell types, so including it in the model might regress out interesting biological effects.
 
 ```{r}
@@ -1528,7 +1528,7 @@ sce <- SingleCellExperiment(list(logcounts=t(incoming)))
 ```
 
 We empirically identify the cell cycle phase using the pair-based classifier in `cyclone`.
-The majority of cells in Figure \@ref(phaseplotth2) seem to lie in G1 phase, with small numbers of cells in the other phases.
+The majority of cells in Figure \@ref(fig:phaseplotth2) seem to lie in G1 phase, with small numbers of cells in the other phases.
 
 ```{r, echo=FALSE, results='hide', message=FALSE}
 mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", package="scran"))
@@ -1556,7 +1556,7 @@ fit.block <- trendVar(sce, design=design, parametric=TRUE, use.spikes=NA)
 sce.block <- denoisePCA(sce, technical=fit.block$trend, design=design) 
 ```
 
-The result of blocking on `design` is visualized with some PCA plots in Figure \@ref(pcaplotth2).
+The result of blocking on `design` is visualized with some PCA plots in Figure \@ref(fig:pcaplotth2).
 Before removal, the distribution of cells along the first two principal components is strongly associated with their G1 and G2/M scores.
 This is no longer the case after removal, which suggests that the cell cycle effect has been mitigated.
 
@@ -1578,7 +1578,7 @@ multiplot(out, out2, cols=2)
 
 As an aside, this dataset contains cells at various stages of differentiation [@mahata2014singlecell].
 This is an ideal use case for diffusion maps which perform dimensionality reduction along a continuous process.
-In Figure \@ref(diffusionth2), cells are arranged along a trajectory in the low-dimensional space.
+In Figure \@ref(fig:diffusionth2), cells are arranged along a trajectory in the low-dimensional space.
 The first diffusion component is likely to correspond to T~H~2 differentiation, given that a key regulator _Gata3_ [@zhu2006gata3] changes in expression from left to right.
 
 ```{r diffusionth2, fig.cap="A diffusion map for the T~H~2 dataset, where each cell is coloured by its expression of _Gata3_."}
