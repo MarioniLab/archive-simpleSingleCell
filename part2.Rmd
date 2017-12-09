@@ -467,7 +467,7 @@ rm(tsne1, tsne2, pca1, pca2)
 gc()
 ```
 
-## Clustering cells into putative subpopulations
+# Clustering cells into putative subpopulations
 
 The denoised log-expression values are used to cluster cells into putative subpopulations.
 Specifically, we perform hierarchical clustering on the Euclidean distances between cells, using Ward's criterion to minimize the total variance within each cluster.
@@ -495,8 +495,7 @@ Adjacent cells are generally assigned to the same cluster, indicating that the c
 
 ```{r tsneclusterbrain, message=FALSE, fig.cap="_t_-SNE plot of the denoised PCs of the brain data set. Each point represents a cell and is coloured according to the cluster identity to which it was assigned."}
 sce$cluster <- factor(my.clusters)
-plotTSNE(sce, use_dimred="PCA", colour_by="cluster",
-    perplexity=10, rand_seed=100) + fontsize
+plotTSNE(sce, colour_by="cluster") + fontsize
 ```
 
 We check the separatedness of the clusters using the silhouette width (Figure ((silhouettebrain))).
@@ -590,6 +589,7 @@ Thus, cells from the subpopulation of interest can be identified as those that e
 top.markers <- marker.set$Gene[marker.set$Top <= 10]
 top.exprs <- norm_exprs(sce)[top.markers,,drop=FALSE]
 heat.vals <- top.exprs - rowMeans(top.exprs)
+library(pheatmap)
 pheatmap(heat.vals, cluster_cols=my.tree,
     annotation_col=data.frame(Cluster=factor(my.clusters), row.names=colnames(sce)),
     annotation_colors=list(Cluster=setNames(clust.col, seq_along(unique(my.clusters)))))
