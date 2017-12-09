@@ -220,7 +220,7 @@ data.frame(ByLibSize=sum(libsize.drop), ByFeature=sum(feature.drop),
 We remove genes that are not expressed in any cell to reduce computational work in downstream steps. 
 
 ```{r}
-to.keep <- num.cells > 0
+to.keep <- nexprs(sce, byrow=TRUE) > 0
 sce <- sce[to.keep,]
 summary(to.keep)
 ```
@@ -265,6 +265,7 @@ We check the distribution of expression values for the genes with the largest bi
 This ensures that the variance estimate is not driven by one or two outlier cells (Figure \@ref(fig:hvgvioplothsc)).
 
 ```{r hvgvioplothsc, fig.cap="Violin plots of normalized log-expression values for the top 10 genes with the largest biological components in the HSC dataset. Each point represents the log-expression value in a single cell."}
+fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
 plotExpression(sce, features=rownames(hvg.out)[1:10]) + fontsize
 ```
 
@@ -340,14 +341,14 @@ We empirically identify the cell cycle phase using the pair-based classifier in 
 The majority of cells in Figure \@ref(fig:phaseplotth2) seem to lie in G1 phase, with small numbers of cells in the other phases.
 
 ```{r, echo=FALSE, results='hide', message=FALSE}
-mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", package="scran"))
-library(org.Mm.eg.db)
-fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
 ```
 
 ```{r phaseplotth2, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the T~H~2 dataset, where each point represents a cell."}
+library(org.Mm.eg.db)
 ensembl <- mapIds(org.Mm.eg.db, keys=rownames(sce), keytype="SYMBOL", column="ENSEMBL")
+
 set.seed(100)
+mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", package="scran"))
 assignments <- cyclone(sce, mm.pairs, gene.names=ensembl, assay.type="logcounts")
 plot(assignments$score$G1, assignments$score$G2M, xlab="G1 score", ylab="G2/M score", pch=16)
 ```
