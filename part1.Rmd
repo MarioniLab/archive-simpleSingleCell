@@ -227,7 +227,7 @@ sce <- calculateQCMetrics(sce, feature_controls=list(ERCC=isSpike(sce),
 head(colnames(colData(sce)), 10)
 ```
 
-The distributions of these metrics are shown in Figure \@ref(fig:qcplothsc).
+The distributions of these metrics are shown in Figure \@ref(fig:qcplot416b).
 The aim is to remove putative low-quality cells that have low library sizes, low numbers of expressed features, and high spike-in (or mitochondrial) proportions.
 
 ```{r qcplot416b, fig.wide=TRUE, fig.cap="Histograms of various QC metrics for all cells in the 416B data set. This includes the library sizes, number of expressed genes, and proportion of reads mapped to spike-in transcripts or mitochondrial genes."}
@@ -258,7 +258,7 @@ plot(sce$total_features, sce$pct_counts_Mt, xlab="Number of expressed genes",
 
 ## Removing low-quality cells based on outliers
 
-### Without blocking on known conditions
+### Identifying outliers for each metric 
 
 Picking a threshold for these metrics is not straightforward as their absolute values depend on the experimental protocol.
 For example, sequencing to greater depth will lead to more reads and more expressed features, regardless of the quality of the cells.
@@ -322,7 +322,7 @@ multiplot(
     cols=2)
 ```
 
-### After blocking on known conditions
+### Blocking on known conditions
 
 Systematic differences in the QC metrics can be handled to some extent using the `batch` argument in the `isOutlier` function.
 Setting `batch` to the plate of origin will identify outliers within each level of `batch`, using plate-specific median and MAD estimates.
@@ -331,12 +331,12 @@ We can also include known biological factors in `batch`, if those factors could 
 
 ```{r}
 blocking <- paste0(sce$Batch, sce$Phenotype)
-libsize.drop <- isOutlier(sce$total_counts, nmads=3, type="lower", log=TRUE, batch=blocking)
-feature.drop <- isOutlier(sce$total_features, nmads=3, type="lower", log=TRUE, batch=blocking)
-spike.drop <- isOutlier(sce$pct_counts_ERCC, nmads=3, type="higher", batch=blocking)
-keep <- !(libsize.drop | feature.drop | spike.drop)
-data.frame(ByLibSize=sum(libsize.drop), ByFeature=sum(feature.drop),
-    BySpike=sum(spike.drop), Remaining=sum(keep))
+libsize.drop2 <- isOutlier(sce$total_counts, nmads=3, type="lower", log=TRUE, batch=blocking)
+feature.drop2 <- isOutlier(sce$total_features, nmads=3, type="lower", log=TRUE, batch=blocking)
+spike.drop2 <- isOutlier(sce$pct_counts_ERCC, nmads=3, type="higher", batch=blocking)
+keep2 <- !(libsize.drop2 | feature.drop2 | spike.drop2)
+data.frame(ByLibSize=sum(libsize.drop2), ByFeature=sum(feature.drop2),
+    BySpike=sum(spike.drop2), Remaining=sum(keep2))
 ```
 
 The use of this blocking approach in `isOutlier` results in a small increase in the number of discarded cells.
@@ -344,7 +344,7 @@ This is expected given that the variability within each level of `batch` is lowe
 We then subset the `SingleCellExperiment` object to retain only the putative high-quality cells.
 
 ```{r}
-sce <- sce[,keep]
+sce <- sce[,keep2]
 dim(sce)
 ```
 
@@ -379,7 +379,7 @@ We use the prediction method described by @scialdone2015computational to classif
 Using a training dataset, the sign of the difference in expression between two genes was computed for each pair of genes.
 Pairs with changes in the sign across cell cycle phases were chosen as markers.
 Cells in a test dataset can then be classified into the appropriate phase, based on whether the observed sign for each marker pair is consistent with one phase or another.
-This approach is implemented in the `cyclone` function using a pre-trained set of marker pairs for mouse data.
+This approach is implemented in the `cyclone` function from the `r Biocpkg("scran")` package, using a pre-trained set of marker pairs for mouse data.
 
 ```{r}
 set.seed(100)
@@ -388,11 +388,11 @@ mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", package="sc
 assignments <- cyclone(sce, mm.pairs, gene.names=rowData(sce)$ENSEMBL)
 ```
 
-The `cyclone` result for each cell in the HSC dataset is shown in Figure \@ref(fig:phaseplothsc).
+The `cyclone` result for each cell in the HSC dataset is shown in Figure \@ref(fig:phaseplot416b).
 Each cell is assigned a score for each phase, with a higher score corresponding to a higher probability that the cell is in that phase.
 We focus on the G1 and G2/M scores as these are the most informative for classification.
 
-```{r phaseplothsc, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the HSC dataset, where each point represents a cell."}
+```{r phaseplot416b, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the 416B dataset. Each point represents a cell, plotted according to its scores for G1 and G2/M phases."}
 plot(assignments$score$G1, assignments$score$G2M, 
      xlab="G1 score", ylab="G2/M score", pch=16)
 ```
@@ -429,12 +429,12 @@ Its lack of expression relative to other genes will still yield informative pair
 
 ## Inspecting the most highly expressed genes
 
-We also look at the identities of the most highly expressed genes (Figure \@ref(fig:topgenehsc)).
+We also look at the identities of the most highly expressed genes (Figure \@ref(fig:topgene416b)).
 This should generally be dominated by constitutively expressed transcripts, such as those for ribosomal or mitochondrial proteins.
 The presence of other classes of features may be cause for concern if they are not consistent with expected biology.
 For example, a top set containing many spike-in transcripts suggests that too much spike-in RNA was added during library preparation, while the absence of ribosomal proteins and/or the presence of their pseudogenes are indicative of suboptimal alignment.
 
-```{r topgenehsc, fig.asp=1.5, fig.wide=TRUE, fig.cap="Percentage of total counts assigned to the top 50 most highly-abundant features in the HSC dataset. For each feature, each bar represents the percentage assigned to that feature for a single cell, while the circle represents the average across all cells. Bars are coloured by the total number of expressed features in each cell, while circles are coloured according to whether the feature is labelled as a control feature."}
+```{r topgene416b, fig.asp=1.5, fig.wide=TRUE, fig.cap="Percentage of total counts assigned to the top 50 most highly-abundant features in the 416B dataset. For each feature, each bar represents the percentage assigned to that feature for a single cell, while the circle represents the average across all cells. Bars are coloured by the total number of expressed features in each cell, while circles are coloured according to whether the feature is labelled as a control feature."}
 plotQC(sce, type = "highest-expression", n=50) + fontsize
 ```
 
@@ -453,9 +453,9 @@ Thus, we (or the relevant function) will filter at each step as needed, rather t
 Several metrics can be used to define low-abundance genes.
 The most obvious is the average count for each gene, computed across all cells in the data set.
 We calculate this using the `calcAverage` function, which also performs some adjustment for library size differences between cells 
-We typically observe a peak of moderately expressed genes following a plateau of lowly expressed genes (Figure \@ref(fig:abhisthsc)).
+We typically observe a peak of moderately expressed genes following a plateau of lowly expressed genes (Figure \@ref(fig:abhist416b)).
 
-```{r abhisthsc, fig.cap="Histogram of log-average counts for all genes in the HSC dataset."}
+```{r abhist416b, fig.cap="Histogram of log-average counts for all genes in the 416B dataset."}
 ave.counts <- calcAverage(sce)
 hist(log10(ave.counts), breaks=100, main="", col="grey80", 
     xlab=expression(Log[10]~"average count"))
@@ -472,17 +472,17 @@ summary(demo.keep)
 ```
 
 We also examine the number of cells that express each gene.
-This is closely related to the average count for most genes, as expression in many cells will result in a higher average (Figure \@ref(fig:nexprshisthsc)).
+This is closely related to the average count for most genes, as expression in many cells will result in a higher average (Figure \@ref(fig:nexprshist416b)).
 Genes expressed in very few cells are often uninteresting as they are driven by amplification artifacts (though they may also also arise from rare populations).
 We could then remove genes that are expressed in fewer than _n_ cells.
 
-```{r nexprshisthsc, fig.cap="The number of cells expressing each gene in the HSC data set, plotted against the log-average count. Intensity of colour corresponds to the number of genes at any given location."}
+```{r nexprshist416b, fig.cap="The number of cells expressing each gene in the 416B data set, plotted against the log-average count. Intensity of colour corresponds to the number of genes at any given location."}
 num.cells <- nexprs(sce, byrow=TRUE)
 smoothScatter(log10(ave.counts), num.cells, ylab="Number of cells", 
     xlab=expression(Log[10]~"average count"))
 ```
 
-As mentioned above, these filters will be applied at each step (automatically, in most cases, within the relevant function).
+As mentioned above, these filters will be applied at each step (automatically, in most cases, within the relevant function) rather than applied globally by subsetting `sce`.
 This ensures that the most appropriate filter is used in each application.
 Nonetheless, we remove genes that are not expressed in any cell to reduce computational work in downstream steps. 
 Such genes provide no information and would be removed by any filtering strategy.
@@ -508,19 +508,23 @@ However, single-cell data can be problematic for these bulk data-based methods d
 To overcome this, we pool counts from many cells to increase the count size for accurate size factor estimation [@lun2016pooling].
 Pool-based size factors are then "deconvolved" into cell-based factors for cell-specific normalization.
 
-```{r, warning=FALSE}
+```{r}
 sce <- computeSumFactors(sce)
 summary(sizeFactors(sce))
 ```
 
-In this case, the size factors are tightly correlated with the library sizes for all cells (Figure \@ref(fig:normplothsc)).
-This suggests that the systematic differences between cells are primarily driven by differences in capture efficiency or sequencing depth.
+The size factors are well-correlated with the library sizes for all cells (Figure \@ref(fig:normplothsc)).
+This suggests that most of the systematic differences between cells are driven by differences in capture efficiency or sequencing depth.
 Any DE between cells would yield a non-linear trend between the total count and size factor, and/or increased scatter around the trend.
-This does not occur here as strong DE is unlikely to exist within a homogeneous population of cells.
+We observe some evidence of this after oncogene induction, where the size factors after induction are systematically lower.
+This is consistent with composition biases introduced by upregulation of genes after induction.
 
-```{r normplothsc, fig.cap="Size factors from deconvolution, plotted against library sizes for all cells in the HSC dataset. Axes are shown on a log-scale."}
-plot(sizeFactors(sce), sce$total_counts/1e6, log="xy",
-    ylab="Library size (millions)", xlab="Size factor")
+```{r normplot416b, fig.cap="Size factors from deconvolution, plotted against library sizes for all cells in the 416B dataset. Axes are shown on a log-scale. Wild-type cells are shown in black and oncogene-induced cells are shown in red."}
+plot(sce$total_counts/1e6, sizeFactors(sce), log="xy",
+    xlab="Library size (millions)", ylab="Size factor",
+    col=c("red", "black")[sce$Phenotype], pch=16)
+legend("bottomright", col=c("red", "black"), pch=16, cex=1.2,
+    legend=levels(sce$Phenotype))
 ```
 
 __Comments from Aaron:__
@@ -586,30 +590,6 @@ The computed values are stored as an `"logcounts"` matrix in addition to the oth
 gc()
 ```
 
-# Checking for confounding technical factors 
-
-We check whether there are technical factors that contribute substantially to the heterogeneity of gene expression.
-If so, the factor may need to be regressed out to ensure that it does not inflate the variances or introduce spurious correlations.
-For this dataset, the simple experimental design means that there are no plate or batch effects to examine.
-Instead, we use the (log-transformed) total count for the spike-in transcripts as a proxy for the technical bias in each sample.
-This is based on the fact that the same amount of spike-in RNA should have been added to each cell.
-Thus, any association of gene expression with this factor is not biologically interesting and should be removed.
-
-For each gene, we calculate the percentage of the variance of the expression values that is explained by the spike-in totals (Figure \@ref(fig:explvarplothsc)).
-The percentages are generally small (1-3%), indicating that the expression profiles of most genes are not strongly associated with this factor.
-This result is consistent with successful removal of cell-specific biases by scaling normalization.
-Thus, the spike-in total does not need to be explicitly modelled in our downstream analyses.
-
-```{r explvarplothsc, fig.cap="Density plot of the percentage of variance explained by the (log-transformed) total spike-in counts across all genes in the HSC dataset. For each gene, the percentage of the variance of the normalized log-expression values across cells that is explained by each factor is calculated. Each curve corresponds to one factor and represents the distribution of percentages across all genes."}
-plotExplanatoryVariables(sce, variables=c("total_counts_ERCC", 
-    "log10_total_counts_ERCC")) + fontsize
-```
-
-Note that the use of the spike-in total as an accurate proxy for the relative technical bias assumes that no library quantification was performed.
-Otherwise, the coverage of the spike-in transcripts would be dependent on the total amount of endogenous RNA in each cell.
-(Specifically, if the same amount of cDNA is used for sequencing per cell, any increase in the amount of endogenous RNA will suppress the coverage of the spike-in transcripts.)
-This means that the spike-in totals could be confounded with genuine biological effects associated with changes in RNA content.
-
 # Modelling the technical noise in gene expression
 
 ## Fitting a trend to the spike-in variances
@@ -644,6 +624,10 @@ curve(var.fit$trend(x), col="dodgerblue", lwd=2, add=TRUE)
 cur.spike <- isSpike(sce)
 points(var.out$mean[cur.spike], var.out$total[cur.spike], col="red", pch=16)
 ```
+
+
+
+
 
 We check the distribution of expression values for the genes with the largest biological components.
 This ensures that the variance estimate is not driven by one or two outlier cells (Figure \@ref(fig:hvgvioplothsc)).
