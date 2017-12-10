@@ -293,6 +293,10 @@ data.frame(ByLibSize=sum(libsize.drop), ByFeature=sum(feature.drop),
     BySpike=sum(spike.drop), Remaining=sum(keep))
 ```
 
+At this point, we could apply `keep` to subset `sce` to only retain high-quality cells.
+However, the above approach ignores prior information about the cells, which can be incorporated to improve the filtering procedure.
+We describe why this is important and how it can be achieved in the following sections.
+
 ### Assumptions of outlier identification 
 
 We have already mentioned the assumption that most cells are of high quality.
@@ -545,7 +549,7 @@ We also recommend that the total number of cells should be at least 100 for effe
 This can be done with the `quickCluster` function and the results passed to `computeSumFactors` via the `cluster` argument.
 Cells in each cluster are normalized separately, and the size factors are rescaled to be comparable across clusters.
 This avoids the need to assume that most genes are non-DE across the entire population - only a non-DE majority is required between pairs of clusters.
-We demonstrate this approach later with a larger data set.
+We demonstrate this approach later with a larger dataset, as there are not enough cells in the 416B dataset.
 
 ## Computing separate size factors for spike-in transcripts
 
@@ -624,9 +628,6 @@ curve(var.fit$trend(x), col="dodgerblue", lwd=2, add=TRUE)
 cur.spike <- isSpike(sce)
 points(var.out$mean[cur.spike], var.out$total[cur.spike], col="red", pch=16)
 ```
-
-
-
 
 
 We check the distribution of expression values for the genes with the largest biological components.
