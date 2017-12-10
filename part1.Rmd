@@ -224,15 +224,15 @@ These are stored in the row- and column-wise metadata of the `SingleCellExperime
 library(scater)
 sce <- calculateQCMetrics(sce, feature_controls=list(ERCC=isSpike(sce),
     Mt=which(rowData(sce)$CHR=="chrM")))
-head(colnames(colData(sce)))
+head(colnames(colData(sce)), 10)
 ```
 
 The distributions of these metrics are shown in Figure \@ref(fig:qcplothsc).
 The aim is to remove putative low-quality cells that have low library sizes, low numbers of expressed features, and high spike-in (or mitochondrial) proportions.
 
-```{r qcplothsc, fig.wide=TRUE, fig.cap="Histograms of various QC metrics for all cells in the HSC data set. This includes the library sizes, number of expressed genes, and proportion of reads mapped to spike-in transcripts or mitochondrial genes."}
+```{r qcplot416b, fig.wide=TRUE, fig.cap="Histograms of various QC metrics for all cells in the 416B data set. This includes the library sizes, number of expressed genes, and proportion of reads mapped to spike-in transcripts or mitochondrial genes."}
 par(mfrow=c(2,2), mar=c(5.1, 4.1, 0.1, 0.1))
-hist(sce$total_counts/1e6, xlab="Library sizes (millions)", main="", 
+hist(sce$total_counts/1e6, xlab="Library size (millions)", main="", 
     breaks=20, col="grey80", ylab="Number of cells")
 hist(sce$total_features, xlab="Number of expressed genes", main="", 
     breaks=20, col="grey80", ylab="Number of cells")
@@ -242,7 +242,23 @@ hist(sce$pct_counts_Mt, xlab="Mitochondrial proportion (%)",
     ylab="Number of cells", breaks=20, main="", col="grey80")
 ```
 
+It is also valuable to examine how the QC metrics behave with respect to each other (Figure \@ref(fig:qcbiplot416b)).
+Generally, they will be in rough agreement, i.e., cells with low total counts will also have low numbers of expressed features and high ERCC/mitochondrial proportions.
+Clear discrepancies may correspond to technical differences between batches of cells (see below) or genuine biological differences in RNA content.
+
+```{r qcbiplot416b, fig.wide=TRUE, fig.asp=0.5, fig.cap="Behaviour of each QC metric compared to the total number of expressed features. Each point represents a cell in the 416B dataset."}
+par(mfrow=c(1,3))
+plot(sce$total_features, sce$total_counts/1e6, xlab="Number of expressed genes",
+    ylab="Library size (millions)")
+plot(sce$total_features, sce$pct_counts_ERCC, xlab="Number of expressed genes",
+    ylab="ERCC proportion (%)")
+plot(sce$total_features, sce$pct_counts_Mt, xlab="Number of expressed genes",
+    ylab="Mitochondrial proportion (%)")
+```
+
 ## Removing low-quality cells based on outliers
+
+### Without blocking on known conditions
 
 Picking a threshold for these metrics is not straightforward as their absolute values depend on the experimental protocol.
 For example, sequencing to greater depth will lead to more reads and more expressed features, regardless of the quality of the cells.
@@ -272,30 +288,65 @@ We examine the number of cells removed by each filter as well as the total numbe
 Removal of a substantial proportion of cells (> 10%) may be indicative of an overall issue with data quality.
 
 ```{r}
-sce <- sce[,!(libsize.drop | feature.drop | spike.drop)]
+keep <- !(libsize.drop | feature.drop | spike.drop)
 data.frame(ByLibSize=sum(libsize.drop), ByFeature=sum(feature.drop),
-    BySpike=sum(spike.drop), Remaining=ncol(sce))
+    BySpike=sum(spike.drop), Remaining=sum(keep))
 ```
 
-## Assumptions of outlier identification 
+### Assumptions of outlier identification 
 
 We have already mentioned the assumption that most cells are of high quality.
 This is usually reasonable, and can be experimentally supported in some situations by visually checking that the cells are intact (e.g., on the microwell plate or in the microfluidics system).
 Another assumption is that the QC metrics are independent on the biological state of each cell.
-This ensures that the outlier values for these metrics are driven by technical factors rather than biological processes.
+This ensures that any outlier values for these metrics are driven by technical factors rather than biological processes.
 Thus, removing cells based on the metrics will not misrepresent the biology in downstream analyses.
 
 The second assumption is most likely to be violated in highly heterogeneous cell populations.
 For example, some cell types may naturally have less RNA or express fewer genes than other cell types.
 Such cell types are more likely to be considered outliers and removed, even if they are of high quality.
 The use of the MAD mitigates this problem by accounting for biological variability in the QC metrics.
-A heterogeneous population should have higher variability in the metrics amongst high-quality cells, increasing the MAD and reducing the chance of incorrectly removing particular cell types.
-Nonetheless, our cell-filtering procedure may not be appropriate in extreme cases where one cell type is very different from the others.
+A heterogeneous population should have higher variability in the metrics among high-quality cells, increasing the MAD and reducing the chance of incorrectly removing particular cell types (at the cost of reducing power to remove low-quality cells).
+Nonetheless, filtering based on outliers may not be appropriate in extreme cases where one cell type is very different from the others.
+
+We can explore the effect of known biological factors on the QC metrics using the `plotPhenoData` function.
+Figure \@ref(qcplotbatch416b) demonstrates that induction of the CBFB-MYH11 oncogene results in some modest changes to the QC metric distributions.
+This suggests that we could improve our QC step by considering the condition of the cell during outlier identification. 
+Analyzing all conditions together would unnecessarily inflate the MAD and compromise the removal of low-quality cells. 
+
+```{r qcplotbatch416b, fig.wide=TRUE, fig.cap="Distribution of each QC metric for wild-type (WT) and oncogene-induced cells in the 416B data set."}
+multiplot(
+    plotPhenoData(sce, aes_string(y="total_counts", x="Phenotype")),
+    plotPhenoData(sce, aes_string(y="total_features", x="Phenotype")),
+    plotPhenoData(sce, aes_string(y="pct_counts_ERCC", x="Phenotype")),
+    plotPhenoData(sce, aes_string(y="pct_counts_Mt", x="Phenotype")),
+    cols=2)
+```
+
+### After blocking on known conditions
 
 Systematic differences in the QC metrics can be handled to some extent using the `batch` argument in the `isOutlier` function.
+Setting `batch` to the plate of origin will identify outliers within each level of `batch`, using plate-specific median and MAD estimates.
 This is obviously useful for batch effects caused by known differences in experimental processing, e.g., sequencing at different depth or had different amounts of spike-in added.
-It may also be useful if an _a priori_ cell type has systematically fewer expressed genes or lower RNA content.
-Analyzing all cell types together would unnecessarily inflate the MAD and compromise the removal of low-quality cells, at best; or lead to the entire loss of one cell type, at worst.
+We can also include known biological factors in `batch`, if those factors could result in systematically fewer expressed genes or lower RNA content.
+
+```{r}
+blocking <- paste0(sce$Batch, sce$Phenotype)
+libsize.drop <- isOutlier(sce$total_counts, nmads=3, type="lower", log=TRUE, batch=blocking)
+feature.drop <- isOutlier(sce$total_features, nmads=3, type="lower", log=TRUE, batch=blocking)
+spike.drop <- isOutlier(sce$pct_counts_ERCC, nmads=3, type="higher", batch=blocking)
+keep <- !(libsize.drop | feature.drop | spike.drop)
+data.frame(ByLibSize=sum(libsize.drop), ByFeature=sum(feature.drop),
+    BySpike=sum(spike.drop), Remaining=sum(keep))
+```
+
+The use of this blocking approach in `isOutlier` results in a small increase in the number of discarded cells.
+This is expected given that the variability within each level of `batch` is lower, resulting in more power to detect outliers.
+We then subset the `SingleCellExperiment` object to retain only the putative high-quality cells.
+
+```{r}
+sce <- sce[,keep]
+dim(sce)
+```
 
 ## Alternative approaches to quality control
 
@@ -308,7 +359,7 @@ Another strategy is to perform a principal components analysis (PCA) based on th
 Outliers on a PCA plot may be indicative of low-quality cells that have aberrant technical properties compared to the (presumed) majority of high-quality cells.
 In Figure \@ref(fig:pcaqualplothsc), no obvious outliers are present, which is consistent with the removal of suspect cells in the preceding quality control steps.
 
-```{r pcaqualplothsc, fig.cap="PCA plot for cells in the HSC dataset, constructed using quality metrics. The first and second components are shown on each axis, along with the percentage of total variance explained by each component. Bars represent the coordinates of the cells on each axis."}
+```{r pcaqualplot416b, fig.cap="PCA plot for cells in the 416Bdataset, constructed using quality metrics. The first and second components are shown on each axis, along with the percentage of total variance explained by each component. Bars represent the coordinates of the cells on each axis."}
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
 plotPCA(sce, pca_data_input="pdata") + fontsize
 ```
