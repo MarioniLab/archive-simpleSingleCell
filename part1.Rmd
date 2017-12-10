@@ -668,7 +668,8 @@ This is done using the `use.spikes=FALSE` setting in `trendVar`, as shown below.
 The resulting trend is higher than most of the spike-in variances (Figure \@ref(fig:hvgplot416b2)), consistent with the presence of non-zero biological variation for most genes.
 
 ```{r hvgplot416b2, fig.cap="Variance of normalized log-expression values for each gene in the 416B dataset, plotted against the mean log-expression. The blue line represents the mean-dependent trend fitted to the variances of the endogenous genes (black), with spike-in transcripts shown in red."}
-var.fit.nospike <- trendVar(sce, parametric=TRUE, use.spikes=FALSE, span=0.2)
+var.fit.nospike <- trendVar(sce, parametric=TRUE, design=design,
+    use.spikes=FALSE, span=0.2)
 var.out.nospike <- decomposeVar(sce, var.fit.nospike)
 plot(var.out.nospike$mean, var.out.nospike$total, pch=16, cex=0.6, 
     xlab="Mean log-expression", ylab="Variance of log-expression")
@@ -695,7 +696,7 @@ In contrast, random technical noise affects each gene independently and will be 
 The `denoisePCA` function removes later PCs until the total discarded variance is equal to the sum of technical components for all genes used in the PCA.
 
 ```{r}
-sce <- denoisePCA(sce, technical=var.fit$trend) 
+sce <- denoisePCA(sce, technical=var.fit$trend, design=design) 
 dim(reducedDim(sce, "PCA")) 
 ```
 
@@ -713,7 +714,7 @@ Discreteness is less of an issue as low-abundance genes also have lower variance
 This is useful for denoising prior to downstream procedures that require gene-wise expression values.
 
 ```{r}
-sce2 <- denoisePCA(sce, technical=var.fit$trend, value="lowrank") 
+sce2 <- denoisePCA(sce, technical=var.fit$trend, design=design, value="lowrank") 
 assayNames(sce2)
 ```
 
@@ -726,11 +727,10 @@ gc()
 
 We visualize the relationships between cells by constructing pairwise PCA plots for the first three components (Figure \@ref(fig:pcaplothsc)).
 Cells with similar expression profiles should be located close together in the plot, while dissimilar cells should be far apart.
-In this case, no clear separation of cells into distinct subpopulations is observed.
-This is consistent with the presence of a highly homogeneous population of 416Bs [@wilson2015combined].
+In this case, we observe a clear separation of cells based on the oncogene induction status, consistent with the expected effects on the transcriptome.
 
-```{r pcaplot416b, fig.cap="Pairwise PCA plots of the first three PCs in the 416B data set, constructed from normalized log-expression values of genes with positive biological components. Each point represents a cell, coloured according to its total number of expressed features. Bars represent the coordinates of the cells on each axis.", fig.width=9}
-plotReducedDim(sce, use_dimred="PCA", ncomponents=3, colour_by="total_features") + fontsize
+```{r pcaplot416b, fig.cap="Pairwise PCA plots of the first three PCs in the 416B data set, constructed from normalized log-expression values of genes with positive biological components. Each point represents a cell, coloured according to the oncogene induction status. Bars represent the coordinates of the cells on each axis.", fig.width=9}
+plotReducedDim(sce, use_dimred="PCA", ncomponents=3, colour_by="Phenotype") + fontsize
 ```
 
 Another widely used approach is the _t_-stochastic neighbour embedding (_t_-SNE) method [@van2008visualizing].
@@ -738,27 +738,19 @@ _t_-SNE tends to work better than PCA for separating cells in more diverse popul
 This is because the former can directly capture non-linear relationships in high-dimensional space, whereas the latter must represent them on linear axes.
 However, this improvement comes at the cost of more computational effort and requires the user to consider parameters such as the random seed and perplexity (see comments).
 We demonstrate the generation of _t_-SNE plots in Figure \@ref(fig:tsneplot416b), using the low-rank approximation of the data to take advantage of the denoising step.
-As with the PCA plots, no consistent substructure is observed.
 
-```{r tsneplot416b, fig.cap="_t_-SNE plots constructed from the denoised PCs in the 416B data set, using a range of perplexity values. Each point represents a cell, coloured according to its total number of expressed features. Bars represent the coordinates of the cells on each axis.", fig.width=15, fig.asp=0.5}
-out5 <- plotTSNE(sce, use_dimred="PCA", perplexity=5, colour_by="total_features", 
+```{r tsneplot416b, fig.cap="_t_-SNE plots constructed from the denoised PCs in the 416B data set, using a range of perplexity values. Each point represents a cell, coloured according to its oncogene induction status. Bars represent the coordinates of the cells on each axis.", fig.width=15, fig.asp=0.5}
+out5 <- plotTSNE(sce, use_dimred="PCA", perplexity=5, colour_by="Phenotype", 
     rand_seed=100) + fontsize + ggtitle("Perplexity = 5")
-out10 <- plotTSNE(sce, use_dimred="PCA", perplexity=10, colour_by="total_features",
+out10 <- plotTSNE(sce, use_dimred="PCA", perplexity=10, colour_by="Phenotype",
     rand_seed=100) + fontsize + ggtitle("Perplexity = 10")
-out20 <- plotTSNE(sce, use_dimred="PCA", perplexity=20, colour_by="total_features",
+out20 <- plotTSNE(sce, use_dimred="PCA", perplexity=20, colour_by="Phenotype",
     rand_seed=100) + fontsize + ggtitle("Perplexity = 20")
 multiplot(out5, out10, out20, cols=3)
 ```
 
 There are many other dimensionality reduction techniques that we do not consider here but could also be used, e.g., multidimensional scaling, diffusion maps.
 These have their own advantages and disadvantages -- for example, diffusion maps (see `plotDiffusionMap`) place cells along a continuous trajectory and are suited for visualizing graduated processes like differentiation [@angerer2016destiny].
-
-<!--
-In fact, users should generally treat clustering results with some caution.
-If the differences between cells are subtle, the assignment of cells into clusters may not be robust.
-Moreover, different algorithms can yield substantially different clusters by focusing on different aspects of the data.
-Experimental validation of the clusters is critical to ensure that the putative subpopulations actually exist.
--->
 
 __Comments from Aaron:__
 
@@ -770,98 +762,157 @@ We will discuss this in more detail in the next section.
 Scripts should set a seed (via the `rand_seed` argument) to ensure that the chosen results are reproducible.
 It is also advisable to test different settings of the "perplexity" parameter as this will affect the distribution of points in the low-dimensional space.
 A good guide on how to interpret _t_-SNE plots can be found at http://distill.pub/2016/misread-tsne/.
-- The `selectorPlot` function from `r Biocpkg("scran")` can also be used to interactively select groups of cells in two-dimensional space.
-This facilitates data exploration as visually identified subpopulations can be directly selected for further examination.
-The `exploreData` function can also be used to interactively visualize gene expression, dimensionality reduction results and other covariates simultaneously.
 
-# Interpreting heterogeneity across a continuum
+# Clustering cells into putative subpopulations
 
-Putative subpopulations of cells can be computationally defined by unsupervised classification, i.e., clustering.
-We do not attempt this here due to the absence of distinct subpopulations in the plots above.
-However, there is a clear visual correlation between the number of expressed features and the first PC in Figure \@ref(fig:pcaplothsc).
-We can study this in more detail by detecting genes that are differentially expressed along the first PC.
-This is done by applying methods from the `r Biocpkg("limma")` package to the log-expression values [@ritchie2015limma].
+## Defining cell clusters from expression data
+
+The denoised log-expression values are used to cluster cells into putative subpopulations.
+Specifically, we perform hierarchical clustering on the Euclidean distances between cells, using Ward's criterion to minimize the total variance within each cluster.
+This yields a dendrogram that groups together cells with similar expression patterns across the chosen genes.
+An alternative approach is to cluster on a matrix of distances derived from correlations (e.g., as in `quickCluster`).
+This is more robust to noise and normalization errors, but is also less sensitive to subtle changes in the expression profiles. 
 
 ```{r}
-pc1 <- reducedDim(sce, "PCA")[,1]
-design <- model.matrix(~pc1)
-library(limma)
-fit <- lmFit(logcounts(sce), design)
-fit <- eBayes(fit, trend=TRUE, robust=TRUE)
-topTable(fit)
+pcs <- reducedDim(sce, "PCA")
+my.dist <- dist(pcs)
+my.tree <- hclust(my.dist)
 ```
 
-Figure \@ref{fig:heatmaphsc} indicates that the majority of genes increase in expression along the first PC.
-Some of these genes are involved in DNA replication and the cell cycle, e.g., _Chek1_.
-However, there are also a few genes that decrease in expression, e.g., _Lst1_.
-This suggests that the first PC corresponds to genuine biology (namely the cell cycle),
-not just a change in total RNA content that non-specifically increases the expression of all transcripts.
+Clusters are explicitly defined by applying a dynamic tree cut [@langfelder2008defining] to the dendrogram.
+This exploits the shape of the branches in the dendrogram to refine the cluster definitions, and is more appropriate than `cutree` for complex dendrograms.
+Greater control of the empirical clusters can be obtained by manually specifying `cutHeight` in `cutreeDynamic`.
+Here, we also set `minClusterSize` to a lower value than the default of 20, to avoid spurious aggregation of distant small clusters.
 
-```{r heatmaphsc, fig.width=6, fig.asp=1.5, fig.cap="Heatmap of the top 50 DE genes along the first PC in the HSC data set. The colour for each cell (column) represents the log-fold change from the average log-expression for each gene (row), bounded to [-2, 2] for visualization purposes. Cells are ordered by their location on the first PC."}
-de.genes <- rownames(topTable(fit, coef=2, n=50))
-heat.vals <- logcounts(sce)[de.genes,]
-heat.vals <- heat.vals - rowMeans(heat.vals)
-heat.vals[heat.vals > 2] <- 2
-heat.vals[heat.vals < -2] <- -2
+```{r}
+library(dynamicTreeCut)
+my.clusters <- unname(cutreeDynamic(my.tree, distM=as.matrix(my.dist), 
+    minClusterSize=10, verbose=0))
+```
+
+We examine the distribution of cells in each cluster with respect to known factors.
+Each cluster is comprised of cells from both batches, indicating that the clustering is not driven by a batch effect.
+Differences in the composition of each cluster are observed with respect to `Phenotype`, consistent with a biological effect of oncogene induction.
+
+```{r}
+table(my.clusters, sce$Batch)
+table(my.clusters, sce$Phenotype)
+```
+
+We visualize the cluster assignments for all cells on the _t_-SNE plot in Figure \@(fig:tsnecluster416b).
+Adjacent cells are generally assigned to the same cluster, indicating that the clustering procedure was applied correctly.
+
+```{r tsnecluster416b, fig.cap="_t_-SNE plot of the denoised PCs of the 416B data set. Each point represents a cell and is coloured according to the cluster identity to which it was assigned."}
+sce$cluster <- factor(my.clusters)
+plotTSNE(sce, use_dimred="PCA", colour_by="cluster", 
+    perplexity=20, rand_seed=200) + fontsize
+```
+
+We check the separatedness of the clusters using the silhouette width (Figure \@(fig:silhouette416b)).
+Cells with large positive silhouette widths are closer to other cells in the _same_ cluster than to cells in _different_ clusters.
+Conversely, cells with negative widths are closer to other clusters than to other cells in the cluster to which it was assigned.
+Each cluster would ideally contain many cells with large positive widths, indicating that it is well-separated from other clusters.
+This can be used to gauge the optimal parameter values (e.g., cut height, number of clusters) that maximize the separation between clusters.
+For example, we could vary the cut height in `cutreeDynamic` to maximize the average silhouette width across all cells.
+
+```{r silhouette416b, fig.cap="Barplot of silhouette widths for cells in each cluster. Each cluster is assigned a colour and cells with positive widths are coloured according to the colour of its assigned cluster. Any cell with a negative width is coloured according to the colour of the cluster that it is closest to. The average width for all cells in each cluster is shown, along with the average width for all cells in the data set."}
+library(cluster)
+clust.col <- scater:::.get_palette("tableau10medium") # hidden scater colours
+sil <- silhouette(my.clusters, dist = my.dist)
+sil.cols <- clust.col[ifelse(sil[,3] > 0, sil[,1], sil[,2])]
+sil.cols <- sil.cols[order(-sil[,1], sil[,3])]
+plot(sil, main = paste(length(unique(my.clusters)), "clusters"), 
+    border=sil.cols, col=sil.cols, do.col.sort=FALSE) 
+```
+
+```{r echo=FALSE, results='hide'}
+gc()
+```
+
+## Detecting marker genes between clusters
+
+Once putative subpopulations are identified by clustering, we can identify marker genes for each cluster using the `findMarkers` function.
+This fits a linear model to the log-expression values for each gene using `r Biocpkg("limma")` [@ritchie2015limma].
+The aim is to test for DE in each cluster compared to the others while blocking on uninteresting factors in `design`.
+The top DE genes are likely to be good candidate markers as they can effectively distinguish between cells in different clusters.
+
+```{r}
+markers <- findMarkers(sce, my.clusters, design=design)
+```
+
+For each cluster, the DE results of the relevant comparisons are consolidated into a single output table.
+This allows a set of marker genes to be easily defined by taking the top DE genes from each pairwise comparison between clusters.
+For example, to construct a marker set for cluster 1 from the top 10 genes of each comparison, one would filter `marker.set` to retain rows with `Top` less than or equal to 10.
+Other statistics are also reported for each gene, including the adjusted p-values (see below) and the log-fold changes relative to every other cluster.
+
+```{r, echo=FALSE, results="hide"}
+old.digits <- options()$digits
+options(digits=3)
+```
+
+```{r}
+marker.set <- markers[["1"]]
+head(marker.set, 10)
+```
+
+```{r, echo=FALSE, results="hide"}
+options(digits=old.digits)
+```
+
+We save the list of candidate marker genes for further examination.
+The `overlapExprs` function may also be useful here, to prioritize candidates where there is clear separation between the distributions of expression values of different clusters.
+
+```{r}
+write.table(marker.set, file="marker_1.tsv", sep="\t", quote=FALSE, col.names=NA)
+```
+
+We visualize the expression profiles of the top candidates to verify that the DE signature is robust.
+Figure \@ref(fig:heatmapmarker416b) indicates that most of the top markers have strong and consistent up- or downregulation in cells of cluster 1 compared to some or all of the other clusters.
+Thus, cells from the subpopulation of interest can be identified as those that express the upregulated markers and do not express the downregulated markers.
+
+```{r heatmapmarker416b, fig.cap="Heatmap of mean-centred normalized and corrected log-expression values for the top set of markers for cluster 1 in the 416B dataset. Column colours represent the cluster to which each cell is assigned, as indicated by the legend."}
+top.markers <- marker.set$Gene[marker.set$Top <= 10]
+top.exprs <- logcounts(sce)[top.markers,,drop=FALSE]
+heat.vals <- top.exprs - rowMeans(top.exprs)
+
 library(pheatmap)
-pheatmap(heat.vals[,order(pc1)], cluster_cols=FALSE)
+unique.clusters <- sort(unique(my.clusters))
+chosen.cols <- clust.col[seq_along(unique.clusters)]
+pheatmap(heat.vals, cluster_cols=my.tree,
+    annotation_col=data.frame(Cluster=factor(my.clusters), Batch=factor(sce$Batch),
+        Phenotype=sce$Phenotype, row.names=colnames(sce)),
+    annotation_colors=list(Cluster=setNames(chosen.cols, unique.clusters),
+        Batch=setNames(c("grey50", "grey80"), levels(sce$Batch)),
+        Phenotype=setNames(c("red", "black"), levels(sce$Phenotype))))
 ```
+
+Many of the markers in Figure \@ref(fig:heatmapmarker416b) are not uniquely up- or downregulated in the chosen cluster.
+Testing for unique DE tends to be too stringent as it overlooks important genes that are expressed in two or more clusters.
+For example, in a mixed population of CD4^+^-only, CD8^+^-only, double-positive and double-negative T cells, neither _Cd4_ or _Cd8_ would be detected as subpopulation-specific markers because each gene is expressed in two subpopulations.
+With our approach, both of these genes will be picked up as candidate markers as they will be DE between at least one pair of subpopulations.
+A combination of markers can then be chosen to characterize a subpopulation, which is more flexible than trying to find uniquely DE genes.
 
 __Comments from Aaron:__
 
-- Users are discouraged from treating the adjusted _p_-values from this analysis with any particular reverence.
-This is because the DE testing is performed on the same data used to define the first PC.
-PCA empirically captures the maximum variance in the data, so there will always be some genes with low _p_-values, even if the variance is purely driven by random noise.
-- The procedure above can be used to test for changes along any covariate, e.g., pseudotime.
-Note that specifying `~pc1` only models linear changes across the covariate.
-Other trends can be more flexibly modelled using splines, i.e., `~splines::ns(pc1, df=5)`, though the spline coefficients are not easy to interpret.
-- Technically, we could achieve more power by filtering out low-abundance genes to reduce the severity of the multiple testing correction.
-This would be performed on the mean of the log-expression values (i.e., `rowMeans(logcounts(sce))`, which is an independent filter statistic for linear models.
-However, this is probably unnecessary given that the interpretation of the adjusted _p_-values is already compromised. 
-- It is not uncommon for cell cycle to be the major driver of variability in cell populations that are very homogeneous.
-If necessary, the `cyclone` results can be used to filter out non-G1 cells prior to further analysis.
-
-# Additional comments
-
-Once the basic analysis is completed, it is often useful to save the `SingleCellExperiment` object to file with the `saveRDS` function.
-The object can then be easily restored into new R sessions using the `readRDS` function.
-This allows further work to be conducted without having to repeat all of the processing steps described above.
-
-```{r}
-saveRDS(file="hsc_data.rds", sce)
-```
-
-A variety of methods are available to perform more complex analyses on the processed expression data.
-For example, cells can be ordered in pseudotime (e.g., for progress along a differentiation pathway) with `r Biocpkg("monocle")` [@trapnell2014dynamics] or `r Biocpkg("TSCAN")` [@ji2016tscan]; 
-cell-state hierarchies can be characterized with the `r Biocpkg("sincell")` package [@julia2015sincell];
-and oscillatory behaviour can be identified using `r Biocpkg("Oscope")` [@leng2015oscope].
-HVGs can be used in gene set enrichment analyses to identify biological pathways and processes with heterogeneous activity, using packages designed for bulk data like `r Biocpkg("topGO")` or with dedicated single-cell methods like `r Biocpkg("scde")` [@fan2016characterizing].
-Full descriptions of these analyses are outside the scope of this workflow, so interested users are advised to consult the relevant documentation.
-
-```{r, echo=FALSE, results='hide'}
-rm(sce, all.counts)
-gc()
-```
+- To avoid problems with discreteness when modelling the mean-variance relationship, `findMarkers` will automatically partition the data into low- and high-abundance genes.
+Empirical Bayes shrinkage is performed in each partition separately, prior to calculation of _p_-values using the shrunk variance estimates.
+This ensures that discreteness does not affect the inferences for high-abundance genes, without needing to entirely discard the low-abundance genes.
+- `findMarkers` can also be directed to find genes that are DE between the chosen cluster and _all_ other clusters.
+This should be done by setting `pval.type="all"`, which defines the p-value for each gene as the maximum value across all pairwise comparisons involving the chosen cluster.
+Combined with `direction="up"`, this can be used to identify unique markers for each cluster.
+However, this is sensitive to overclustering, as unique marker genes will no longer exist if a cluster is split into two smaller subclusters.
+- It must be stressed that the (adjusted) _p_-values computed here cannot be properly interpreted as measures of significance.
+This is because the clusters have been empirically identified from the data.
+`r Biocpkg("limma")` does not account for the uncertainty of clustering, which means that the _p_-values are much lower than they should be. 
+This is not a concern in other analyses where the groups are pre-defined.
 
 # Software availability
 
 All software packages used in this workflow are publicly available from the Comprehensive R Archive Network (https://cran.r-project.org) or the Bioconductor project (http://bioconductor.org).
 The specific version numbers of the packages used are shown below, along with the version of the R installation.
-Version numbers of all Bioconductor packages correspond to release version 3.5 of the Bioconductor project.
-```{r, echo=FALSE, results='asis'}
-if (!on.bioc) { 
-    cat("Users can install all required packages and execute the workflow by following the instructions at https://www.bioconductor.org/help/workflows/simpleSingleCell.\n")
-}
-cat("The workflow takes less than an hour to run on a desktop computer with 8 GB of memory.\n")
-```
 
 ```{r}
 sessionInfo()
-```
-
-```{r, eval=on.bioc, echo=FALSE, results='hide'}
-unlink(all.basenames)
-unlink("GSE61533_HTSEQ_count_results.xls")
 ```
 
 # Author contributions
