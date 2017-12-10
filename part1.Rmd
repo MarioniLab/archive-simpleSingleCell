@@ -600,28 +600,27 @@ gc()
 
 Variability in the observed expression values across genes can be driven by genuine biological heterogeneity or uninteresting technical noise. 
 To distinguish between these two possibiltiies, we need to model the technical component of the variance of the expression values for each gene.
-We use the `trendVar` function to fit a mean-dependent trend to the variances of the log-expression values for the spike-in transcripts,
-Recall that the same set of spike-ins was added in the same quantity to each cell.
-This means that the spike-in transcripts should exhibit no biological variability, i.e., any variance in their counts should be technical in origin.
+We do so using the set of spike-in transcripts, which were added in the same quantity to each cell.
+Thus, the spike-in transcripts should exhibit no biological variability, i.e., any variance in their counts should be technical in origin.
+
+We use the `trendVar` function to fit a mean-dependent trend to the variances of the log-expression values for the spike-in transcripts.
+We set `design` to block on the plate of origin for each cell, to ensure that technical differences between plates do not inflate the variances.
+Given the mean abundance of a gene, the fitted value of the trend is then used as an estimate of the technical component for that gene.
+The biological component of the variance is finally calculated by subtracting the technical component from the total variance of each gene with the `decomposeVar` function.
 
 ```{r}
-var.fit <- trendVar(sce, parametric=TRUE, span=0.3)
-```
-
-Given the mean abundance of a gene, the fitted value of the trend can be used as an estimate of the technical component for that gene.
-The biological component of the variance can then be calculated by subtracting the technical component from the total variance of each gene with the `decomposeVar` function.
-
-```{r}
+design <- model.matrix(~sce$Batch)
+var.fit <- trendVar(sce, parametric=TRUE, design=design, span=0.3)
 var.out <- decomposeVar(sce, var.fit)
 head(var.out)
 ```
 
-We visually inspect the trend to confirm that it corresponds to the spike-in variances (Figure \@ref(fig:hvgplothsc))). 
+We visually inspect the trend to confirm that it corresponds to the spike-in variances (Figure \@ref(fig:hvgplot416b))). 
 The wave-like shape is typical of the mean-variance trend for log-expression values.
 A linear increase in the variance is observed as the mean increases from zero, as larger variances are possible when the counts increase.
 At very high abundances, the effect of sampling noise decreases due to the law of large numbers, resulting in a decrease in the variance.
 
-```{r hvgplothsc, fig.cap="Variance of normalized log-expression values for each gene in the HSC dataset, plotted against the mean log-expression. The blue line represents the mean-dependent trend fitted to the variances of the spike-in transcripts (red)."}
+```{r hvgplot416b, fig.cap="Variance of normalized log-expression values for each gene in the 416B dataset, plotted against the mean log-expression. The blue line represents the mean-dependent trend fitted to the variances of the spike-in transcripts (red)."}
 plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression", 
     ylab="Variance of log-expression")
 curve(var.fit$trend(x), col="dodgerblue", lwd=2, add=TRUE)
@@ -629,11 +628,10 @@ cur.spike <- isSpike(sce)
 points(var.out$mean[cur.spike], var.out$total[cur.spike], col="red", pch=16)
 ```
 
-
 We check the distribution of expression values for the genes with the largest biological components.
-This ensures that the variance estimate is not driven by one or two outlier cells (Figure \@ref(fig:hvgvioplothsc)).
+This ensures that the variance estimate is not driven by one or two outlier cells (Figure \@ref(fig:hvgvioplot416b)).
 
-```{r hvgvioplothsc, fig.cap="Violin plots of normalized log-expression values for the top 10 genes with the largest biological components in the HSC dataset. Each point represents the log-expression value in a single cell."}
+```{r hvgvioplot416b, fig.cap="Violin plots of normalized log-expression values for the top 10 genes with the largest biological components in the 416B dataset. Each point represents the log-expression value in a single cell."}
 chosen.genes <- order(var.out$bio, decreasing=TRUE)[1:10]
 plotExpression(sce, features=rownames(var.out)[chosen.genes]) + fontsize
 ```
@@ -665,26 +663,22 @@ We will discuss this in more detail later, as formal detection of HVGs is not ne
 
 ## Trend fitting when spike-ins are unavailable
 
-If spike-in RNA has not been added in appropriate quantities, an alternative approach is to fit the trend to the variance estimates of the endogenous genes.
+If spike-in RNA has not been added in appropriate quantities (or at all), an alternative approach is to fit the trend to the variance estimates of the endogenous genes.
 This is done using the `use.spikes=FALSE` setting in `trendVar`, as shown below.
+The resulting trend is higher than most of the spike-in variances (Figure \@ref(fig:hvgplot416b2)), consistent with the presence of non-zero biological variation for most genes.
 
-```{r}
+```{r hvgplot416b2, fig.cap="Variance of normalized log-expression values for each gene in the 416B dataset, plotted against the mean log-expression. The blue line represents the mean-dependent trend fitted to the variances of the endogenous genes (black), with spike-in transcripts shown in red."}
 var.fit.nospike <- trendVar(sce, parametric=TRUE, use.spikes=FALSE, span=0.2)
 var.out.nospike <- decomposeVar(sce, var.fit.nospike)
-```
-
-This assumes that the majority of genes are not variably expressed, such that the technical component dominates the total variance for most genes.
-In Figure \@ref(fig:hvgplothsc2), the trend passes through or close to most of the spike-in variances, indicating that our assumption is valid.
-
-```{r hvgplothsc2, fig.cap="Variance of normalized log-expression values for each gene in the HSC dataset, plotted against the mean log-expression. The blue line represents the mean-dependent trend fitted to the variances of the endogenous genes (black), with spike-in transcripts shown in red."}
 plot(var.out.nospike$mean, var.out.nospike$total, pch=16, cex=0.6, 
     xlab="Mean log-expression", ylab="Variance of log-expression")
 curve(var.fit.nospike$trend(x), col="dodgerblue", lwd=2, add=TRUE)
 points(var.out.nospike$mean[cur.spike], var.out.nospike$total[cur.spike], col="red", pch=16)
 ```
 
-If our assumption does not hold, the output of `decomposeVar` is more difficult to interpret.
-The function quantifies changes in variances for each gene over the majority of genes with the same abundance.
+The output of `decomposeVar` is more difficult to interpret when the trend is fitted to the variances of endogenous genes.
+The fitted value of the trend can no longer be generally interpreted as the technical component, as it contains some biological variation as well.
+Instead, recall that `decomposeVar` quantifies changes in variances for each gene over the majority of genes with the same abundance.
 One could assume that the variabilities of most genes are driven by constitutive "house-keeping" processes, which are generally uninteresting.
 Any gene with an increase in its variance is _relatively_ highly variable and can be prioritized for further study.
 
@@ -733,9 +727,9 @@ gc()
 We visualize the relationships between cells by constructing pairwise PCA plots for the first three components (Figure \@ref(fig:pcaplothsc)).
 Cells with similar expression profiles should be located close together in the plot, while dissimilar cells should be far apart.
 In this case, no clear separation of cells into distinct subpopulations is observed.
-This is consistent with the presence of a highly homogeneous population of HSCs [@wilson2015combined].
+This is consistent with the presence of a highly homogeneous population of 416Bs [@wilson2015combined].
 
-```{r pcaplothsc, fig.cap="Pairwise PCA plots of the first three PCs in the HSC data set, constructed from normalized log-expression values of genes with positive biological components. Each point represents a cell, coloured according to its total number of expressed features. Bars represent the coordinates of the cells on each axis.", fig.width=9}
+```{r pcaplot416b, fig.cap="Pairwise PCA plots of the first three PCs in the 416B data set, constructed from normalized log-expression values of genes with positive biological components. Each point represents a cell, coloured according to its total number of expressed features. Bars represent the coordinates of the cells on each axis.", fig.width=9}
 plotReducedDim(sce, use_dimred="PCA", ncomponents=3, colour_by="total_features") + fontsize
 ```
 
@@ -743,10 +737,10 @@ Another widely used approach is the _t_-stochastic neighbour embedding (_t_-SNE)
 _t_-SNE tends to work better than PCA for separating cells in more diverse populations.
 This is because the former can directly capture non-linear relationships in high-dimensional space, whereas the latter must represent them on linear axes.
 However, this improvement comes at the cost of more computational effort and requires the user to consider parameters such as the random seed and perplexity (see comments).
-We demonstrate the generation of _t_-SNE plots in Figure \@ref(fig:tsneplothsc), using the low-rank approximation of the data to take advantage of the denoising step.
+We demonstrate the generation of _t_-SNE plots in Figure \@ref(fig:tsneplot416b), using the low-rank approximation of the data to take advantage of the denoising step.
 As with the PCA plots, no consistent substructure is observed.
 
-```{r tsneplothsc, fig.cap="_t_-SNE plots constructed from the denoised PCs in the HSC data set, using a range of perplexity values. Each point represents a cell, coloured according to its total number of expressed features. Bars represent the coordinates of the cells on each axis.", fig.width=15, fig.asp=0.5}
+```{r tsneplot416b, fig.cap="_t_-SNE plots constructed from the denoised PCs in the 416B data set, using a range of perplexity values. Each point represents a cell, coloured according to its total number of expressed features. Bars represent the coordinates of the cells on each axis.", fig.width=15, fig.asp=0.5}
 out5 <- plotTSNE(sce, use_dimred="PCA", perplexity=5, colour_by="total_features", 
     rand_seed=100) + fontsize + ggtitle("Perplexity = 5")
 out10 <- plotTSNE(sce, use_dimred="PCA", perplexity=10, colour_by="total_features",
