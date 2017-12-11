@@ -259,9 +259,7 @@ plot(sce$total_features, sce$pct_counts_Mt, xlab="Number of expressed genes",
     ylab="Mitochondrial proportion (%)")
 ```
 
-## Removing low-quality cells based on outliers
-
-### Identifying outliers for each metric 
+## Identifying outliers for each metric 
 
 Picking a threshold for these metrics is not straightforward as their absolute values depend on the experimental protocol.
 For example, sequencing to greater depth will lead to more reads and more expressed features, regardless of the quality of the cells.
@@ -301,7 +299,7 @@ At this point, we could apply `keep` to subset `sce` to only retain high-quality
 However, the above approach ignores prior information about the cells, which can be incorporated to improve the filtering procedure.
 We describe why this is important and how it can be achieved in the following sections.
 
-### Assumptions of outlier identification 
+## Assumptions of outlier identification 
 
 We have already mentioned the assumption that most cells are of high quality.
 This is usually reasonable, and can be experimentally supported in some situations by visually checking that the cells are intact (e.g., on the microwell plate or in the microfluidics system).
@@ -330,7 +328,7 @@ multiplot(
     cols=2)
 ```
 
-### Blocking on known conditions
+## Blocking on known conditions
 
 Systematic differences in the QC metrics can be handled to some extent using the `batch` argument in the `isOutlier` function.
 Setting `batch` to the plate of origin will identify outliers within each level of `batch`, using plate-specific median and MAD estimates.
@@ -355,31 +353,6 @@ We then subset the `SingleCellExperiment` object to retain only the putative hig
 sce <- sce[,keep2]
 dim(sce)
 ```
-
-## Alternative approaches to quality control
-
-An alternative approach to quality control is to set pre-defined thresholds on each QC metric.
-For example, we might remove all cells with library sizes below 100000 and numbers of expressed genes below 4000.
-This generally requires a great deal of experience to determine appropriate thresholds for each experimental protocol and biological system.
-Indeed, even with the same protocol and system, the appropriate threshold can vary from run to run due to the vagaries of RNA capture and sequencing.
-
-Another strategy is to perform a principal components analysis (PCA) based on the quality metrics for each cell, e.g., the total number of reads, the total number of features and the proportion of mitochondrial or spike-in reads.
-Outliers on a PCA plot may be indicative of low-quality cells that have aberrant technical properties compared to the (presumed) majority of high-quality cells.
-In Figure \@ref(fig:pcaqualplot416b), no obvious outliers are present, which is consistent with the removal of suspect cells in the preceding quality control steps.
-
-```{r pcaqualplot416b, fig.cap="PCA plot for cells in the 416Bdataset, constructed using quality metrics. The first and second components are shown on each axis, along with the percentage of total variance explained by each component. Bars represent the coordinates of the cells on each axis."}
-fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
-plotPCA(sce, pca_data_input="pdata") + fontsize
-```
-
-Methods like PCA-based outlier detection and support vector machines can provide more power to distinguish low-quality cells from high-quality counterparts [@ilicic2016classification].
-This is because they are able to detect subtle patterns across many quality metrics simultaneously. 
-However, this comes at some cost to interpretability, as the reason for removing a given cell may not always be obvious.
-Thus, for this workflow, we will use the simple approach whereby each quality metric is considered separately.
-Users interested in the more sophisticated approaches are referred to the `r Biocpkg("scater")` and `r Biocpkg("cellity")` packages.
-
-For completeness, we note that outliers can also be identified based on the gene expression profiles, rather than QC metrics.
-However, we consider this to be a risky strategy as it can remove high-quality cells in rare populations.
 
 # Classification of cell cycle phase 
 
@@ -873,9 +846,11 @@ The `overlapExprs` function may also be useful here, to prioritize candidates wh
 write.table(marker.set, file="416B_marker_1.tsv", sep="\t", quote=FALSE, col.names=NA)
 ```
 
-We visualize the expression profiles of the top candidates to verify that the DE signature is robust.
-Figure \@ref(fig:heatmapmarker416b) indicates that most of the top markers have strong and consistent up- or downregulation in cells of cluster 1 compared to some or all of the other clusters.
-Thus, cells from the subpopulation of interest can be identified as those that express the upregulated markers and do not express the downregulated markers.
+We visualize the expression profiles of the top candidates to verify that the DE signature is robust (Figure \@ref(fig:heatmapmarker416b)). 
+Most of the top markers have strong and consistent up- or downregulation in cells of cluster 1 compared to some or all of the other clusters.
+This can be used in validation studies to identify the corresponding cells in an independent replicate population,
+based on whether they express the upregulated markers and do not express the downregulated markers.
+(Ideally, a different technique for quantifying expression would also be used during validation, e.g., fluorescent _in situ_ hybridisation or quantitative PCR.)
 
 ```{r heatmapmarker416b, fig.wide=TRUE, fig.asp=1.5, fig.cap="Heatmap of mean-centred and normalized log-expression values for the top set of markers for cluster 1 in the 416B dataset. Column colours represent the cluster to which each cell is assigned, the plate of origin or the oncogene induction status of each cell, as indicated by the legend."}
 top.markers <- marker.set$Gene[marker.set$Top <= 10]

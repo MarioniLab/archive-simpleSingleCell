@@ -66,6 +66,49 @@ The previous workflows focused on analyzing single-cell RNA-seq data with "stand
 However, a number of alternative parameter settings and strategies can be used at some steps of the workflow.
 This article describes a few of these alternative settings as well as the rationale behind choosing them instead of the defaults.
 
+# Alternative approaches to quality control
+
+## Using fixed thresholds
+
+One alternative strategy is to set pre-defined thresholds on each QC metric.
+For example, we might remove all cells with library sizes below 100000 and numbers of expressed genes below 4000.
+This generally requires substantial experience to determine appropriate thresholds for each experimental protocol and biological system.
+Indeed, even with the same protocol and system, the appropriate threshold can vary from run to run due to the vagaries of RNA capture and sequencing.
+
+## Using PCA-based outliers
+
+Another strategy is to perform a principal components analysis (PCA) based on the quality metrics for each cell, e.g., the total number of reads, the total number of features and the proportion of mitochondrial or spike-in reads.
+Outliers on a PCA plot may be indicative of low-quality cells that have aberrant technical properties compared to the (presumed) majority of high-quality cells.
+This is demonstrated below using a brain cell dataset from @tasic2016adult.
+
+```{r}
+# Obtaining the dataset.
+library(scRNAseq)
+data(allen)
+
+# Setting up the data.
+library(SingleCellExperiment)
+sce <- as(allen, "SingleCellExperiment")
+assayNames(sce) <- "counts"
+isSpike(sce, "ERCC") <- grep("ERCC", rownames(sce))
+
+# Computing the QC metrics and running PCA.
+library(scater)
+sce <- calculateQCMetrics(sce, feature_controls=list(ERCC=isSpike(sce)))
+sce <- runPCA(sce, pca_data_input="coldata", detect_outliers=TRUE)
+table(sce$outlier)
+```
+
+Methods like PCA-based outlier detection and support vector machines can provide more power to distinguish low-quality cells from high-quality counterparts [@ilicic2016classification].
+This is because they are able to detect subtle patterns across many quality metrics simultaneously. 
+However, this comes at some cost to interpretability, as the reason for removing a given cell may not always be obvious.
+Users interested in the more sophisticated approaches are referred to the `r Biocpkg("scater")` and `r Biocpkg("cellity")` packages.
+
+## Using expression-based outliers
+
+For completeness, we note that outliers can also be identified based on the gene expression profiles, rather than QC metrics.
+However, we consider this to be a risky strategy as it can remove high-quality cells in rare populations.
+
 # Normalizing based on spike-in coverage
 
 ## Motivation 
@@ -162,17 +205,13 @@ This avoids problems with discreteness as mentioned in our previous uses of `com
 - Setting `sf.out=TRUE` will directly return the size factors, rather than a `SingleCellExperiment` object containing those factors.
 This is more convenient when only the size factors are required for further analysis.
 
-# Characterising heterogeneity with hypothesis tests 
+# Detecting highly variable genes
 
-# Motivation 
+## Motivation 
 
 Highly variable genes (HVGs) are defined as genes with biological components that are significantly greater than zero.
 These genes are interesting as they drive differences in the expression profiles between cells, and should be prioritized for further investigation.
 Formal detection of HVGs allows us to avoid genes that are highly variable due to technical factors such as sampling noise during RNA capture and library preparation.
-
-Another use of scRNA-seq data is to identify correlations between pairs of genes.
-This is quantified by computing Spearman's rho, which accommodates non-linear relationships in the expression values.
-However, some work is required to determine whether a non-zero value for the correlations is statistically significant, given the noise in the data.
 
 ## Setting up the data 
 
@@ -279,9 +318,14 @@ Some of these methods are available in `r Biocpkg("scran")` -- for example, see 
 Here, we use the variance of the log-expression values because the log-transformation protects against genes with strong expression in only one or two cells.
 This ensures that the set of top HVGs is not dominated by genes with (mostly uninteresting) outlier expression patterns.
 
-## Identifying correlated gene pairs with Spearman's rho
+# Identifying correlated gene pairs with Spearman's rho
 
-We use the `correlatePairs` function to identify significant correlations between the various histocompatability antigens in the HSC data set.
+Another use for scRNA-seq data is to identify correlations between the expression profiles of different genes.
+This is quantified by computing Spearman's rho, which accommodates non-linear relationships in the expression values.
+Non-zero correlations between pairs of genes provide evidence for their co-regulation.
+However, the noise in the data requires some statistical analysis to determine whether a correlation is significantly non-zero.
+
+To demonstrate, we use the `correlatePairs` function to identify significant correlations between the various histocompatability antigens in the HSC data set.
 The significance of each correlation is determined using a permutation test.
 For each pair of genes, the null hypothesis is that the expression profiles of two genes are independent.
 Shuffling the profiles and recalculating the correlation yields a null distribution that is used to obtain a _p_-value for each observed correlation value [@phipson2010permutation].
@@ -312,14 +356,20 @@ Examination of the expression profiles in Figure \@ref(fig:fosjuncorplot) confir
 plotExpression(sce, features="Fos", x="Jun")
 ```
 
+The use of `correlatePairs` is primarily intended to identify correlated gene pairs for validation studies.
+Obviously, non-zero correlations do not provide evidence for a direct regulatory interaction, let alone specify causality.
+To construct regulatory networks involving many genes, we suggest using dedicated packages such as `r CRANpkg("WCGNA")`.
+
 __Comments from Aaron:__
 
-- It is recommended to compute correlations between a subset of genes of interest, known either _a priori_ or empirically defined, e.g., as HVGs.
+- We suggest only computing correlations between a subset of genes of interest, known either _a priori_ or empirically defined, e.g., as HVGs.
 Computing correlations across all genes will take too long; unnecessarily increase the severity of the multiple testing correction; 
 and may prioritize strong but uninteresting correlations, e.g., between tightly co-regulated house-keeping genes.
 - The `correlatePairs` function can also return gene-centric output by setting `per.gene=TRUE`.
 This calculates a combined _p_-value [@simes1986improved] for each gene that indicates whether it is significantly correlated to any other gene.
 From a statistical perspective, this is a more natural approach to correcting for multiple testing when genes, rather than pairs of genes, are of interest.
+- The `Limited` field indicates whether the _p_-value was lower-bounded by the number of permutations.
+If this is `TRUE` for any non-significant gene at the chosen FDR threshold, consider increasing the number of permutations to improve power.
 
 # Blocking on the cell cycle phase
 
@@ -400,75 +450,10 @@ saveRDS(file="th2_data.rds", sce)
 gc()
 ```
 
-# Extracting annotation from Ensembl identifiers
-
-Feature-counting tools typically report genes in terms of standard identifiers from Ensembl or Entrez.
-These identifiers are used as they are unambiguous and highly stable.
-However, they are difficult to interpret compared to the gene symbols which are more commonly used in the literature.
-We can easily convert from one to the other using annotation packages like `r Biocpkg("org.Mm.eg.db")`.
-This is demonstrated below for Ensembl identifiers in a mESC dataset [@kolod2015singlecell] obtained from http://www.ebi.ac.uk/teichmann-srv/espresso.
-The `mapIds` call extracts the specified data from the annotation object, returning the first gene symbol if multiple symbols correspond to a single Ensembl identifier.
-
-```{r}
-incoming <- read.table("counttable_es.csv", header=TRUE, row.names=1)
-my.ids <- rownames(incoming)
-symb <- mapIds(org.Mm.eg.db, keys=my.ids, keytype="ENSEMBL", column="SYMBOL")
-head(symb)
-```
-
-To identify which rows correspond to mitochondrial genes, we need to use extra annotation describing the genomic location of each gene.
-For Ensembl, this involves using the `r Biocpkg("TxDb.Mmusculus.UCSC.mm10.ensGene")` package.
-
-```{r}
-library(TxDb.Mmusculus.UCSC.mm10.ensGene)
-location <- mapIds(TxDb.Mmusculus.UCSC.mm10.ensGene, keys=my.ids, 
-    column="CDSCHROM", keytype="GENEID")
-is.mito <- location == "chrM" & !is.na(location)
-sum(is.mito)
-```
-
-Identification of rows that correspond to spike-in transcripts is much easier, given that the ERCC spike-ins were used.
-
-```{r}
-is.spike <- grepl("^ERCC", my.ids)
-sum(is.spike)
-```
-
-All of this information can be consolidated into a `SingleCellExperiment` object for further manipulation.
-Alternatively, annotation from BioMart resources can be directly added to the object using the `getBMFeatureAnnos` function from `r Biocpkg("scater")`.
-
-```{r}
-sce <- SingleCellExperiment(list(counts=as.matrix(incoming)), 
-    rowData=DataFrame(Symbol=symb, Chr=location))
-isSpike(sce, "ERCC") <- is.spike
-sce <- calculateQCMetrics(sce, feature_controls=list(ERCC=is.spike, Mito=is.mito))
-sce
-```
-
-We filter out rows that do not correspond to endogenous genes or spike-in transcripts.
-This will remove rows containing mapping statistics such as the number of unaligned or unassigned reads, which would be misleading if treated as gene expression values.
-The object is then ready for downstream analyses as previously described. 
-
-```{r}
-tail(rownames(sce))
-sce <- sce[grepl("ENSMUS", rownames(sce)) | isSpike(sce),]
-dim(sce)
-```
-
-```{r, echo=FALSE, results='hide'}
-saveRDS(file="mesc_data.rds", sce)
-gc()
-```
-
 # Software availability
 
 All software packages used in this workflow are publicly available from the Comprehensive R Archive Network (https://cran.r-project.org) or the Bioconductor project (http://bioconductor.org).
 The specific version numbers of the packages used are shown below, along with the version of the R installation.
-```{r, echo=FALSE, results='asis'}
-if (!on.bioc) { 
-    cat("Users can install all required packages and execute the workflow by following the instructions at https://www.bioconductor.org/help/workflows/simpleSingleCell.\n")
-}
-```
 
 ```{r}
 sessionInfo()
@@ -479,24 +464,26 @@ unlink(all.basenames)
 unlink("GSE61533_HTSEQ_count_results.xls")
 ```
 
-# Author contributions
+# Author information
+
+## Author contributions
 
 A.T.L.L. developed and tested the workflow on all datasets.
 A.T.L.L. and D.J.M. implemented improvements to the software packages required by the workflow.
 J.C.M. provided direction to the software and workflow development.
 All authors wrote and approved the final manuscript.
 
-# Competing interests
+## Competing interests
 
 No competing interests were disclosed.
 
-# Grant information
+## Grant information
 
 A.T.L.L. and J.C.M. were supported by core funding from Cancer Research UK (award no. A17197).
 D.J.M. was supported by a CJ Martin Fellowship from the National Health and Medical Research Council of Australia.
 D.J.M and J.C.M. were also supported by core funding from EMBL.
 
-# Acknowledgements
+## Acknowledgements
 
 We would like to thank Antonio Scialdone for helpful discussions, as well as Michael Epstein, James R. Smith and John Wilson-Kanamori for testing the workflow on other datasets.
 
