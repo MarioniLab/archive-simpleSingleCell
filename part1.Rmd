@@ -904,28 +904,5 @@ The specific version numbers of the packages used are shown below, along with th
 sessionInfo()
 ```
 
-# Author information
-
-## Author contributions
-
-A.T.L.L. developed and tested the workflow on all datasets.
-A.T.L.L. and D.J.M. implemented improvements to the software packages required by the workflow.
-J.C.M. provided direction to the software and workflow development.
-All authors wrote and approved the final manuscript.
-
-## Competing interests
-
-No competing interests were disclosed.
-
-## Grant information
-
-A.T.L.L. and J.C.M. were supported by core funding from Cancer Research UK (award no. A17197).
-D.J.M. was supported by a CJ Martin Fellowship from the National Health and Medical Research Council of Australia.
-D.J.M and J.C.M. were also supported by core funding from EMBL.
-
-## Acknowledgements
-
-We would like to thank Antonio Scialdone for helpful discussions, as well as Michael Epstein, James R. Smith and John Wilson-Kanamori for testing the workflow on other datasets.
-
 # References
 
