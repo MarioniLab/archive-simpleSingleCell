@@ -541,14 +541,20 @@ top.markers <- marker.set$Gene[marker.set$Top <= 10]
 top.exprs <- logcounts(sce)[top.markers,,drop=FALSE]
 heat.vals <- top.exprs - rowMeans(top.exprs)
 
-clust.col <- scater:::.get_palette("tableau20")
+# Winsorizing to preserve dynamic range of colours.
+max.val <- 5
+heat.vals[] <- pmax(pmin(max.val, heat.vals), -max.val)
+col.breaks <- seq(-max.val, max.val, length.out=101) # Force symmetry around zero
+
+# Defining cluster colours.
 unique.clust <- sort(unique(my.clusters))
-clust.col <- clust.col[seq_along(unique.clust)]
+clust.col <- scater:::.get_palette("tableau20")
+chosen.cols <- clust.col[seq_along(unique.clust)]
 
 library(pheatmap)
-pheatmap(heat.vals[,order(my.clusters)], cluster_cols=FALSE,
+pheatmap(heat.vals[,order(my.clusters)], cluster_cols=FALSE, breaks=col.breaks,
     annotation_col=data.frame(Cluster=factor(my.clusters), row.names=colnames(sce)),
-    annotation_colors=list(Cluster=setNames(clust.col, unique.clust)))
+    annotation_colors=list(Cluster=setNames(chosen.cols, unique.clust)))
 ```
 
 # Additional comments

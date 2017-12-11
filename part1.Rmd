@@ -874,18 +874,25 @@ We visualize the expression profiles of the top candidates to verify that the DE
 Figure \@ref(fig:heatmapmarker416b) indicates that most of the top markers have strong and consistent up- or downregulation in cells of cluster 1 compared to some or all of the other clusters.
 Thus, cells from the subpopulation of interest can be identified as those that express the upregulated markers and do not express the downregulated markers.
 
-```{r heatmapmarker416b, fig.cap="Heatmap of mean-centred normalized and corrected log-expression values for the top set of markers for cluster 1 in the 416B dataset. Column colours represent the cluster to which each cell is assigned, as indicated by the legend."}
+```{r heatmapmarker416b, fig.wide=TRUE, fig.asp=1.5, fig.cap="Heatmap of mean-centred and normalized log-expression values for the top set of markers for cluster 1 in the 416B dataset. Column colours represent the cluster to which each cell is assigned, the plate of origin or the oncogene induction status of each cell, as indicated by the legend."}
 top.markers <- marker.set$Gene[marker.set$Top <= 10]
 top.exprs <- logcounts(sce)[top.markers,,drop=FALSE]
 heat.vals <- top.exprs - rowMeans(top.exprs)
+colnames(heat.vals) <- paste0("Cell", seq_len(ncol(heat.vals)))
 
+# Winsorizing to preserve dynamic range of colours.
+max.val <- 5
+heat.vals[] <- pmax(pmin(max.val, heat.vals), -max.val)
+col.breaks <- seq(-max.val, max.val, length.out=101) # Force symmetry around zero
+
+# Defining cluster colours.
 unique.clusters <- sort(unique(my.clusters))
 chosen.cols <- clust.col[seq_along(unique.clusters)]
 
 library(pheatmap)
-pheatmap(heat.vals, cluster_cols=my.tree,
+pheatmap(heat.vals, cluster_cols=my.tree, breaks=col.breaks, 
     annotation_col=data.frame(Cluster=factor(my.clusters), Plate=factor(sce$Plate),
-        Oncogene=sce$Oncogene, row.names=colnames(sce)),
+        Oncogene=sce$Oncogene, row.names=colnames(heat.vals)),
     annotation_colors=list(Cluster=setNames(chosen.cols, unique.clusters),
         Plate=setNames(c("grey50", "grey80"), levels(sce$Plate)),
         Oncogene=setNames(c("red", "black"), levels(sce$Oncogene))))
