@@ -128,7 +128,7 @@ summary(is.sirv)
 
 - Some feature-counting tools will report mapping statistics in the count matrix (e.g., the number of unaligned or unassigned reads).
 While these values can be useful for quality control, they would be misleading if treated as gene expression values.
-Thus, they should be removed (or at least moved to the `rowData`) prior to further analyses.
+Thus, they should be removed (or at least moved to the `colData`) prior to further analyses.
 - Be aware of using the `^ERCC` regular expression for human data where the row names of the count matrix are gene symbols.
 An ERCC gene family actually exists in human annotation, so this would result in incorrect identification of genes as spike-in transcripts.
 This problem can be avoided by publishing count matrices with standard identifiers (e.g., Ensembl, Entrez).
@@ -164,7 +164,7 @@ table(colData(sce)$Oncogene, colData(sce)$Plate)
 Feature-counting tools typically report genes in terms of standard identifiers from Ensembl or Entrez.
 These identifiers are used as they are unambiguous and highly stable.
 However, they are difficult to interpret compared to the gene symbols which are more commonly used in the literature.
-We can easily convert from one to the other using annotation packages like `r Biocpkg("org.Mm.eg.db")`.
+Given the Ensembl identifiers, we can easily obtain the gene symbols using annotation packages like `r Biocpkg("org.Mm.eg.db")`.
 
 ```{r}
 library(org.Mm.eg.db)
@@ -198,6 +198,9 @@ location <- mapIds(TxDb.Mmusculus.UCSC.mm10.ensGene, keys=rowData(sce)$ENSEMBL,
 rowData(sce)$CHR <- location
 summary(location=="chrM")
 ```
+
+Alternatively, annotation from BioMart resources can be directly added to the object using the `getBMFeatureAnnos` function from `r Biocpkg("scater")`.
+This may be more convenient than the approach shown above, but depends on an available internet connection to the BioMart databases.
 
 # Quality control on the cells 
 
@@ -918,10 +921,7 @@ This is because the clusters have been empirically identified from the data.
 `r Biocpkg("limma")` does not account for the uncertainty of clustering, which means that the _p_-values are much lower than they should be. 
 This is not a concern in other analyses where the groups are pre-defined.
 
-
-# Additional comments
-
-## Serializing the data object
+# Concluding remarks
 
 Once the basic analysis is completed, it is often useful to save the `SingleCellExperiment` object to file with the `saveRDS` function.
 The object can then be easily restored into new R sessions using the `readRDS` function.
@@ -942,14 +942,14 @@ Full descriptions of these analyses are outside the scope of this workflow, so i
 gc()
 ```
 
-## Software availability
-
 All software packages used in this workflow are publicly available from the Comprehensive R Archive Network (https://cran.r-project.org) or the Bioconductor project (http://bioconductor.org).
 The specific version numbers of the packages used are shown below, along with the version of the R installation.
 
 ```{r}
 sessionInfo()
 ```
+
+# Author information
 
 ## Author contributions
 
