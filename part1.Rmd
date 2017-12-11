@@ -314,7 +314,7 @@ A heterogeneous population should have higher variability in the metrics among h
 Nonetheless, filtering based on outliers may not be appropriate in extreme cases where one cell type is very different from the others.
 
 We can explore the effect of known biological factors on the QC metrics using the `plotPhenoData` function.
-Figure \@ref(qcplotbatch416b) demonstrates that induction of the CBFB-MYH11 oncogene results in some modest changes to the QC metric distributions.
+Figure \@ref(fig:qcplotbatch416b) demonstrates that induction of the CBFB-MYH11 oncogene results in some modest changes to the QC metric distributions.
 This suggests that we could improve our QC step by considering the condition of the cell during outlier identification. 
 Analyzing all conditions together would unnecessarily inflate the MAD and compromise the removal of low-quality cells. 
 
@@ -362,7 +362,7 @@ Indeed, even with the same protocol and system, the appropriate threshold can va
 
 Another strategy is to perform a principal components analysis (PCA) based on the quality metrics for each cell, e.g., the total number of reads, the total number of features and the proportion of mitochondrial or spike-in reads.
 Outliers on a PCA plot may be indicative of low-quality cells that have aberrant technical properties compared to the (presumed) majority of high-quality cells.
-In Figure \@ref(fig:pcaqualplothsc), no obvious outliers are present, which is consistent with the removal of suspect cells in the preceding quality control steps.
+In Figure \@ref(fig:pcaqualplot416b), no obvious outliers are present, which is consistent with the removal of suspect cells in the preceding quality control steps.
 
 ```{r pcaqualplot416b, fig.cap="PCA plot for cells in the 416Bdataset, constructed using quality metrics. The first and second components are shown on each axis, along with the percentage of total variance explained by each component. Bars represent the coordinates of the cells on each axis."}
 fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
@@ -521,7 +521,7 @@ sce <- computeSumFactors(sce)
 summary(sizeFactors(sce))
 ```
 
-The size factors are well-correlated with the library sizes for all cells (Figure \@ref(fig:normplothsc)).
+The size factors are well-correlated with the library sizes for all cells (Figure \@ref(fig:normplot416b)).
 This suggests that most of the systematic differences between cells are driven by differences in capture efficiency or sequencing depth.
 Any DE between cells would yield a non-linear trend between the total count and size factor, and/or increased scatter around the trend.
 We observe some evidence of this after oncogene induction, where the size factors after induction are systematically lower.
@@ -729,7 +729,7 @@ gc()
 
 # Data exploration with dimensionality reduction 
 
-We visualize the relationships between cells by constructing pairwise PCA plots for the first three components (Figure \@ref(fig:pcaplothsc)).
+We visualize the relationships between cells by constructing pairwise PCA plots for the first three components (Figure \@ref(fig:pcaplot416b)).
 Cells with similar expression profiles should be located close together in the plot, while dissimilar cells should be far apart.
 In this case, we observe a clear separation of cells based on the oncogene induction status, consistent with the expected effects on the transcriptome.
 
@@ -919,7 +919,9 @@ This is because the clusters have been empirically identified from the data.
 This is not a concern in other analyses where the groups are pre-defined.
 
 
-## Additional comments
+# Additional comments
+
+## Serializing the data object
 
 Once the basic analysis is completed, it is often useful to save the `SingleCellExperiment` object to file with the `saveRDS` function.
 The object can then be easily restored into new R sessions using the `readRDS` function.
@@ -940,7 +942,7 @@ Full descriptions of these analyses are outside the scope of this workflow, so i
 gc()
 ```
 
-# Software availability
+## Software availability
 
 All software packages used in this workflow are publicly available from the Comprehensive R Archive Network (https://cran.r-project.org) or the Bioconductor project (http://bioconductor.org).
 The specific version numbers of the packages used are shown below, along with the version of the R installation.
@@ -949,24 +951,24 @@ The specific version numbers of the packages used are shown below, along with th
 sessionInfo()
 ```
 
-# Author contributions
+## Author contributions
 
 A.T.L.L. developed and tested the workflow on all datasets.
 A.T.L.L. and D.J.M. implemented improvements to the software packages required by the workflow.
 J.C.M. provided direction to the software and workflow development.
 All authors wrote and approved the final manuscript.
 
-# Competing interests
+## Competing interests
 
 No competing interests were disclosed.
 
-# Grant information
+## Grant information
 
 A.T.L.L. and J.C.M. were supported by core funding from Cancer Research UK (award no. A17197).
 D.J.M. was supported by a CJ Martin Fellowship from the National Health and Medical Research Council of Australia.
 D.J.M and J.C.M. were also supported by core funding from EMBL.
 
-# Acknowledgements
+## Acknowledgements
 
 We would like to thank Antonio Scialdone for helpful discussions, as well as Michael Epstein, James R. Smith and John Wilson-Kanamori for testing the workflow on other datasets.
 
