@@ -557,7 +557,7 @@ pheatmap(heat.vals[,order(my.clusters)], cluster_cols=FALSE, breaks=col.breaks,
     annotation_colors=list(Cluster=setNames(chosen.cols, unique.clust)))
 ```
 
-# Additional comments
+# Concluding remarks
 
 Having completed the basic analysis, we save the `SingleCellExperiment` object with its associated data to file.
 This is especially important here as the brain dataset is quite large.
@@ -571,8 +571,6 @@ saveRDS(file="brain_data.rds", sce)
 gc()
 ```
 
-# Software availability
-
 All software packages used in this workflow are publicly available from the Comprehensive R Archive Network (https://cran.r-project.org) or the Bioconductor project (http://bioconductor.org).
 The specific version numbers of the packages used are shown below, along with the version of the R installation.
 
@@ -584,24 +582,26 @@ sessionInfo()
 unlink(all.basenames)
 ```
 
-# Author contributions
+# Author information
+
+## Author contributions
 
 A.T.L.L. developed and tested the workflow on all datasets.
 A.T.L.L. and D.J.M. implemented improvements to the software packages required by the workflow.
 J.C.M. provided direction to the software and workflow development.
 All authors wrote and approved the final manuscript.
 
-# Competing interests
+## Competing interests
 
 No competing interests were disclosed.
 
-# Grant information
+## Grant information
 
 A.T.L.L. and J.C.M. were supported by core funding from Cancer Research UK (award no. A17197).
 D.J.M. was supported by a CJ Martin Fellowship from the National Health and Medical Research Council of Australia.
 D.J.M and J.C.M. were also supported by core funding from EMBL.
 
-# Acknowledgements
+## Acknowledgements
 
 We would like to thank Antonio Scialdone for helpful discussions, as well as Michael Epstein, James R. Smith and John Wilson-Kanamori for testing the workflow on other datasets.
 
