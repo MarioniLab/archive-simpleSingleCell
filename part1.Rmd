@@ -638,30 +638,10 @@ or due to the frequency of low-abundance genes, which reduces the sensitivity of
 - Negative biological components are often obtained from `decomposeVar`. 
 These are intuitively meaningless as it is impossible for a gene to have total variance below technical noise.
 Nonetheless, such values occur due to imprecise estimation of the total variance, especially for low numbers of cells.
+- Users can set `use.spikes=FALSE` to fit a trend to the variances of the endogenous genes in the absence of spike-in transcripts.
+However, this requires some care in interpretation of the results, which will be discussed later.
 - `decomposeVar` also yields _p_-values that can be used to define HVGs at a specific threshold for the false discovery rate (FDR).
 We will discuss this in more detail later, as formal detection of HVGs is not necessary for feature selection during data exploration.
-
-## Trend fitting when spike-ins are unavailable
-
-If spike-in RNA has not been added in appropriate quantities (or at all), an alternative approach is to fit the trend to the variance estimates of the endogenous genes.
-This is done using the `use.spikes=FALSE` setting in `trendVar`, as shown below.
-The resulting trend is higher than most of the spike-in variances (Figure \@ref(fig:hvgplot416b2)), consistent with the presence of non-zero biological variation for most genes.
-
-```{r hvgplot416b2, fig.cap="Variance of normalized log-expression values for each gene in the 416B dataset, plotted against the mean log-expression. The blue line represents the mean-dependent trend fitted to the variances of the endogenous genes (black), with spike-in transcripts shown in red."}
-var.fit.nospike <- trendVar(sce, parametric=TRUE, design=design,
-    use.spikes=FALSE, span=0.2)
-var.out.nospike <- decomposeVar(sce, var.fit.nospike)
-plot(var.out.nospike$mean, var.out.nospike$total, pch=16, cex=0.6, 
-    xlab="Mean log-expression", ylab="Variance of log-expression")
-curve(var.fit.nospike$trend(x), col="dodgerblue", lwd=2, add=TRUE)
-points(var.out.nospike$mean[cur.spike], var.out.nospike$total[cur.spike], col="red", pch=16)
-```
-
-The output of `decomposeVar` is more difficult to interpret when the trend is fitted to the variances of endogenous genes.
-The fitted value of the trend can no longer be generally interpreted as the technical component, as it contains some biological variation as well.
-Instead, recall that `decomposeVar` quantifies changes in variances for each gene over the majority of genes with the same abundance.
-One could assume that the variabilities of most genes are driven by constitutive "house-keeping" processes, which are generally uninteresting.
-Any gene with an increase in its variance is _relatively_ highly variable and can be prioritized for further study.
 
 # Denoising expression values using PCA
 
