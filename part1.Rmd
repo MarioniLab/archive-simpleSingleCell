@@ -60,7 +60,7 @@ unzip(all.basenames[1])
 
 # Overview
 
-We use a relatively simple dataset [@lun2017assessing] to introduce most of the concepts of scRNA-seq data analysis.
+In this article, we use a relatively simple dataset [@lun2017assessing] to introduce most of the concepts of scRNA-seq data analysis.
 This dataset contains two plates of 416B cells (an immortalized mouse myeloid progenitor cell line), processed using the Smart-seq2 protocol [@picelli2014fulllength].
 A constant amount of spike-in RNA from the External RNA Controls Consortium (ERCC) was also added to each cell's lysate prior to library preparation.
 High-throughput sequencing was performed and the expression of each gene was quantified by counting the total number of reads mapped to its exonic regions.
@@ -277,7 +277,8 @@ feature.drop <- isOutlier(sce$total_features, nmads=3, type="lower", log=TRUE)
 
 We identify outliers for the proportion-based metrics in a similar manner.
 Here, no transformation is required as we are identifying large outliers, for which the distinction should be fairly clear on the raw scale.
-We do not use the mitochondrial proportions as we already have the spike-in proportions for this data set.
+(We do not use the mitochondrial proportions as we already have the spike-in proportions for this data set.
+This avoids potential problems with genuine differences in mitochondrial content between cell types that may confound outlier identification.)
 
 ```{r}
 spike.drop <- isOutlier(sce$pct_counts_ERCC, nmads=3, type="higher")
@@ -383,7 +384,10 @@ We use the prediction method described by @scialdone2015computational to classif
 Using a training dataset, the sign of the difference in expression between two genes was computed for each pair of genes.
 Pairs with changes in the sign across cell cycle phases were chosen as markers.
 Cells in a test dataset can then be classified into the appropriate phase, based on whether the observed sign for each marker pair is consistent with one phase or another.
-This approach is implemented in the `cyclone` function from the `r Biocpkg("scran")` package, using a pre-trained set of marker pairs for mouse data.
+
+This approach is implemented in the `cyclone` function from the `r Biocpkg("scran")` package.
+The package contains a pre-trained set of marker pairs for mouse data, which we can load in the the `readRDS` function.
+We use the Ensembl identifiers for each gene in our data set to match up with the names in the pre-trained set of gene pairs.
 
 ```{r}
 set.seed(100)
@@ -782,7 +786,7 @@ my.tree <- hclust(my.dist, method="ward.D2")
 Clusters are explicitly defined by applying a dynamic tree cut [@langfelder2008defining] to the dendrogram.
 This exploits the shape of the branches in the dendrogram to refine the cluster definitions, and is more appropriate than `cutree` for complex dendrograms.
 Greater control of the empirical clusters can be obtained by manually specifying `cutHeight` in `cutreeDynamic`.
-Here, we also set `minClusterSize` to a lower value than the default of 20, to avoid spurious aggregation of distant small clusters.
+We also set `minClusterSize` to a lower value than the default of 20, to avoid spurious aggregation of distant small clusters.
 
 ```{r}
 library(dynamicTreeCut)
@@ -833,7 +837,7 @@ gc()
 
 Once putative subpopulations are identified by clustering, we can identify marker genes for each cluster using the `findMarkers` function.
 This fits a linear model to the log-expression values for each gene using `r Biocpkg("limma")` [@ritchie2015limma].
-The aim is to test for DE in each cluster compared to the others while blocking on uninteresting factors in `design`.
+The aim is to test for DE in each cluster compared to the others while blocking on uninteresting factors such as the plate of origin in `design`.
 The top DE genes are likely to be good candidate markers as they can effectively distinguish between cells in different clusters.
 
 ```{r}
@@ -863,7 +867,7 @@ We save the list of candidate marker genes for further examination.
 The `overlapExprs` function may also be useful here, to prioritize candidates where there is clear separation between the distributions of expression values of different clusters.
 
 ```{r}
-write.table(marker.set, file="marker_1.tsv", sep="\t", quote=FALSE, col.names=NA)
+write.table(marker.set, file="416B_marker_1.tsv", sep="\t", quote=FALSE, col.names=NA)
 ```
 
 We visualize the expression profiles of the top candidates to verify that the DE signature is robust.
@@ -875,9 +879,10 @@ top.markers <- marker.set$Gene[marker.set$Top <= 10]
 top.exprs <- logcounts(sce)[top.markers,,drop=FALSE]
 heat.vals <- top.exprs - rowMeans(top.exprs)
 
-library(pheatmap)
 unique.clusters <- sort(unique(my.clusters))
 chosen.cols <- clust.col[seq_along(unique.clusters)]
+
+library(pheatmap)
 pheatmap(heat.vals, cluster_cols=my.tree,
     annotation_col=data.frame(Cluster=factor(my.clusters), Plate=factor(sce$Plate),
         Oncogene=sce$Oncogene, row.names=colnames(sce)),
@@ -905,6 +910,28 @@ However, this is sensitive to overclustering, as unique marker genes will no lon
 This is because the clusters have been empirically identified from the data.
 `r Biocpkg("limma")` does not account for the uncertainty of clustering, which means that the _p_-values are much lower than they should be. 
 This is not a concern in other analyses where the groups are pre-defined.
+
+
+## Additional comments
+
+Once the basic analysis is completed, it is often useful to save the `SingleCellExperiment` object to file with the `saveRDS` function.
+The object can then be easily restored into new R sessions using the `readRDS` function.
+This allows further work to be conducted without having to repeat all of the processing steps described above.
+
+```{r}
+saveRDS(file="416B_data.rds", sce)
+```
+
+A variety of methods are available to perform more complex analyses on the processed expression data.
+For example, cells can be ordered in pseudotime (e.g., for progress along a differentiation pathway) with `r Biocpkg("monocle")` [@trapnell2014dynamics] or `r Biocpkg("TSCAN")` [@ji2016tscan]; 
+cell-state hierarchies can be characterized with the `r Biocpkg("sincell")` package [@julia2015sincell];
+and oscillatory behaviour can be identified using `r Biocpkg("Oscope")` [@leng2015oscope].
+HVGs can be used in gene set enrichment analyses to identify biological pathways and processes with heterogeneous activity, using packages designed for bulk data like `r Biocpkg("topGO")` or with dedicated single-cell methods like `r Biocpkg("scde")` [@fan2016characterizing].
+Full descriptions of these analyses are outside the scope of this workflow, so interested users are advised to consult the relevant documentation.
+
+```{r, echo=FALSE, results='hide'}
+gc()
+```
 
 # Software availability
 
