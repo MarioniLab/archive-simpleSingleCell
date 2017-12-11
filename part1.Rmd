@@ -77,22 +77,22 @@ In each matrix, each row represents an endogenous gene or a spike-in transcript,
 Subsequently, the count in each entry of the matrix represents the number of reads mapped to a particular gene/transcript in a particular cell.
 
 ```{r}
-batch1 <- read.delim("counts_Calero_20160113.tsv", 
+plate1 <- read.delim("counts_Calero_20160113.tsv", 
     header=TRUE, row.names=1, check.names=FALSE)
-batch2 <- read.delim("counts_Calero_20160325.tsv", 
+plate2 <- read.delim("counts_Calero_20160325.tsv", 
     header=TRUE, row.names=1, check.names=FALSE)
-gene.lengths <- batch1$Length # First column is the gene length.
-batch1 <- as.matrix(batch1[,-1]) # Discarding gene length (as it is not a cell).
-batch2 <- as.matrix(batch2[,-1])
-rbind(Batch1=dim(batch1), Batch2=dim(batch2))
+gene.lengths <- plate1$Length # First column is the gene length.
+plate1 <- as.matrix(plate1[,-1]) # Discarding gene length (as it is not a cell).
+plate2 <- as.matrix(plate2[,-1])
+rbind(Plate1=dim(plate1), Plate2=dim(plate2))
 ```
 
 We combine the two matrices into a single object for further processing.
 This is done after verifying that the genes are in the same order between the two matrices.
 
 ```{r}
-stopifnot(identical(rownames(batch1), rownames(batch2)))
-all.counts <- cbind(batch1, batch2)
+stopifnot(identical(rownames(plate1), rownames(plate2)))
+all.counts <- cbind(plate1, plate2)
 ```
 
 For convenience, the count matrix is stored in a `SingleCellExperiment` object from the `r Biocpkg("SingleCellExperiment")` package.
@@ -148,15 +148,15 @@ head(colnames(metadata))
 ```
 
 We only retain relevant metadata fields to avoid storing unnecessary information in the `colData` of the `SingleCellExperiment` object.
-In particular, we keep the plate (i.e., `block`) in which each cell was processed, and the phenotype of each cell.
+In particular, we keep the plate of origin (i.e., `block`) and phenotype of each cell.
 The second field is relevant as all of the cells contain a _CBFB-MYH11_ oncogene, but the expression of this oncogene is only induced in a subset of the cells.
 
 ```{r}
-colData(sce)$Batch <- factor(metadata[["Factor Value[block]"]])
+colData(sce)$Plate <- factor(metadata[["Factor Value[block]"]])
 pheno <- metadata[["Factor Value[phenotype]"]]
-levels(pheno) <- c("induced", "WT")
-colData(sce)$Phenotype <- pheno
-table(colData(sce)$Phenotype, colData(sce)$Batch)
+levels(pheno) <- c("induced", "control")
+colData(sce)$Oncogene <- pheno
+table(colData(sce)$Oncogene, colData(sce)$Plate)
 ```
 
 ## Incorporating gene-based annotation
@@ -317,12 +317,12 @@ Figure \@ref(qcplotbatch416b) demonstrates that induction of the CBFB-MYH11 onco
 This suggests that we could improve our QC step by considering the condition of the cell during outlier identification. 
 Analyzing all conditions together would unnecessarily inflate the MAD and compromise the removal of low-quality cells. 
 
-```{r qcplotbatch416b, fig.wide=TRUE, fig.cap="Distribution of each QC metric for wild-type (WT) and oncogene-induced cells in the 416B data set."}
+```{r qcplotbatch416b, fig.wide=TRUE, fig.cap="Distribution of each QC metric for control and oncogene-induced cells in the 416B data set."}
 multiplot(
-    plotPhenoData(sce, aes_string(y="total_counts", x="Phenotype")),
-    plotPhenoData(sce, aes_string(y="total_features", x="Phenotype")),
-    plotPhenoData(sce, aes_string(y="pct_counts_ERCC", x="Phenotype")),
-    plotPhenoData(sce, aes_string(y="pct_counts_Mt", x="Phenotype")),
+    plotPhenoData(sce, aes_string(y="total_counts", x="Oncogene")),
+    plotPhenoData(sce, aes_string(y="total_features", x="Oncogene")),
+    plotPhenoData(sce, aes_string(y="pct_counts_ERCC", x="Oncogene")),
+    plotPhenoData(sce, aes_string(y="pct_counts_Mt", x="Oncogene")),
     cols=2)
 ```
 
@@ -334,7 +334,7 @@ This is obviously useful for batch effects caused by known differences in experi
 We can also include known biological factors in `batch`, if those factors could result in systematically fewer expressed genes or lower RNA content.
 
 ```{r}
-blocking <- paste0(sce$Batch, sce$Phenotype)
+blocking <- paste0(sce$Plate, sce$Oncogene)
 libsize.drop2 <- isOutlier(sce$total_counts, nmads=3, type="lower", log=TRUE, batch=blocking)
 feature.drop2 <- isOutlier(sce$total_features, nmads=3, type="lower", log=TRUE, batch=blocking)
 spike.drop2 <- isOutlier(sce$pct_counts_ERCC, nmads=3, type="higher", batch=blocking)
@@ -526,9 +526,9 @@ This is consistent with composition biases introduced by upregulation of genes a
 ```{r normplot416b, fig.cap="Size factors from deconvolution, plotted against library sizes for all cells in the 416B dataset. Axes are shown on a log-scale. Wild-type cells are shown in black and oncogene-induced cells are shown in red."}
 plot(sce$total_counts/1e6, sizeFactors(sce), log="xy",
     xlab="Library size (millions)", ylab="Size factor",
-    col=c("red", "black")[sce$Phenotype], pch=16)
+    col=c("red", "black")[sce$Oncogene], pch=16)
 legend("bottomright", col=c("red", "black"), pch=16, cex=1.2,
-    legend=levels(sce$Phenotype))
+    legend=levels(sce$Oncogene))
 ```
 
 __Comments from Aaron:__
@@ -609,7 +609,7 @@ Given the mean abundance of a gene, the fitted value of the trend is then used a
 The biological component of the variance is finally calculated by subtracting the technical component from the total variance of each gene with the `decomposeVar` function.
 
 ```{r}
-design <- model.matrix(~sce$Batch)
+design <- model.matrix(~sce$Plate)
 var.fit <- trendVar(sce, parametric=TRUE, design=design, span=0.3)
 var.out <- decomposeVar(sce, var.fit)
 head(var.out)
@@ -730,7 +730,7 @@ Cells with similar expression profiles should be located close together in the p
 In this case, we observe a clear separation of cells based on the oncogene induction status, consistent with the expected effects on the transcriptome.
 
 ```{r pcaplot416b, fig.cap="Pairwise PCA plots of the first three PCs in the 416B data set, constructed from normalized log-expression values of genes with positive biological components. Each point represents a cell, coloured according to the oncogene induction status. Bars represent the coordinates of the cells on each axis.", fig.width=9}
-plotReducedDim(sce, use_dimred="PCA", ncomponents=3, colour_by="Phenotype") + fontsize
+plotReducedDim(sce, use_dimred="PCA", ncomponents=3, colour_by="Oncogene") + fontsize
 ```
 
 Another widely used approach is the _t_-stochastic neighbour embedding (_t_-SNE) method [@van2008visualizing].
@@ -740,11 +740,11 @@ However, this improvement comes at the cost of more computational effort and req
 We demonstrate the generation of _t_-SNE plots in Figure \@ref(fig:tsneplot416b), using the low-rank approximation of the data to take advantage of the denoising step.
 
 ```{r tsneplot416b, fig.cap="_t_-SNE plots constructed from the denoised PCs in the 416B data set, using a range of perplexity values. Each point represents a cell, coloured according to its oncogene induction status. Bars represent the coordinates of the cells on each axis.", fig.width=15, fig.asp=0.5}
-out5 <- plotTSNE(sce, use_dimred="PCA", perplexity=5, colour_by="Phenotype", 
+out5 <- plotTSNE(sce, use_dimred="PCA", perplexity=5, colour_by="Oncogene", 
     rand_seed=100) + fontsize + ggtitle("Perplexity = 5")
-out10 <- plotTSNE(sce, use_dimred="PCA", perplexity=10, colour_by="Phenotype",
+out10 <- plotTSNE(sce, use_dimred="PCA", perplexity=10, colour_by="Oncogene",
     rand_seed=100) + fontsize + ggtitle("Perplexity = 10")
-out20 <- plotTSNE(sce, use_dimred="PCA", perplexity=20, colour_by="Phenotype",
+out20 <- plotTSNE(sce, use_dimred="PCA", perplexity=20, colour_by="Oncogene",
     rand_seed=100) + fontsize + ggtitle("Perplexity = 20")
 multiplot(out5, out10, out20, cols=3)
 ```
@@ -792,11 +792,11 @@ my.clusters <- unname(cutreeDynamic(my.tree, distM=as.matrix(my.dist),
 
 We examine the distribution of cells in each cluster with respect to known factors.
 Each cluster is comprised of cells from both batches, indicating that the clustering is not driven by a batch effect.
-Differences in the composition of each cluster are observed with respect to `Phenotype`, consistent with a biological effect of oncogene induction.
+Differences in the composition of each cluster are observed with respect to `Oncogene`, consistent with a biological effect of oncogene induction.
 
 ```{r}
-table(my.clusters, sce$Batch)
-table(my.clusters, sce$Phenotype)
+table(my.clusters, sce$Plate)
+table(my.clusters, sce$Oncogene)
 ```
 
 We visualize the cluster assignments for all cells on the _t_-SNE plot in Figure \@(fig:tsnecluster416b).
@@ -879,11 +879,11 @@ library(pheatmap)
 unique.clusters <- sort(unique(my.clusters))
 chosen.cols <- clust.col[seq_along(unique.clusters)]
 pheatmap(heat.vals, cluster_cols=my.tree,
-    annotation_col=data.frame(Cluster=factor(my.clusters), Batch=factor(sce$Batch),
-        Phenotype=sce$Phenotype, row.names=colnames(sce)),
+    annotation_col=data.frame(Cluster=factor(my.clusters), Plate=factor(sce$Plate),
+        Oncogene=sce$Oncogene, row.names=colnames(sce)),
     annotation_colors=list(Cluster=setNames(chosen.cols, unique.clusters),
-        Batch=setNames(c("grey50", "grey80"), levels(sce$Batch)),
-        Phenotype=setNames(c("red", "black"), levels(sce$Phenotype))))
+        Plate=setNames(c("grey50", "grey80"), levels(sce$Plate)),
+        Oncogene=setNames(c("red", "black"), levels(sce$Oncogene))))
 ```
 
 Many of the markers in Figure \@ref(fig:heatmapmarker416b) are not uniquely up- or downregulated in the chosen cluster.
