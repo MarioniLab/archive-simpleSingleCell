@@ -56,7 +56,7 @@ for (x in seq_along(all.urls)) {
 
 # Overview
 
-We examine a heterogeneous dataset from a study of cell types in the mouse brain [@zeisel2015brain].
+In this article, we examine a heterogeneous dataset from a study of cell types in the mouse brain [@zeisel2015brain].
 This contains approximately 3000 cells of varying types such as oligodendrocytes, microglia and neurons.
 Individual cells were isolated using the Fluidigm C1 microfluidics system and library preparation was performed on each cell using a UMI-based protocol.
 After sequencing, expression was quantified by counting the number of UMIs mapped to each gene.
@@ -125,13 +125,21 @@ sce <- SingleCellExperiment(list(counts=all.counts), colData=endo.data$metadata)
 dim(sce)
 ```
 
-We also add annotation identifying rows that correspond to each class of features.
+We add gene-based annotation identifying rows that correspond to each class of features.
+We also determine the Ensembl identifier for each row.
 
 ```{r}
+# Specifying the nature of each row.
 nrows <- c(nrow(endo.data$counts), nrow(mito.data$counts), nrow(spike.data$counts))
 is.spike <- rep(c(FALSE, FALSE, TRUE), nrows)
 is.mito <- rep(c(FALSE, TRUE, FALSE), nrows)
 isSpike(sce, "Spike") <- is.spike
+
+# Adding Ensembl IDs.
+library(org.Mm.eg.db)
+ensembl <- mapIds(org.Mm.eg.db, keys=rownames(sce), keytype="SYMBOL", column="ENSEMBL")
+rowData(sce)$ENSEMBL <- ensembl
+
 sce
 ```
 
@@ -151,8 +159,10 @@ library(scater)
 sce <- calculateQCMetrics(sce, feature_controls=list(Spike=is.spike, Mt=is.mito)) 
 ```
 
-We examine the distribution of library sizes and numbers of expressed genes across cells (Figure \@ref(fig:libplotbrain)).
-In particular, the spike-in proportions here are more variable than in the HSC dataset.
+We examine the distribution of the QC metrics across all cells (Figure \@ref(fig:libplotbrain)).
+The library sizes here are at least one order of magnitude lower than observed in the 416B dataset.
+This is consistent with the use of UMI counts rather than read counts, as each transcript molecule can only produce one UMI count but can yield many reads after fragmentation.
+In addition, the spike-in proportions are more variable than observed in the 416B dataset.
 This may reflect a greater variability in the total amount of endogenous RNA per cell when many cell types are present.
 
 ```{r libplotbrain, fig.wide=TRUE, fig.cap="Histograms of QC metrics including the library sizes, number of expressed genes and proportion of UMIs assigned to spike-in transcripts or mitochondrial genes for all cells in the brain dataset."}
@@ -185,6 +195,10 @@ data.frame(ByLibSize=sum(libsize.drop), ByFeature=sum(feature.drop),
     BySpike=sum(spike.drop), Remaining=ncol(sce))
 ```
 
+We could improve our cell filtering procedure further by setting `batch` in `isOutlier` to one or more known factors, e.g., mouse/plate of origin.
+As previously mentioned, this would avoid inflation of the MAD and improve power to remove low-quality cells.
+However, for simplicity, we will not do this as quality control has already been performed by the original authors.
+
 ```{r echo=FALSE, results='hide'}
 gc()
 ```
@@ -192,26 +206,21 @@ gc()
 # Cell cycle classification
 
 Application of `cyclone` to the brain dataset suggests that most of the cells are in G1 phase (Figure \@ref(fig:phaseplotbrain)).
-However, the intepretation of this result requires some caution due to the differences between the test and training datasets.
-The classifier was trained on C1 SMARTer data [@scialdone2015computational] and accounts for the biases in that protocol. 
-The brain dataset uses UMI counts, which has an entirely different set of biases, e.g., 3'-end coverage only, no length bias, no amplification noise.
-These new biases (and the absence of expected biases) may interfere with accurate classification of some cells.
+This requires the use of the Ensembl identifiers to match up with the pre-defined classifier.
 
 ```{r phaseplotbrain, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the brain dataset, where each point represents a cell."}
-library(org.Mm.eg.db)
-ensembl <- mapIds(org.Mm.eg.db, keys=rownames(sce), keytype="SYMBOL", column="ENSEMBL")
-
 library(scran)
 mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", package="scran"))
-assignments <- cyclone(sce, mm.pairs, gene.names=ensembl)
+assignments <- cyclone(sce, mm.pairs, gene.names=rowData(sce)$ENSEMBL)
+table(assignments$phase)
 plot(assignments$score$G1, assignments$score$G2M, xlab="G1 score", ylab="G2/M score", pch=16)
 ```
 
-An additional complication is that many neuronal cell types are expected to lie in the G0 resting phase, which is distinct from the other phases of the cell cycle [@coller2006new].
-Application of `cyclone` to these cells may be suboptimal if each cell must be assigned into one of the G1, S or G2/M phases.
-To avoid problems from misclassification, we will not perform any processing of this dataset by cell cycle phase.
-This is unlikely to be problematic here, as the cell cycle effect will be relatively subtle compared to the obvious differences between cell types in a diverse population.
-Thus, the former is unlikely to distort the conclusions regarding the latter.
+However, the intepretation of this result requires some caution due to differences between the training and test datasets.
+The classifier was trained on C1 SMARTer data [@scialdone2015computational] and accounts for the biases in that protocol. 
+The brain dataset uses UMI counts, which has a different set of biases, e.g., 3'-end coverage only, no length bias, no amplification noise.
+Furthermore, many neuronal cell types are expected to lie in the G0 resting phase, which is distinct from the other phases of the cell cycle [@coller2006new].
+`cyclone` will generally assign such cells to the closest known phase in the training set, which would be G1.
 
 ```{r echo=FALSE, results='hide'}
 gc()
@@ -230,9 +239,6 @@ plotQC(sce, type = "highest-expression", n=50) + fontsize
 
 Gene abundance is quantified by computing the average count across all cells (Figure \@ref(fig:abhistbrain)).
 As previously mentioned, the UMI count is generally lower than the read count.
-This is because each transcript can only produce one UMI count but can yield many reads after fragmentation.
-Some power will be lost due to the decrease in the size of the counts, but this is mitigated by a concomitant reduction in their variability.
-Specifically, the use of UMIs eliminates technical noise due to amplification biases [@islam2014quantitative].
 
 ```{r abhistbrain, fig.cap="Histogram of log-average counts for all genes in the brain dataset. The filter threshold is represented by the blue line."}
 ave.counts <- calcAverage(sce)
@@ -270,16 +276,16 @@ sce <- computeSumFactors(sce, cluster=clusters,
 summary(sizeFactors(sce))
 ```
 
-We set `subset.row` to use only the high-abundance genes for normalization (and clustering, for consistency).
-We use a threshold of 0.1 to define `high.ave`, which is lower than the threshold in the HSC analysis to reflect the fact that UMI counts are generally smaller.
+We set `subset.row` to use only the high-abundance genes for normalization (as well as clustering, for consistency).
+We use a threshold of 0.1 to define `high.ave`, which is lower than the default threshold of `min.mean=1` in `computeSumFactors`.
+This reflects the fact that UMI counts are generally smaller than read counts.
 Setting `min.mean=NULL` simply avoids recomputing the average count within `computeSumFactors`, given that filtering has already been performed with `subset.row`.
-(Here, `subset.row=high.ave` and `min.mean=0.1` are redundant as they do exactly the same thing.)
 
 ```{r echo=FALSE, results='hide'}
 gc()
 ```
 
-Compared to the HSC analysis, more scatter is observed around the trend between the total count and size factor for each cell (Figure \@ref(fig:normplotbrain)).
+Compared to the 416B analysis, more scatter is observed around the trend between the total count and size factor for each cell (Figure \@ref(fig:normplotbrain)).
 This is consistent with an increased amount of DE between cells of different types, which compromises the accuracy of library size normalization [@robinson2010scaling].
 In contrast, the size factors are estimated based on median ratios and are more robust to the presence of DE between cells.
 
@@ -308,55 +314,29 @@ __Comments from Aaron:__
 
 - Only a rough clustering is required to avoid pooling together very different cell types in `computeSumFactors`.
 The function is robust to a moderate level of differential expression between cells in the same cluster.
+- `quickCluster` uses distances based on Spearman's rank correlation for clustering.
+This ensures that scaling biases in the counts do not affect clustering, but yields very coarse clusters and is not recommended for biological interpretation.
 - For large data sets, using `method="igraph"` in `quickCluster` will speed up clustering. 
 This uses a graph-based clustering algorithm - see `?buildSNNGraph` for more details.
-
-# Checking for important technical factors
-
-Larger experiments contain more technical factors that need to be investigated.
-In this dataset, factors include the sex of the animal from which the cells were extracted, the age of the animal, the tissue of origin for each cell, and the total spike-in count in each cell.
-Figure \@ref(fig:explvarplotbrain) shows that the tissue of origin explains a substantial proportion of the variance for a subset of genes.
-This is probably because each tissue contains a different composition of cell types, leading to systematic differences in gene expression between tissues.
-The other factors explain only a small proportion of the variance for most genes and do not need to be incorporated into our downstream analyses.
-
-```{r, echo=FALSE, results='hide', message=FALSE}
-fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
-```
-
-```{r explvarplotbrain, fig.cap="Density plot of the percentage of variance explained by each factor across all genes in the brain dataset. For each gene, the percentage of the variance of the normalized log-expression values that is explained by the (log-transformed) total spike-in counts, the sex or age of the mouse, or the tissue of origin is calculated. Each curve corresponds to one factor and represents the distribution of percentages across all genes."}
-plotExplanatoryVariables(sce, variables=c("log10_total_counts_Spike", 
-    "log10_total_counts_Spike", "sex", "tissue", "age")) + fontsize
-```
-
-Nonetheless, we demonstrate how to account for uninteresting technical factors by using sex as an example.
-We set up a design matrix with the sex of the animal as the explanatory factor for each cell.
-This ensures that any sex-specific changes in expression will be modelled in our downstream analyses.
-We do not block on the tissue of origin, despite the fact that it explains more of the variance than sex in Figure \@ref(fig:explvarplotbrain).
-This is because the tissue factor is likely to be associated with genuine differences between cell types, so including it in the model might regress out interesting biological effects.
-
-```{r}
-design <- model.matrix(~sce$sex)
-```
-
-Other relevant factors include the chip or plate on which the cells were processed and the batch in which the libraries were sequenced.
-Blocking on these factors may be necessary to account for batch effects that are often observed in scRNA-seq data [@hicks2015widespread; @tung2016batch].
 
 # Modelling and removing technical noise
 
 We model the technical noise by fitting a mean-variance trend to the spike-in transcripts, as previously described.
-To account for uninteresting factors, we supply `design` to `trendVar` to regress out any technical differences due to sex.
+In theory, we should block on the plate of origin for each cell.
+However, only 20-40 cells are available on each plate, and the population is also highly heterogeneous.
+This means that we cannot assume that the distribution of cell types on each plate is the same.
+Thus, to avoid regressing out potential biology, we will not block on any factors in this analysis.
 
 ```{r}
-var.fit <- trendVar(sce, parametric=TRUE, span=0.4, design=design)
+var.fit <- trendVar(sce, parametric=TRUE, span=0.4)
 var.out <- decomposeVar(sce, var.fit)
 ```
 
 Figure \@ref(fig:hvgplotbrain) indicates that the trend is fitted accurately to the technical variances.
-The technical and total variances are also much smaller than those in the HSC dataset.
-This is due to the use of UMIs which reduces the noise caused by variable PCR amplification.
+The technical and total variances are also much smaller than those in the 416B dataset.
+This is due to the use of UMIs, which reduces the noise caused by variable PCR amplification [@islam2014quantitative].
 Furthermore, the spike-in trend is consistently lower than the variances of the endogenous genes.
 This reflects the heterogeneity in gene expression across cells of different types.
-It also provides an example where most genes _are_ highly variable, such that fitting a trend to their variances would not recover the technical component.
 
 ```{r hvgplotbrain, fig.cap="Variance of normalized log-expression values against the mean for each gene, calculated across all cells in the brain data set after blocking on the sex effect. The blue line represents the mean-dependent trend in the technical variance of the spike-in transcripts (also highlighted as red points)."}
 plot(var.out$mean, var.out$total, pch=16, cex=0.6, xlab="Mean log-expression", 
@@ -374,12 +354,12 @@ plotExpression(sce, rownames(var.out)[chosen.genes],
     alpha=0.05, jitter="jitter") + fontsize
 ```
 
-Finally, we denoise the expression values using our PCA-based approach.
-We supply `design` to regress out uninteresting factors, and we use only the genes with positive biological components, 
-This yields a set of coordinates for each cell where the technical noise has been removed.
+Finally, we denoise the expression values using our PCA-based approach, yielding a set of coordinates for each cell where the technical noise has been removed.
+Setting `approximate=TRUE` in `denoisePCA` will perform an approximate singular value decomposition, using methods from the `r CRANpkg("irlba")` package.
+This is much faster than the exact algorithm on large data sets, without much loss of accuracy.
 
 ```{r}
-sce <- denoisePCA(sce, technical=var.fit$trend, design=design, approximate=TRUE)
+sce <- denoisePCA(sce, technical=var.fit$trend, approximate=TRUE)
 ncol(reducedDim(sce, "PCA"))
 ```
 
@@ -431,8 +411,6 @@ gc()
 
 - That being said, if an analysis method can accept a design matrix, blocking on nuisance factors in the design matrix is preferable to using `removeBatchEffect`.
 This is because the latter does not account for the loss of residual degrees of freedom, nor the uncertainty of estimation of the blocking factor terms.
-- Setting `approximate=TRUE` in `denoisePCA` will perform an approximate singular value decomposition, using methods from the `r CRANpkg("irlba")` package.
-This is much faster than the exact algorithm on large data sets, without much loss of accuracy.
 
 # Data exploration with dimensionality reduction
 
@@ -463,31 +441,21 @@ It can also be used to characterise each cluster if the selected genes are known
 For example, _Mog_ can be used to identify clusters corresponding to oligodendrocytes.
 
 ```{r echo=FALSE, results='hide'}
-rm(tsne1, tsne2, pca1, pca2)
 gc()
 ```
 
 # Clustering cells into putative subpopulations
 
-The denoised log-expression values are used to cluster cells into putative subpopulations.
-Specifically, we perform hierarchical clustering on the Euclidean distances between cells, using Ward's criterion to minimize the total variance within each cluster.
-This yields a dendrogram that groups together cells with similar expression patterns across the chosen genes.
-An alternative approach is to cluster on a matrix of distances derived from correlations (e.g., as in `quickCluster`).
-This is more robust to noise and normalization errors, but is also less sensitive to subtle changes in the expression profiles. 
+The reduced dimension coordinates are used to cluster cells into putative subpopulations.
+We do so by constructing a shared-nearest-neighbour graph [@xu2015identification], in which cells are the nodes and edges are formed between cells that share nearest neighbours.
+Clusters are then defined as highly connected communities of cells within this graph, using methods from the `r CRANpkg("igraph")` package.
+This is more efficient than forming a pairwise distance matrix for hierarchical clustering of large numbers of cells.
 
 ```{r}
-pcs <- reducedDim(sce, "PCA")
-my.dist <- dist(pcs)
-my.tree <- hclust(my.dist, method="ward.D2")
-```
-
-Clusters are explicitly defined by applying a dynamic tree cut [@langfelder2008defining] to the dendrogram.
-This exploits the shape of the branches in the dendrogram to refine the cluster definitions, and is more appropriate than `cutree` for complex dendrograms.
-Greater control of the empirical clusters can be obtained by manually specifying `cutHeight` in `cutreeDynamic`.
-
-```{r}
-library(dynamicTreeCut)
-my.clusters <- unname(cutreeDynamic(my.tree, distM=as.matrix(my.dist), verbose=0))
+snn.gr <- buildSNNGraph(sce, use.dimred="PCA")
+cluster.out <- igraph::cluster_walktrap(snn.gr)
+my.clusters <- cluster.out$membership
+table(my.clusters)
 ```
 
 We visualize the cluster assignments for all cells on the _t_-SNE plot in Figure \@(fig:tsneclusterbrain).
@@ -498,67 +466,48 @@ sce$cluster <- factor(my.clusters)
 plotTSNE(sce, colour_by="cluster") + fontsize
 ```
 
-We check the separatedness of the clusters using the silhouette width (Figure ((silhouettebrain))).
-Cells with large positive silhouette widths are closer to other cells in the _same_ cluster than to cells in _different_ clusters.
-Conversely, cells with negative widths are closer to other clusters than to other cells in the cluster to which it was assigned.
-Each cluster would ideally contain many cells with large positive widths, indicating that it is well-separated from other clusters.
-This can be used to gauge the optimal parameter values (e.g., cut height, number of clusters) that maximize the separation between clusters.
-For example, we could vary the cut height in `cutreeDynamic` to maximize the average silhouette width across all cells.
+To assess clustering performance, we calculate the total weight of edges between cells in the same cluster.
+We divide this by the total weight of edges involving a cell in that cluster to obtain a per-cluster modularity score.
+High modularity scores (near the maximum of 1) should be observed if a cell is mostly connected to other cells in the same cluster compared to cells in other clusters.
 
-```{r silhouettebrain, message=FALSE, fig.cap="Barplot of silhouette widths for cells in each cluster. Each cluster is assigned a colour and cells with positive widths are coloured according to the colour of its assigned cluster. Any cell with a negative width is coloured according to the colour of the cluster that it is closest to. The average width for all cells in each cluster is shown, along with the average width for all cells in the data set."}
-library(cluster)
-clust.col <- scater:::.get_palette("tableau10medium") # hidden scater colours
-sil <- silhouette(my.clusters, dist = my.dist)
-sil.cols <- clust.col[ifelse(sil[,3] > 0, sil[,1], sil[,2])]
-sil.cols <- sil.cols[order(-sil[,1], sil[,3])]
-plot(sil, main = paste(length(unique(my.clusters)), "clusters"), 
-    border=sil.cols, col=sil.cols, do.col.sort=FALSE) 
+```{r}
+grmat <- snn.gr[]
+total.weight <- Matrix::colSums(grmat)/2 # Symmetric for undirected graphs
+mod.cluster <- numeric(nlevels(sce$cluster))
+names(mod.cluster) <- levels(sce$cluster)
+for (x in names(mod.cluster)) {
+    current <- sce$cluster==x
+    internal.weight <- sum(grmat[current,current])/2
+    mod.cluster[x] <- internal.weight/sum(total.weight[current])
+}
+mod.cluster
 ```
 
 ```{r echo=FALSE, results='hide'}
 gc()
 ```
 
-__Comments from Aaron:__
-
-- Very heterogeneous datasets may yield a few large clusters on the first round of clustering.
+Very heterogeneous datasets may yield a few large clusters on the first round of clustering.
 It can be useful to repeat the variance modelling, denoising and clustering using only the cells within each of the initial clusters.
 This can be achieved by subsetting `sce` according to a particular level of `my.clusters`, and re-applying the relevant functions on the subset.
 Doing so may focus on a different set of genes that define heterogeneity _within_ an initial cluster, as opposed to those that define differences _between_ the initial clusters.
 This would allow fine-scale structure within each cluster to be explored at greater resolution. 
 For simplicity, though, we will only use the broad clusters corresponding to clear subpopulations in this workflow.
-- For larger data sets, consider using `buildSNNGraph` and methods from the `r CRANpkg("igraph")` package to perform clustering.
-This builds a shared-nearest-neighbour graph [@xu2015identification] in which cells are the nodes and edges are formed between cells that share nearest neighbours.
-Clusters are then defined as highly connected communities of cells within this graph.
-This is more efficient than forming a pairwise distance matrix for large numbers of cells.
-Clustering parameters can be optimized by maximizing the modularity score for the formed clusters.
 
-```{r}
-snn.gr <- buildSNNGraph(sce, use.dimred="PCA")
-gr.clusters <- igraph::cluster_fast_greedy(snn.gr)
-table(gr.clusters$membership)
-```
+**Comments from Aaron:**
 
-```{r echo=FALSE, results='hide'}
-rm(snn.gr, gr.clusters)
-gc()
-```
+- Many different clustering methods are available in the `r CRANpkg("igraph")` package.
+We find that the Walktrap algorithm is usually a good default choice [@yang2016comparative], though users are encouraged to experiment with different algorithms.
+- Decreasing the number of neighbours `k` in `buildSNNGraph` will reduce the connectivity of the graph.
+This will generally result in the formation of smaller clusters [@xu2015identification], which may be desirable if greater resolution is required.
+- Notice that we do not run `library(igraph)`. 
+This is because `r CRANpkg("igraph")` contains a `normalize` method that will override its counterpart from `r Biocpkg("scater")`, resulting in some unusual bugs.
 
 # Detecting marker genes between subpopulations
 
-Once putative subpopulations are identified by clustering, we can identify marker genes for each cluster using the `findMarkers` function.
-This fits a linear model to the log-expression values for each gene using `r Biocpkg("limma")` [@ritchie2015limma].
-The aim is to test for DE in each cluster compared to the others while blocking on uninteresting factors in `design`.
-The top DE genes are likely to be good candidate markers as they can effectively distinguish between cells in different clusters.
-
-```{r}
-markers <- findMarkers(sce, my.clusters, design=design)
-```
-
-For each cluster, the DE results of the relevant comparisons are consolidated into a single output table.
-This allows a set of marker genes to be easily defined by taking the top DE genes from each pairwise comparison between clusters.
-For example, to construct a marker set for cluster 1 from the top 10 genes of each comparison, one would filter `marker.set` to retain rows with `Top` less than or equal to 10.
-Other statistics are also reported for each gene, including the adjusted p-values (see below) and the log-fold changes relative to every other cluster.
+We use the `findMarkers` function to identify marker genes for each cluster, as previously described.
+We examine the output table for cluster 1, in which log-fold changes are reported between cluster 1 and every other cluster.
+The same output is provided for each cluster in order to identify genes that discriminate between clusters.
 
 ```{r, echo=FALSE, results="hide"}
 old.digits <- options()$digits
@@ -566,61 +515,40 @@ options(digits=3)
 ```
 
 ```{r}
+markers <- findMarkers(sce, my.clusters)
 marker.set <- markers[["1"]]
-head(marker.set, 10)
+head(marker.set[,1:8], 10) # only first 8 columns, for brevity
 ```
 
 ```{r, echo=FALSE, results="hide"}
 options(digits=old.digits)
 ```
 
-We save the list of candidate marker genes for further examination.
-The `overlapExprs` function may also be useful here, to prioritize candidates where there is clear separation between the distributions of expression values of different clusters.
+We save the list of candidate marker genes for further examination, using compression to reduce the file size.
+The `overlapExprs` function may also be useful for summarizing differences between clusters, as previously mentioned.
 
 ```{r}
-write.table(marker.set, file="brain_marker_1.tsv", sep="\t", quote=FALSE, col.names=NA)
+gzout <- gzfile("brain_marker_1.tsv.gz", open="wb")
+write.table(marker.set, file=gzout, sep="\t", quote=FALSE, col.names=NA)
+close(gzout)
 ```
 
-We visualize the expression profiles of the top candidates to verify that the DE signature is robust.
-Figure \@ref(fig:heatmapmarkerbrain) indicates that most of the top markers have strong and consistent up- or downregulation in cells of cluster 1 compared to some or all of the other clusters.
-Thus, cells from the subpopulation of interest can be identified as those that express the upregulated markers and do not express the downregulated markers.
+Figure \@ref(fig:heatmapmarkerbrain) indicates that most of the top markers are strongly DE in cells of cluster 1 compared to some or all of the other clusters.
+We can use these markers to identify cells from cluster 1 in validation studies with an independent population of cells.
 
-```{r heatmapmarkerbrain, fig.cap="Heatmap of mean-centred normalized and corrected log-expression values for the top set of markers for cluster 1 in the brain dataset. Column colours represent the cluster to which each cell is assigned, as indicated by the legend."}
+```{r heatmapmarkerbrain, fig.wide=TRUE, fig.asp=1.5, fig.cap="Heatmap of mean-centred and normalized log-expression values for the top set of markers for cluster 1 in the brain dataset. Column colours represent the cluster to which each cell is assigned, as indicated by the legend."}
 top.markers <- marker.set$Gene[marker.set$Top <= 10]
-top.exprs <- norm_exprs(sce)[top.markers,,drop=FALSE]
+top.exprs <- logcounts(sce)[top.markers,,drop=FALSE]
 heat.vals <- top.exprs - rowMeans(top.exprs)
+
+clust.col <- scater:::.get_palette("tableau20")
+unique.clust <- sort(unique(my.clusters))
+clust.col <- clust.col[seq_along(unique.clust)]
+
 library(pheatmap)
-pheatmap(heat.vals, cluster_cols=my.tree,
+pheatmap(heat.vals[,order(my.clusters)], cluster_cols=FALSE,
     annotation_col=data.frame(Cluster=factor(my.clusters), row.names=colnames(sce)),
-    annotation_colors=list(Cluster=setNames(clust.col, seq_along(unique(my.clusters)))))
-```
-
-Many of the markers in Figure \@ref(fig:heatmapmarkerbrain) are not uniquely up- or downregulated in the chosen cluster.
-Testing for unique DE tends to be too stringent as it overlooks important genes that are expressed in two or more clusters.
-For example, in a mixed population of CD4^+^-only, CD8^+^-only, double-positive and double-negative T cells, neither _Cd4_ or _Cd8_ would be detected as subpopulation-specific markers because each gene is expressed in two subpopulations.
-With our approach, both of these genes will be picked up as candidate markers as they will be DE between at least one pair of subpopulations.
-A combination of markers can then be chosen to characterize a subpopulation, which is more flexible than trying to find uniquely DE genes.
-
-__Comments from Aaron:__
-
-- To avoid problems with discreteness when modelling the mean-variance relationship, `findMarkers` will automatically partition the data into low- and high-abundance genes.
-Empirical Bayes shrinkage is performed in each partition separately, prior to calculation of _p_-values using the shrunk variance estimates.
-This ensures that discreteness does not affect the inferences for high-abundance genes, without needing to entirely discard the low-abundance genes.
-- `findMarkers` can also be directed to find genes that are DE between the chosen cluster and _all_ other clusters.
-This should be done by setting `pval.type="all"`, which defines the p-value for each gene as the maximum value across all pairwise comparisons involving the chosen cluster.
-Combined with `direction="up"`, this can be used to identify unique markers for each cluster.
-However, this is sensitive to overclustering, as unique marker genes will no longer exist if a cluster is split into two smaller subclusters.
-- It must be stressed that the (adjusted) _p_-values computed here cannot be properly interpreted as measures of significance.
-This is because the clusters have been empirically identified from the data.
-`r Biocpkg("limma")` does not account for the uncertainty of clustering, which means that the _p_-values are much lower than they should be. 
-This is not a concern in other analyses where the groups are pre-defined.
-- The `SingleCellExperiment` object can also be easily transformed for use in other DE analysis methods.
-For example, the `convertTo` function can be used to construct a `DGEList` for input into the `r Biocpkg("edgeR")` pipeline [@robinson2010edgeR].
-This allows users to construct their own marker detection pipeline, though we find that direct use of `findMarkers` is usually sufficient.
-
-```{r}
-library(edgeR)
-y <- convertTo(sce, type="edgeR")
+    annotation_colors=list(Cluster=setNames(clust.col, unique.clust)))
 ```
 
 # Additional comments
@@ -641,13 +569,6 @@ gc()
 
 All software packages used in this workflow are publicly available from the Comprehensive R Archive Network (https://cran.r-project.org) or the Bioconductor project (http://bioconductor.org).
 The specific version numbers of the packages used are shown below, along with the version of the R installation.
-Version numbers of all Bioconductor packages correspond to release version 3.5 of the Bioconductor project.
-```{r, echo=FALSE, results='asis'}
-if (!on.bioc) { 
-    cat("Users can install all required packages and execute the workflow by following the instructions at https://www.bioconductor.org/help/workflows/simpleSingleCell.\n")
-}
-cat("The workflow takes less than an hour to run on a desktop computer with 8 GB of memory.\n")
-```
 
 ```{r}
 sessionInfo()
