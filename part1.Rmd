@@ -617,32 +617,83 @@ chosen.genes <- order(var.out$bio, decreasing=TRUE)[1:10]
 plotExpression(sce, features=rownames(var.out)[chosen.genes]) + fontsize
 ```
 
-__Comments from Aaron:__
+## Choosing the parameters of the trend fit
 
-- In practice, trend fitting is complicated by the small number of spike-in transcripts and the uneven distribution of their abundances.
+In practice, trend fitting is complicated by the small number of spike-in transcripts and the uneven distribution of their abundances.
 For low numbers of cells, these issues are exacerbated by the low precision of the variance estimates.
-Some tuning of trend parameters such as `span` may be required to achieve a suitable fit - see `?trendVar` for more details.
+Thus, some tuning of trend parameters such as `span` may be required to achieve a suitable fit - see `?trendVar` for more details.
 Setting `parametric=TRUE` is especially useful for modelling the expected wave-like shape of the mean-variance relationship.
 (This is not the default setting as it is not robust for arbitrary trend shapes.)
-- The `trendVar` function will automatically filter out low-abundance genes prior to trend fitting.
-This ensures that low-abundance genes do not interfere with the fit - either due to discreteness, which biases the estimate of variability of the variances around the trend;
+
+The `trendVar` function will also automatically filter out low-abundance genes prior to trend fitting.
+This ensures that low-abundance genes do not interfere with the fit due to discreteness, which biases the estimate of variability of the variances around the trend;
 or due to the frequency of low-abundance genes, which reduces the sensitivity of span-based smoothing algorithms at higher abundances.
-    - Filtering uses the average of log-expression values rather than the (library size-adjusted) average count.
-    The mean log-expression is independent of the variance estimate in a linear modelling framework [@bourgon2010independent], 
-    which ensures that the filter does not introduce spurious trends in the variances at the filter boundary.
-    - The filter threshold is specified with the `min.mean` argument in `trendVar`.
-    We use the default threshold of 0.1 (`min.mean`) based on the appearance of discrete patterns in the variance estimates for simulated Poisson-distributed counts.
-    Lower thresholds of 0.001-0.01 may be more suitable for very sparse data, e.g., from droplet-based protocols.
-    - The filter used in `trendVar` is _not_ applied in `decomposeVar` by default.
-    Retention of all genes ensures that weak biological signal from rare subpopulations is not discarded.
-    To apply the filter in `decomposeVar`, users should set `subset.row=rowMeans(logcounts(sce)) > 0.1` in the function call.
+The internal choice of filtering strategy involves a number of considerations:
+
+- Filtering uses the average of log-expression values rather than the (library size-adjusted) average count.
+The mean log-expression is independent of the variance estimate in a linear modelling framework [@bourgon2010independent], 
+which ensures that the filter does not introduce spurious trends in the variances at the filter boundary.
+- The filter threshold is specified with the `min.mean` argument in `trendVar`.
+We use the default threshold of 0.1 (`min.mean`) based on the appearance of discrete patterns in the variance estimates for simulated Poisson-distributed counts.
+Lower thresholds of 0.001-0.01 may be more suitable for very sparse data, e.g., from droplet-based protocols.
+- The filter used in `trendVar` is _not_ applied in `decomposeVar` by default.
+Retention of all genes ensures that weak biological signal from rare subpopulations is not discarded.
+To apply the filter in `decomposeVar`, users should set `subset.row=rowMeans(logcounts(sce)) > 0.1` in the function call.
+
+Finally, users can set `use.spikes=FALSE` to fit a trend to the variances of the endogenous genes in the absence of spike-in transcripts.
+This requires some care in interpretation of the results, which will be discussed later.
+
+**Comments from Aaron:**
+
 - Negative biological components are often obtained from `decomposeVar`. 
 These are intuitively meaningless as it is impossible for a gene to have total variance below technical noise.
 Nonetheless, such values occur due to imprecise estimation of the total variance, especially for low numbers of cells.
-- Users can set `use.spikes=FALSE` to fit a trend to the variances of the endogenous genes in the absence of spike-in transcripts.
-However, this requires some care in interpretation of the results, which will be discussed later.
 - `decomposeVar` also yields _p_-values that can be used to define HVGs at a specific threshold for the false discovery rate (FDR).
 We will discuss this in more detail later, as formal detection of HVGs is not necessary for feature selection during data exploration.
+
+## Blocking on uninteresting factors of variation
+
+As previously mentioned, the use of `design` in `trendVar` will ensure that systematic differences between plates do not inflate the variance.
+However, this implicitly assumes that the trend is the same between plates, given that a single trend is fitted to the spike-in transcripts. 
+This may not always be the case, e.g., when different amounts of spike-in RNA are added between batches.
+The use of a single trend would subsequently be inappropriate, resulting in inaccurate estimates of the technical component for each gene.
+
+For data sets containing multiple batches, an alternative strategy is to perform trend fitting and variance decomposition separately for each batch.
+This accommodates differences in the mean-variance trends between batches, especially if a different amount of spike-in RNA was added to the cells in each batch.
+We demonstrate this approach by treating each plate in the 416B dataset as a different batch (Figure \@(fig:hvgplotbatch416b)).
+
+```{r hvgplotbatch416b, fig.wide=TRUE, fig.asp=0.5, fig.cap="Variance of normalized log-expression values for each gene in each plate of the 416B dataset, plotted against the mean log-expression. The blue line represents the mean-dependent trend fitted to the variances of the spike-in transcripts (red)."}
+collected <- list()
+par(mfrow=c(1,2))
+for (plate in levels(sce$Plate)) {
+    cur.sce <- sce[,sce$Plate==plate]
+    cur.sce <- normalize(cur.sce) 
+
+    # Estimating the technical/biological components.
+    cur.fit <- trendVar(cur.sce, parametric=TRUE, span=0.4)
+    cur.out <- decomposeVar(cur.sce, cur.fit)
+    collected[[plate]] <- cur.out 
+
+    # Making a plot for diagnostic purposes.
+    plot(cur.out$mean, cur.out$total, pch=16, cex=0.6, xlab="Mean log-expression", 
+        ylab="Variance of log-expression", main=plate)
+    curve(cur.fit$trend(x), col="dodgerblue", lwd=2, add=TRUE)
+    cur.spike <- isSpike(cur.sce)
+    points(cur.out$mean[cur.spike], cur.out$total[cur.spike], col="red", pch=16)
+}
+```             
+
+Statistics are combined across multiple batches using the `combineVar` function.
+These values can be used in downstream functions in place of the corresponding values from `var.out`.
+
+```{r}
+comb.out <- do.call(combineVar, collected)
+head(comb.out)
+```
+
+```{r, echo=FALSE, results="hide"}
+gc()
+```
 
 # Denoising expression values using PCA
 
@@ -681,6 +732,24 @@ assayNames(sce2)
 
 ```{r, echo=FALSE, results="hide"}
 rm(sce2)
+gc()
+```
+
+- When `design` is specified, `denoisePCA` will automatically regress out uninteresting factors of variation and perform PCA on the residuals.
+This ensures that those factors do not drive separation between clusters or in low-dimensional space.
+Users can do this manually with the `removeBatchEffect` function from the `r Biocpkg("limma")` package [@ritchie2015limma], as shown below.
+However, if an analysis method can accept a design matrix, blocking on nuisance factors in the design matrix is preferable to using `removeBatchEffect`.
+This is because the latter does not account for the loss of residual degrees of freedom, nor the uncertainty of estimation of the blocking factor terms.
+
+```{r}
+library(limma)
+adj.exprs <- logcounts(sce)
+adj.exprs <- removeBatchEffect(adj.exprs, batch=sce$Plate)
+norm_exprs(sce) <- adj.exprs 
+```
+
+```{r, echo=FALSE, results='hide', message=FALSE}
+rm(adj.exprs)
 gc()
 ```
 

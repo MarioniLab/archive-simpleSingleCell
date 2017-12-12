@@ -356,7 +356,7 @@ plotExpression(sce, rownames(var.out)[chosen.genes],
 
 Finally, we denoise the expression values using our PCA-based approach, yielding a set of coordinates for each cell where the technical noise has been removed.
 Setting `approximate=TRUE` in `denoisePCA` will perform an approximate singular value decomposition, using methods from the `r CRANpkg("irlba")` package.
-This is much faster than the exact algorithm on large data sets, without much loss of accuracy.
+This is much faster than the exact algorithm on large data sets without much loss of accuracy.
 
 ```{r}
 sce <- denoisePCA(sce, technical=var.fit$trend, approximate=TRUE)
@@ -366,51 +366,6 @@ ncol(reducedDim(sce, "PCA"))
 ```{r, echo=FALSE, results='hide', message=FALSE}
 gc()
 ```
-
-__Comments from Aaron:__
-
-- For data sets containing multiple batches, an alternative strategy is to perform trend fitting and variance decomposition separately for each batch.
-This accommodates differences in the mean-variance trends between batches, especially if a different amount of spike-in RNA was added to the cells in each batch.
-We demonstrate the second approach below by treating each sex as a different "batch".
-Statistics are combined across multiple batches using the `combineVar` function.
-
-```{r}
-collected <- list()
-for (block in levels(sce$sex)) {
-    cur.sce <- sce[,sce$sex==block]
-    cur.sce <- normalize(cur.sce) 
-    var.fit <- trendVar(cur.sce, parametric=TRUE, span=0.4)
-    collected[[block]] <- decomposeVar(cur.sce, var.fit)
-}
-var.out <- do.call(combineVar, collected)
-```
-
-```{r, echo=FALSE, results='hide', message=FALSE}
-rm(cur.sce)
-gc()
-```
-
-- Some downstream procedures must be performed on all batches at once, e.g., clustering or dimensionality reduction of all cells across multiple batches.
-However, many of these procedures are not model-based and thus do not accept a design matrix to account for the batch effect.
-To remove uninteresting factors of variation beforehand, we use the `removeBatchEffect` function from the `r Biocpkg("limma")` package [@ritchie2015limma].
-This computes new expression values where the batch effect is regressed out, ensuring that it does not drive separation between clusters or in low-dimensional space.
-This is demonstrated below for the sex effect in the brain data.
-Note that this step is automatically performed inside `denoisePCA` when `design` is supplied, and does not need to be repeated.
-
-```{r}
-library(limma)
-adj.exprs <- logcounts(sce)
-adj.exprs <- removeBatchEffect(adj.exprs, batch=sce$sex)
-norm_exprs(sce) <- adj.exprs 
-```
-
-```{r, echo=FALSE, results='hide', message=FALSE}
-rm(adj.exprs)
-gc()
-```
-
-- That being said, if an analysis method can accept a design matrix, blocking on nuisance factors in the design matrix is preferable to using `removeBatchEffect`.
-This is because the latter does not account for the loss of residual degrees of freedom, nor the uncertainty of estimation of the blocking factor terms.
 
 # Data exploration with dimensionality reduction
 
