@@ -419,6 +419,7 @@ The presence of other classes of features may be cause for concern if they are n
 For example, a top set containing many spike-in transcripts suggests that too much spike-in RNA was added during library preparation, while the absence of ribosomal proteins and/or the presence of their pseudogenes are indicative of suboptimal alignment.
 
 ```{r topgene416b, fig.asp=1.5, fig.wide=TRUE, fig.cap="Percentage of total counts assigned to the top 50 most highly-abundant features in the 416B dataset. For each feature, each bar represents the percentage assigned to that feature for a single cell, while the circle represents the average across all cells. Bars are coloured by the total number of expressed features in each cell, while circles are coloured according to whether the feature is labelled as a control feature."}
+fontsize <- theme(axis.text=element_text(size=12), axis.title=element_text(size=16))
 plotQC(sce, type = "highest-expression", n=50) + fontsize
 ```
 
@@ -828,11 +829,10 @@ write.table(marker.set, file="416B_marker_1.tsv", sep="\t", quote=FALSE, col.nam
 
 We visualize the expression profiles of the top candidates to verify that the DE signature is robust (Figure \@ref(fig:heatmapmarker416b)). 
 Most of the top markers have strong and consistent up- or downregulation in cells of cluster 1 compared to some or all of the other clusters.
-This can be used in validation studies to identify the corresponding cells in an independent replicate population,
-based on whether they express the upregulated markers and do not express the downregulated markers.
-(Ideally, a different technique for quantifying expression would also be used during validation, e.g., fluorescent _in situ_ hybridisation or quantitative PCR.)
+A cursory examination of the DE genes suggests that cluster 1 contains oncogene-induced cells with no expression of cell cycle genes.
+This is consistent with senescence as a tumour suppression mechanism.
 
-```{r heatmapmarker416b, fig.wide=TRUE, fig.asp=1.5, fig.cap="Heatmap of mean-centred and normalized log-expression values for the top set of markers for cluster 1 in the 416B dataset. Column colours represent the cluster to which each cell is assigned, the plate of origin or the oncogene induction status of each cell, as indicated by the legend."}
+```{r heatmapmarker416b, fig.wide=TRUE, fig.cap="Heatmap of mean-centred and normalized log-expression values for the top set of markers for cluster 1 in the 416B dataset. Column colours represent the cluster to which each cell is assigned, the plate of origin or the oncogene induction status of each cell, as indicated by the legend."}
 top.markers <- marker.set$Gene[marker.set$Top <= 10]
 top.exprs <- logcounts(sce)[top.markers,,drop=FALSE]
 heat.vals <- top.exprs - rowMeans(top.exprs)
@@ -862,11 +862,19 @@ For example, in a mixed population of CD4^+^-only, CD8^+^-only, double-positive 
 With our approach, both of these genes will be picked up as candidate markers as they will be DE between at least one pair of subpopulations.
 A combination of markers can then be chosen to characterize a subpopulation, which is more flexible than trying to find uniquely DE genes.
 
+We strongly recommend selecting some markers for use in validation studies with an independent replicate population of cells.
+The aim is to identify a corresponding subset of cells that express the upregulated markers and do not express the downregulated markers.
+Ideally, a different technique for quantifying expression would also be used during validation, e.g., fluorescent _in situ_ hybridisation or quantitative PCR.
+This confirms that the subpopulation genuinely exists and is not an artifact of scRNA-seq or the computational analysis.
+
 __Comments from Aaron:__
 
 - To avoid problems with discreteness when modelling the mean-variance relationship, `findMarkers` will automatically partition the data into low- and high-abundance genes.
 Empirical Bayes shrinkage is performed in each partition separately, prior to calculation of _p_-values using the shrunk variance estimates.
 This ensures that discreteness does not affect the inferences for high-abundance genes, without needing to entirely discard the low-abundance genes.
+- By setting `direction="up"`, `findMarkers` will only return genes that are upregulated in each cluster compared to the others.
+This is convenient in highly heterogeneous populations to focus on genes that can immediately identify each cluster.
+While lack of expression may also be informative, it is less useful for positive identification.
 - `findMarkers` can also be directed to find genes that are DE between the chosen cluster and _all_ other clusters.
 This should be done by setting `pval.type="all"`, which defines the p-value for each gene as the maximum value across all pairwise comparisons involving the chosen cluster.
 Combined with `direction="up"`, this can be used to identify unique markers for each cluster.
