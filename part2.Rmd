@@ -413,29 +413,53 @@ my.clusters <- cluster.out$membership
 table(my.clusters)
 ```
 
+The modularity score provides a global measure of clustering performance for community detection methods.
+Briefly, it compares the number of within-cluster edges to the expected number under a null model of random edges.
+A high modularity score (approaching the maximum of 1) indicates that the detected clusters are enriched for internal edges, with relatively few edges between clusters.
+
+```{r}
+igraph::modularity(cluster.out)
+```
+
+We further investigate the clusters by examining the total weight of edges for each pair of clusters.
+For each pair, the observed total weight is compared to what is expected under a null model, similar to the modularity calculation.
+Most clusters contain more internal links than expected (Figure \@ref(fig:heatmodbrain)), while links between clusters are fewer than expected.
+This indicates that we successfully clustered cells into highly-connected communities.
+
+```{r heatmodbrain, fig.cap="Heatmap of the log-ratio of the total weight between nodes in the same cluster or in different clusters, relative to the total weight expected under a null model of random links."}
+uclust <- sort(unique(my.clusters))
+nclust <- length(uclust)
+mod.mat <- matrix(0, nclust, nclust)
+rownames(mod.mat) <- colnames(mod.mat) <- uclust
+
+# Calculating total weight within/between clusters.
+library(Matrix)
+grmat <- snn.gr[]
+for (x in uclust) { 
+    current <- my.clusters==x
+    for (y in uclust) { 
+        other <- my.clusters==y
+        mod.mat[x,y] <- sum(grmat[current,other])
+    }
+}
+
+# Calculating expected matrix under the null, and comparing to observed.
+total.weight <- colSums(mod.mat)/sum(mod.mat)
+expected.mat <- tcrossprod(total.weight) * sum(mod.mat)
+ratio <- log10(mod.mat/expected.mat + 1)
+library(pheatmap)
+pheatmap(ratio, cluster_rows=FALSE, cluster_cols=FALSE, 
+    color=colorRampPalette(c("white", "blue"))(100))
+```
+
 We visualize the cluster assignments for all cells on the _t_-SNE plot in Figure \@(fig:tsneclusterbrain).
 Adjacent cells are generally assigned to the same cluster, indicating that the clustering procedure was applied correctly.
+We could also use graph-based visualizations such as force-directed layouts (e.g., `layout_with_fr` from `r CRANpkg("igraph")`).
+These are appealing as they only need information that is already in the graph, without needing to refer back to the expression matrices or PC coordinates.
 
 ```{r tsneclusterbrain, message=FALSE, fig.cap="_t_-SNE plot of the denoised PCs of the brain data set. Each point represents a cell and is coloured according to the cluster identity to which it was assigned."}
 sce$cluster <- factor(my.clusters)
 plotTSNE(sce, colour_by="cluster") + fontsize
-```
-
-To assess clustering performance, we calculate the total weight of edges between cells in the same cluster.
-We divide this by the total weight of edges involving a cell in that cluster to obtain a per-cluster modularity score.
-High modularity scores (near the maximum of 1) should be observed if a cell is mostly connected to other cells in the same cluster compared to cells in other clusters.
-
-```{r}
-grmat <- snn.gr[]
-total.weight <- Matrix::colSums(grmat)/2 # Symmetric for undirected graphs
-mod.cluster <- numeric(nlevels(sce$cluster))
-names(mod.cluster) <- levels(sce$cluster)
-for (x in names(mod.cluster)) {
-    current <- sce$cluster==x
-    internal.weight <- sum(grmat[current,current])/2
-    mod.cluster[x] <- internal.weight/sum(total.weight[current])
-}
-mod.cluster
 ```
 
 ```{r echo=FALSE, results='hide'}
@@ -455,7 +479,9 @@ For simplicity, though, we will only use the broad clusters corresponding to cle
 We find that the Walktrap algorithm is usually a good default choice [@yang2016comparative], though users are encouraged to experiment with different algorithms.
 - Decreasing the number of neighbours `k` in `buildSNNGraph` will reduce the connectivity of the graph.
 This will generally result in the formation of smaller clusters [@xu2015identification], which may be desirable if greater resolution is required.
-- Notice that we do not run `library(igraph)`. 
+- We do not use the silhouette coefficient to assess clustering for large datasets.
+This is because `cluster::silhouette` requires the construction of a distance matrix, which may not be feasible when many cells are involved.
+- Notice that we do not run `library(igraph)`, but instead use `igraph::` to extract methods from the package. 
 This is because `r CRANpkg("igraph")` contains a `normalize` method that will override its counterpart from `r Biocpkg("scater")`, resulting in some unusual bugs.
 
 # Detecting marker genes between subpopulations
@@ -509,7 +535,6 @@ unique.clust <- sort(unique(my.clusters))
 clust.col <- scater:::.get_palette("tableau20")
 chosen.cols <- clust.col[seq_along(unique.clust)]
 
-library(pheatmap)
 pheatmap(heat.vals[,order(my.clusters)], cluster_cols=FALSE, breaks=col.breaks,
     annotation_col=data.frame(Cluster=factor(my.clusters), row.names=colnames(sce)),
     annotation_colors=list(Cluster=setNames(chosen.cols, unique.clust)))
