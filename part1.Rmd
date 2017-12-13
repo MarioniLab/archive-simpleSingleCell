@@ -60,7 +60,7 @@ unzip(all.basenames[1])
 
 # Overview
 
-In this article, we use a relatively simple dataset [@lun2017assessing] to introduce most of the concepts of scRNA-seq data analysis.
+In this workflow, we use a relatively simple dataset [@lun2017assessing] to introduce most of the concepts of scRNA-seq data analysis.
 This dataset contains two plates of 416B cells (an immortalized mouse myeloid progenitor cell line), processed using the Smart-seq2 protocol [@picelli2014fulllength].
 A constant amount of spike-in RNA from the External RNA Controls Consortium (ERCC) was also added to each cell's lysate prior to library preparation.
 High-throughput sequencing was performed and the expression of each gene was quantified by counting the total number of reads mapped to its exonic regions.
@@ -506,7 +506,7 @@ The size factors are well-correlated with the library sizes for all cells (Figur
 This suggests that most of the systematic differences between cells are driven by differences in capture efficiency or sequencing depth.
 Any DE between cells would yield a non-linear trend between the total count and size factor, and/or increased scatter around the trend.
 We observe some evidence of this after oncogene induction, where the size factors after induction are systematically lower.
-This is consistent with composition biases introduced by upregulation of genes after induction.
+This is consistent with composition biases [@robinson2010scaling] introduced by upregulation of genes after induction.
 
 ```{r normplot416b, fig.cap="Size factors from deconvolution, plotted against library sizes for all cells in the 416B dataset. Axes are shown on a log-scale. Wild-type cells are shown in black and oncogene-induced cells are shown in red."}
 plot(sce$total_counts/1e6, sizeFactors(sce), log="xy",
