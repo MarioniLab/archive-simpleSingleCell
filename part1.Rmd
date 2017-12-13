@@ -338,11 +338,12 @@ We can also include known biological factors in `batch`, if those factors could 
 ```{r}
 blocking <- paste0(sce$Plate, sce$Oncogene)
 libsize.drop2 <- isOutlier(sce$total_counts, nmads=3, type="lower", 
-                           log=TRUE, batch=blocking)
+    log=TRUE, batch=blocking)
 feature.drop2 <- isOutlier(sce$total_features, nmads=3, type="lower", 
-                           log=TRUE, batch=blocking)
+    log=TRUE, batch=blocking)
 spike.drop2 <- isOutlier(sce$pct_counts_ERCC, nmads=3, type="higher", 
-                         batch=locking)
+    batch=locking)
+
 keep2 <- !(libsize.drop2 | feature.drop2 | spike.drop2)
 data.frame(ByLibSize=sum(libsize.drop2), ByFeature=sum(feature.drop2),
     BySpike=sum(spike.drop2), Remaining=sum(keep2))
@@ -372,7 +373,7 @@ We use the Ensembl identifiers for each gene in our data set to match up with th
 set.seed(100)
 library(scran)
 mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", 
-                    package="scran"))
+    package="scran"))
 assignments <- cyclone(sce, mm.pairs, gene.names=rowData(sce)$ENSEMBL)
 ```
 
@@ -382,7 +383,7 @@ We focus on the G1 and G2/M scores as these are the most informative for classif
 
 ```{r phaseplot416b, message=FALSE, fig.cap="Cell cycle phase scores from applying the pair-based classifier on the 416B dataset. Each point represents a cell, plotted according to its scores for G1 and G2/M phases."}
 plot(assignments$score$G1, assignments$score$G2M, 
-     xlab="G1 score", ylab="G2/M score", pch=16)
+    xlab="G1 score", ylab="G2/M score", pch=16)
 ```
 
 Cells are classified as being in G1 phase if the G1 score is above 0.5 and greater than the G2/M score; 
@@ -765,7 +766,7 @@ In this case, we observe a clear separation of cells based on the oncogene induc
 
 ```{r pcaplot416b, fig.cap="Pairwise PCA plots of the first three PCs in the 416B data set, constructed from normalized log-expression values of genes with positive biological components. Each point represents a cell, coloured according to the oncogene induction status. Bars represent the coordinates of the cells on each axis.", fig.width=9}
 plotReducedDim(sce, use_dimred="PCA", ncomponents=3, 
-               colour_by="Oncogene") + fontsize
+    colour_by="Oncogene") + fontsize
 ```
 
 Another widely used approach is the _t_-stochastic neighbour embedding (_t_-SNE) method [@van2008visualizing].
@@ -998,6 +999,10 @@ The specific version numbers of the packages used are shown below, along with th
 
 ```{r}
 sessionInfo()
+```
+
+```{r, eval=on.bioc, echo=FALSE, results='hide'}
+unlink(all.basenames)
 ```
 
 # References
