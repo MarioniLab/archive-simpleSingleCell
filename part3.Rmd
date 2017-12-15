@@ -127,7 +127,7 @@ With non-DE normalization, an increase in RNA content will systematically increa
 ## Setting up the data
 
 We demonstrate the use of spike-in normalization on a dataset involving different cell types -- namely, mouse embryonic stem cells (mESCs) and mouse embryonic fibroblasts (MEFs) [@islam2011characterization].
-The count table was obtained from NCBI GEO as a supplementary file using the accession number [GSE29087](http://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE29087).
+The count table was obtained from the NCBI Gene Expression Omnibus (GEO) as a supplementary file using the accession number [GSE29087](http://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE29087).
 We load the counts into R, using `colClasses` to speed up `read.table` by pre-defining the type of each column.
 We also specify the rows corresponding to spike-in transcripts.
 
@@ -214,16 +214,15 @@ This is more convenient when only the size factors are required for further anal
 
 # Detecting highly variable genes
 
-## Motivation 
+## Setting up the data 
 
 Highly variable genes (HVGs) are defined as genes with biological components that are significantly greater than zero.
 These genes are interesting as they drive differences in the expression profiles between cells, and should be prioritized for further investigation.
 Formal detection of HVGs allows us to avoid genes that are highly variable due to technical factors such as sampling noise during RNA capture and library preparation.
+This adds another level of statistical rigour to our previous analyses, in which we only modelled the technical component.
 
-## Setting up the data 
-
-Here, we use data from haematopoietic stem cells (HSCs) [@wilson2015combined], generated using the Smart-seq2 protocol [@picelli2014fulllength] with ERCC spike-ins.
-Counts were obtained from the NCBI Gene Expression Omnibus (GEO) as a supplementary file using the accession number [GSE61533](http://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE61533).
+To demonstrate, we use data from haematopoietic stem cells (HSCs) [@wilson2015combined], generated using the Smart-seq2 protocol [@picelli2014fulllength] with ERCC spike-ins.
+Counts were obtained from NCBI GEO as a supplementary file using the accession number [GSE61533](http://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE61533).
 Our first task is to load the count matrix into memory.
 In this case, some work is required to retrieve the data from the Gzip-compressed Excel format.
 
@@ -279,7 +278,7 @@ summary(sizeFactors(sce.hsc, "ERCC"))
 sce.hsc <- normalize(sce.hsc)
 ```
 
-## Detecting highly variable genes
+## Testing for significantly positive biological components
 
 We fit a mean-variance trend to the spike-in transcripts to quantify the technical component of the variance, as previously described.
 The biological component for each gene is defined as the difference between its total variance and the fitted value of the trend (Figure \@ref(fig:hvgplothsc)).
@@ -331,10 +330,12 @@ Some of these methods are available in `r Biocpkg("scran")` -- for example, see 
 Here, we use the variance of the log-expression values because the log-transformation protects against genes with strong expression in only one or two cells.
 This ensures that the set of top HVGs is not dominated by genes with (mostly uninteresting) outlier expression patterns.
 
+# Advanced modelling of the technical noise 
+
 ## Trend fitting when spike-ins are unavailable
 
 If spike-in RNA has not been added in appropriate quantities (or at all), an alternative approach is to fit the trend to the variance estimates of the endogenous genes.
-This is done using the `use.spikes=FALSE` setting in `trendVar`, as shown below.
+This is done using the `use.spikes=FALSE` setting in `trendVar`, as shown below for the HSC dataset.
 
 ```{r}
 var.fit.nospike <- trendVar(sce.hsc, parametric=TRUE, use.spikes=FALSE, span=0.2)
@@ -358,12 +359,59 @@ Instead, recall that the biological component reported by `decomposeVar` represe
 One could assume that the variabilities of most genes are driven by constitutive "house-keeping" processes, which are biological in origin but generally uninteresting.
 Any gene with an increase in its variance is _relatively_ highly variable and can be prioritized for further study.
 
-Testing:
+## Blocking on uninteresting factors of variation
+
+Our previous analysis of the 416B dataset specified `design` in `trendVar` to ensure that systematic differences between plates do not inflate the variance.
+However, this implicitly assumes that the trend is the same between plates, given that a single trend is fitted to the spike-in transcripts. 
+This may not always be the case, e.g., when different amounts of spike-in RNA are added between batches.
+The use of a single trend would subsequently be inappropriate, resulting in inaccurate estimates of the technical component for each gene.
+
+For datasets containing multiple batches, an alternative strategy is to perform trend fitting and variance decomposition separately for each batch.
+This accommodates differences in the mean-variance trends between batches, especially if a different amount of spike-in RNA was added to the cells in each batch.
+We demonstrate this approach by treating each plate in the 416B dataset as a different batch (Figure \@ref(fig:hvgplotbatch416b)).
+This yields plate-specific estimates of the biological and technical components for each gene.
+
+```{r hvgplotbatch416b, fig.width=10, fig.asp=0.5, fig.cap="Variance of normalized log-expression values for each gene in each plate of the 416B dataset, plotted against the mean log-expression. The blue line represents the mean-dependent trend fitted to the variances of the spike-in transcripts (red)."}
+sce.416B <- readRDS("416B_data.rds") # Loading the saved object.
+collected <- list()
+par(mfrow=c(1,2))
+for (plate in levels(sce.416B$Plate)) {
+    cur.sce <- sce.416B[,sce.416B$Plate==plate]
+    cur.sce <- normalize(cur.sce) 
+
+    # Estimating the technical/biological components.
+    cur.fit <- trendVar(cur.sce, parametric=TRUE, span=0.4)
+    cur.out <- decomposeVar(cur.sce, cur.fit)
+    collected[[plate]] <- cur.out 
+
+    # Making a plot for diagnostic purposes.
+    plot(cur.out$mean, cur.out$total, pch=16, cex=0.6, xlab="Mean log-expression", 
+        ylab="Variance of log-expression", main=plate)
+    curve(cur.fit$trend(x), col="dodgerblue", lwd=2, add=TRUE)
+    cur.spike <- isSpike(cur.sce)
+    points(cur.out$mean[cur.spike], cur.out$total[cur.spike], col="red", pch=16)
+}
+```
+
+Statistics are combined across multiple batches using the `combineVar` function.
+This function uses a weighted average across batches for the means and variances, and Fisher's method for combining the _p_-values.
+These results can be used in downstream functions such as `denoisePCA`, or for detecting highly variable genes (see below).
 
 ```{r}
-sce2 <- readRDS("416B_data.rds")
-sce2
+comb.out <- do.call(combineVar, collected)
+head(comb.out)
 ```
+
+```{r, echo=FALSE, results="hide"}
+gc()
+```
+
+**Comments from Aaron:**
+
+- We run `normalize` within the loop to ensure that the average abundances of the spike-in transcripts are comparable to the endogenous genes.
+This is because the size factors may no longer be centred at unity after subsetting, especially if the quantities of spike-in RNA differ between batches.
+If one batch contained less spike-in RNA, normalization with globally-centred size factors would push up the average abundance for spike-in transcripts in that batch.
+This means that the trend would be shifted along the x-axis and would not accurately capture the technical component for each gene.
 
 # Identifying correlated gene pairs with Spearman's rho
 
