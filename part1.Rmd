@@ -220,7 +220,7 @@ The same amount of spike-in RNA to each cell, so an enrichment in spike-in count
 High proportions are indicative of poor-quality cells [@islam2014quantitative;@ilicic2016classification], possibly because of loss of cytoplasmic RNA from perforated cells.
 The reasoning is that mitochondria are larger than individual transcript molecules and less likely to escape through tears in the cell membrane.
 
-For each cell, we calculate these quality control metrics using the `calculateQCMetrics` function from the `r Biocpkg("scater")` package [@mccarthy2016scater].
+For each cell, we calculate these quality control metrics using the `calculateQCMetrics` function from the `r Biocpkg("scater")` package [@mccarthy2017scater].
 These are stored in the row- and column-wise metadata of the `SingleCellExperiment` for future reference.
 
 ```{r}
